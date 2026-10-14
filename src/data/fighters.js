@@ -143,6 +143,7 @@ export const ROSTER = [
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
     stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 900, pushW: 31 },
     look: {
+      female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
       eyes: '#a6d63a', brows: 'sharp', mouth: 'lips', lips: '#8a2a7a', freckles: true,
       hair: { style: 'bun', color: '#15121a', streak: '#e0399b', streak2: '#2fc8b8' },

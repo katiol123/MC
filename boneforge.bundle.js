@@ -684,6 +684,7 @@ const ROSTER = [
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
     stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 900, pushW: 31 },
     look: {
+      female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
       eyes: '#a6d63a', brows: 'sharp', mouth: 'lips', lips: '#8a2a7a', freckles: true,
       hair: { style: 'bun', color: '#15121a', streak: '#e0399b', streak2: '#2fc8b8' },
@@ -3691,12 +3692,13 @@ class FighterPainter {
 
     // Shoulder mass (deltoid) + upper arm + forearm
     const upperC = fullSleeve ? sleeveC : skin;
-    this.seg(ctx, pass, S, E, ru0 + sleeveBoost, ru1 + sleeveBoost * 0.8, upperC, 3.2 * muscle, 1.2 * muscle, 0.32);
+    // biceps peaks mid-arm and stays modest: a big rounded bulge over the chest reads as a bust
+    this.seg(ctx, pass, S, E, ru0 + sleeveBoost, ru1 + sleeveBoost * 0.8, upperC, 1.7 * muscle, 1.4 * muscle, 0.5);
     if (pass === 'fill' && shortSleeve) {
       // short sleeve over the deltoid
       const sEnd = along(S, E, 0.5);
       ctx.beginPath();
-      limbPath(ctx, S, sEnd, ru0 + 2.6, ru0 + 2.2, 2.5 * muscle, 1);
+      limbPath(ctx, S, sEnd, ru0 + 2.2, ru0 + 2.0, 0.8 * muscle, 0.8);
       ctx.fillStyle = sleeveC;
       ctx.fill();
       this.shadeSeg(ctx, S, sEnd, ru0 + 3);
@@ -3939,12 +3941,30 @@ class FighterPainter {
 
   torsoPoints(F) {
     const { uS, uC, uP, fS, fC, fP, N, W, Pv, up, cw, ww, hw } = F;
-    const female = this.look.top?.type === 'sportstop';
+    if (this.look.female) {
+      return [
+        P2(N, fC, this.pr.rNeck * 1.2, uC, -1),
+        P2(N, uC, -up * 0.16, fC, cw * 0.82),
+        P2(N, uC, -up * 0.5, fC, cw * 1.02),
+        P2(W, uS, 2, fS, ww * 0.92),
+        P2(Pv, uP, -2, fP, hw * 0.9),
+        P2(Pv, uP, -this.pr.hipDrop - 8, fP, 2),
+        P2(Pv, uP, -4, fP, -hw * 0.9),
+        P2(W, fS, -ww * 0.86, uS, 0),
+        P2(N, uC, -up * 0.5, fC, -cw * 0.9),
+        P2(N, uC, -up * 0.08, fC, -cw * 0.78),
+        P2(N, fC, -this.pr.rNeck * 1.1, uC, 3),
+      ];
+    }
+    // Male profile: broad flat pectorals high on the ribcage, then an almost straight abdomen
+    // (no round bulge followed by a deep waist cut, which reads as a bust in side view).
+    const belly = Math.max(ww, cw * 0.84);
     return [
       P2(N, fC, this.pr.rNeck * 1.2, uC, -1),
-      P2(N, uC, -up * 0.16, fC, cw * 0.82),
-      P2(N, uC, -up * 0.5, fC, cw * (female ? 1.02 : 0.98)),
-      P2(W, uS, 2, fS, ww * 0.92),
+      P2(N, uC, -up * 0.1, fC, cw * 0.88),
+      P2(N, uC, -up * 0.36, fC, cw * 0.94),
+      P2(N, uC, -up * 0.62, fC, belly * 0.95),
+      P2(W, uS, -4, fS, belly * 0.9),
       P2(Pv, uP, -2, fP, hw * 0.9),
       P2(Pv, uP, -this.pr.hipDrop - 8, fP, 2),
       P2(Pv, uP, -4, fP, -hw * 0.9),
@@ -3960,8 +3980,8 @@ class FighterPainter {
     const F = this.torsoFrame(J, A);
     const pants = this.look.pants || { color: '#333' };
     const pts = [
-      P2(F.Pv, F.uP, 8, F.fP, F.hw * 0.95),
-      P2(F.Pv, F.uP, -this.pr.hipDrop - 10, F.fP, F.hw * 0.4),
+      P2(F.Pv, F.uP, 8, F.fP, F.hw * 0.8),
+      P2(F.Pv, F.uP, -this.pr.hipDrop - 10, F.fP, F.hw * 0.3),
       P2(F.Pv, F.uP, -this.pr.hipDrop - 4, F.fP, -F.hw * 0.8),
       P2(F.Pv, F.uP, 8, F.fP, -F.hw * 0.92),
     ];
