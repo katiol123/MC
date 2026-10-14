@@ -18,7 +18,7 @@ export class TitleScene {
     if (j === i) j = (j + 1) % ROSTER.length;
     this.match = new Match({ p1: ROSTER[i].id, p2: ROSTER[j].id, roundsToWin: 1 });
     this.renderer = new FightRenderer(this.match, { arena: Math.random() < 0.6 ? 'dusk' : 'night', portraits: this.app.portraits, hud: false });
-    this.ai = [new AIController(0, { level: 'hard', seed: i * 7 + 1 }), new AIController(1, { level: 'hard', seed: j * 13 + 2 })];
+    this.ai = [new AIController(0, { level: 'hard', seed: Math.floor(Math.random() * 1e9) }), new AIController(1, { level: 'hard', seed: Math.floor(Math.random() * 1e9) })];
     this.loop = new FixedStepLoop();
   }
 

@@ -7,6 +7,9 @@ import { AIController } from '../ai/aiController.js';
 import { emptyRaw } from '../input/inputBuffer.js';
 import { el, clearUI } from './dom.js';
 
+// Fresh AI seed per fight: the simulation is deterministic, so a fixed seed replays the same bout.
+const randomSeed = () => Math.floor(Math.random() * 1e9);
+
 const SPEEDS = [1, 0.5, 0.25, 0.1];
 const DUMMY_MODES = ['stand', 'crouch', 'block', 'jump', 'cpu'];
 
@@ -27,11 +30,11 @@ export class FightScene {
     this.loop = new FixedStepLoop();
     this.debug = { enabled: mode === 'training', timeScale: 1, paused: false };
     this.ai = [
-      mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: 11 }) : null,
-      mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: 29 }) : null,
+      mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: randomSeed() }) : null,
+      mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: randomSeed() }) : null,
     ];
     this.dummyMode = 'stand';
-    this.dummyAI = new AIController(1, { level: 'normal', seed: 5 });
+    this.dummyAI = new AIController(1, { level: 'normal', seed: randomSeed() });
     this.overlay = null;
     this.paused = false;
     this.endTimer = 0;

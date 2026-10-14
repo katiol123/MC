@@ -1783,6 +1783,9 @@ const { AIController } = __require("src/ai/aiController.js");
 const { emptyRaw } = __require("src/input/inputBuffer.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 
+// Fresh AI seed per fight: the simulation is deterministic, so a fixed seed replays the same bout.
+const randomSeed = () => Math.floor(Math.random() * 1e9);
+
 const SPEEDS = [1, 0.5, 0.25, 0.1];
 const DUMMY_MODES = ['stand', 'crouch', 'block', 'jump', 'cpu'];
 
@@ -1803,11 +1806,11 @@ class FightScene {
     this.loop = new FixedStepLoop();
     this.debug = { enabled: mode === 'training', timeScale: 1, paused: false };
     this.ai = [
-      mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: 11 }) : null,
-      mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: 29 }) : null,
+      mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: randomSeed() }) : null,
+      mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: randomSeed() }) : null,
     ];
     this.dummyMode = 'stand';
-    this.dummyAI = new AIController(1, { level: 'normal', seed: 5 });
+    this.dummyAI = new AIController(1, { level: 'normal', seed: randomSeed() });
     this.overlay = null;
     this.paused = false;
     this.endTimer = 0;
@@ -7215,7 +7218,7 @@ const M = {
 
 /** How each fighter likes to use its signature move: [min distance, max distance]. */
 const SIGNATURE_RANGE = {
-  brick: [110, 230], rattigan: [280, 700], smiles: [170, 330], jax: [260, 700],
+  brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
@@ -7444,7 +7447,7 @@ class TitleScene {
     if (j === i) j = (j + 1) % ROSTER.length;
     this.match = new Match({ p1: ROSTER[i].id, p2: ROSTER[j].id, roundsToWin: 1 });
     this.renderer = new FightRenderer(this.match, { arena: Math.random() < 0.6 ? 'dusk' : 'night', portraits: this.app.portraits, hud: false });
-    this.ai = [new AIController(0, { level: 'hard', seed: i * 7 + 1 }), new AIController(1, { level: 'hard', seed: j * 13 + 2 })];
+    this.ai = [new AIController(0, { level: 'hard', seed: Math.floor(Math.random() * 1e9) }), new AIController(1, { level: 'hard', seed: Math.floor(Math.random() * 1e9) })];
     this.loop = new FixedStepLoop();
   }
 

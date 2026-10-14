@@ -21,7 +21,7 @@ const M = {
 
 /** How each fighter likes to use its signature move: [min distance, max distance]. */
 const SIGNATURE_RANGE = {
-  brick: [110, 230], rattigan: [280, 700], smiles: [170, 330], jax: [260, 700],
+  brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
