@@ -53,7 +53,7 @@ export class FightRenderer {
     });
     for (const f of fs) if (f.state === 'attack' && f.move?.frame === 1) this.drawOrder = [1 - f.index, f.index];
     this.trails.tick(fs);
-    this.effects.tick();
+    this.effects.tick(fs);
     this.arena.tick();
     if (this.hud.announce) this.hud.announce.t++;
   }
@@ -138,6 +138,7 @@ export class FightRenderer {
       prop,
       fire,
       claws,
+      critical: f.critical,
       now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,

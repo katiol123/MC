@@ -162,6 +162,10 @@ export class AudioSystem {
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
         break;
+      case 'critical':
+        this.tone(0.16, { freq: 900, to: 300, type: 'square', gain: 0.12 }); // comic "pop"
+        this.noise(0.12, { freq: 2400, q: 1.5, gain: 0.2, sweep: 0.4 });
+        break;
       case 'armor':
         this.tone(0.3, { freq: 110, to: 60, gain: 0.6 });
         this.noise(0.12, { freq: 900, q: 2, gain: 0.3 });

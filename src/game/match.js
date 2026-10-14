@@ -145,8 +145,21 @@ export class Match {
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
     if (this.phase === 'fight') this.updateBurn();
+    this.updateCritical();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /** Low health: the fighter turns battered once per round (a prop flies off, heavy breathing). */
+  updateCritical() {
+    for (const f of this.fighters) {
+      const share = f.health / f.maxHealth;
+      if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
+        f.critical = true;
+        const head = f.skel.j.head;
+        this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
+      } else if (f.critical && share > 0.6) f.critical = false; // training refill
+    }
   }
 
   /** Burning fighters take a small hit every TUNING.burnInterval ticks; burn alone never KOs. */

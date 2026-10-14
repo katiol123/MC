@@ -2,6 +2,7 @@
 // floating labels and camera shake. All in world space; driven by simulation events.
 import { rgba } from './color.js';
 import { drawGlow } from './fire.js';
+import { spawnProp, stepProp, drawProp } from './props.js';
 
 export class Effects {
   constructor() {
@@ -88,6 +89,23 @@ export class Effects {
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
         break;
+      case 'critical': {
+        // battered: the fighter's signature item flies off with a pop
+        const f = fighters?.[e.who];
+        const dmg = f?.def.damaged;
+        if (!f) break;
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 8, vr: 7, life: 14, max: 14, color: '#ffffff' });
+        this.parts.push({ kind: 'burst', x: e.x, y: e.y, r: 26, life: 6, max: 6, color: '#ffffff', dir: e.facing });
+        this.shake = Math.max(this.shake, 5);
+        for (const pr of dmg?.props || []) {
+          const from = pr.from === 'chest' ? { x: e.x - e.facing * 14, y: e.y - 70 } : pr.from === 'mouth' ? { x: e.x + e.facing * 16, y: e.y - 10 } : { x: e.x, y: e.y + 18 };
+          this.parts.push(spawnProp(pr.type, from.x, from.y, e.facing, pr, f.def.look));
+        }
+        break;
+      }
+      case 'roundIntro':
+        this.parts = this.parts.filter((p) => p.kind !== 'prop');
+        break;
       case 'armor':
         // the charge shrugs the hit off: amber flash ring + label
         this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffb347' });
@@ -141,7 +159,15 @@ export class Effects {
     this.parts.push({ kind: 'fireball', x, y, r: 16, life: 12, max: 12 });
   }
 
-  tick() {
+  tick(fighters) {
+    // battered fighters sweat; an overheated Cinder smokes
+    for (const f of fighters || []) {
+      if (!f.critical || f.state === 'ko') continue;
+      this.clock = (this.clock || 0) + 1;
+      const head = f.skel.j.head, hx = f.body.x + f.facing * head.x, hy = f.body.y + head.y;
+      if (this.rnd() < 0.035) this.parts.push({ kind: 'sweat', x: hx + (this.rnd() - 0.3) * 20 * f.facing, y: hy + 6, vx: -f.facing * (0.5 + this.rnd()), vy: 1.5, life: 34, max: 34 });
+      if (f.def.damaged?.look?.smoke && this.rnd() < 0.25) this.parts.push({ kind: 'smoke', x: hx + (this.rnd() - 0.5) * 22, y: hy + 16, vx: (this.rnd() - 0.5) * 0.6, vy: 1.2 + this.rnd(), r: 5 + this.rnd() * 4, life: 40, max: 40 });
+    }
     for (const p of this.parts) {
       p.life--;
       if (p.kind === 'spark') { p.x += p.vx; p.y += p.vy; p.vx *= 0.86; p.vy = p.vy * 0.86 - 0.3; }
@@ -149,6 +175,9 @@ export class Effects {
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
       else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
       else if (p.kind === 'fireball') p.r += 3.5;
+      else if (p.kind === 'prop') stepProp(p);
+      else if (p.kind === 'sweat') { p.x += p.vx; p.y += p.vy; p.vy -= 0.35; }
+      else if (p.kind === 'smoke') { p.x += p.vx + Math.sin(p.life * 0.2) * 0.4; p.y += p.vy; p.r += 0.35; }
       else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
@@ -244,6 +273,18 @@ export class Effects {
           ctx.lineTo(t.x + dir * (60 + 20 * (1 - k)) * cam.zoom, t.y + i * 22 * cam.zoom);
           ctx.stroke();
         }
+      } else if (p.kind === 'prop') {
+        drawProp(ctx, p, s, cam.zoom);
+      } else if (p.kind === 'sweat') {
+        ctx.fillStyle = rgba('#bfefff', 0.85 * Math.min(1, k * 2));
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, 2.6 * cam.zoom, 4 * cam.zoom, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'smoke') {
+        ctx.fillStyle = rgba('#6a6470', 0.5 * k);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, p.r * cam.zoom, 0, Math.PI * 2);
+        ctx.fill();
       } else if (p.kind === 'mote') {
         const prev = ctx.globalCompositeOperation;
         ctx.globalCompositeOperation = 'lighter';

@@ -29,6 +29,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#3b2a20', sole: '#16110f' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { toothGap: true }, props: [{ type: 'tooth', from: 'mouth', vx: 3, vy: 7, spin: 0.5 }] },
     moves: {
       hp: { damage: 92, stun: 80 },
       s1: { name: 'Pier Breaker', damage: 125 },
@@ -54,6 +56,8 @@ export const ROSTER = [
       tail: '#8a5a36',
       victory: 2,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: null }, props: [{ type: 'tophat', from: 'head', vx: -3.5, vy: 11, spin: -0.22 }] },
     moves: {
       lp: { damage: 28, startup: 3 },
       lk: { startup: 5 },
@@ -81,6 +85,8 @@ export const ROSTER = [
       shoes: { type: 'sneakers', color: '#e9e4da', sole: '#8a1f6a' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { eyesClosed: false, mouth: 'teeth', top: { open: true } }, props: [{ type: 'button', from: 'chest', vx: 3, vy: 6, spin: 0.6 }, { type: 'button', from: 'chest', vx: 4.5, vy: 8, spin: -0.5 }, { type: 'button', from: 'chest', vx: 2, vy: 9, spin: 0.4 }] },
     moves: {
       lk: { damage: 48 },
       hk: { damage: 98, startup: 12 },
@@ -107,6 +113,8 @@ export const ROSTER = [
       shoes: { type: 'sneakers', color: '#e8e2d6', sole: '#2a2a30' },
       victory: 0,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { headphones: null }, props: [{ type: 'headphones', from: 'head', vx: -3, vy: 9, spin: 0.25 }] },
     moves: {
       lp: { recovery: 6 },
       s1: { name: 'Feedback Fist', startup: 11 },
@@ -132,6 +140,8 @@ export const ROSTER = [
       shoes: { type: 'shoes', color: '#151214', sole: '#0a0909' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'comb', from: 'head', vx: -2.5, vy: 10, spin: 0.45 }] },
     moves: {
       hp: { startup: 9, damage: 90 },
       s2: { name: 'Collar Rise' },
@@ -157,6 +167,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 9, spin: 0.3 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },
@@ -184,6 +196,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#2b2522', sole: '#100c0b' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: null }, props: [{ type: 'chefhat', from: 'head', vx: -2.5, vy: 12, spin: 0.18 }] },
     moves: {
       lp: { startup: 5, damage: 38 },
       hp: { startup: 10, damage: 108, hitstop: 13 },
@@ -212,6 +226,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#2a2018', sole: '#0c0a08' },
       victory: 2,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { mask: null, brows: 'angry', mouth: 'snarl' }, props: [{ type: 'mask', from: 'head', vx: 2.5, vy: 6, spin: 0.15 }] },
     moves: {
       s2: { name: 'Sun Pounce' },
       s3: { name: 'Jungle Arc', startup: 13 },
@@ -236,6 +252,8 @@ export const ROSTER = [
       shoes: { type: 'sneakers', color: '#2a2a30', sole: '#e8e4dc' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { streak: '#2a1a14' }, smoke: true }, props: [] },
     moves: {
       lp: { startup: 4 },
       s1: { name: 'Spark Fist' },
@@ -260,6 +278,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#6e4224', sole: '#3a2414' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hood: null }, props: [{ type: 'bearhood', from: 'head', vx: -3, vy: 9, spin: -0.15 }] },
     moves: {
       hp: { damage: 90, stun: 80 },
       s1: { name: 'Honey Hammer' },
@@ -285,6 +305,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#6a4a30', sole: '#2a1a10' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: { sparse: true } }, props: [{ type: 'feather', from: 'head', vx: -1.5, vy: 6, spin: 0.08 }, { type: 'feather', from: 'head', vx: 0.5, vy: 7.5, spin: -0.06 }, { type: 'feather', from: 'head', vx: -3, vy: 8, spin: 0.1 }, { type: 'feather', from: 'head', vx: 2, vy: 5, spin: -0.09 }] },
     moves: {
       hk: { damage: 82 },
       s1: { name: 'Hawk Strike' },

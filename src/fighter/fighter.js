@@ -52,6 +52,7 @@ export class Fighter {
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
     this.pulled = null; // being reeled in by a pull
+    this.critical = false; // battered look + heavy breathing (health below TUNING.criticalHealth)
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -602,6 +603,7 @@ export class Fighter {
       moveFrame: this.move ? this.move.frame : 0,
       stance: this.stance,
       throwRot: this.state === 'thrown' ? this.sd.rot : 0,
+      tired: this.critical,
     };
   }
 

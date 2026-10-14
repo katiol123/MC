@@ -9,6 +9,9 @@ const MAX_SPEED = { limb: 46, leg: 34, spine: 9, head: 10, rot: 45, pos: 22 };
 
 const SWAP_LAYER = { fa: 'ba', ba: 'fa', fl: 'bl', bl: 'fl' };
 
+/** Clips in which an exhausted fighter visibly pants. */
+const TIRED_CLIPS = new Set(['idle', 'walk', 'guardHigh', 'guardLow', 'crouch']);
+
 export class Animator {
   constructor(props) {
     this.props = props;
@@ -50,6 +53,7 @@ export class Animator {
         layers = l;
       }
     }
+    if (ctx.tired && TIRED_CLIPS.has(this.clipId)) pose = this.heavyBreathing(pose);
     if (this.blendFrom && this.frame < this.blendLen) {
       pose = blendPoses(this.blendFrom, pose, ease.smooth(this.frame / this.blendLen), this.props, emptyPose());
     } else {
@@ -60,6 +64,21 @@ export class Animator {
     this.layers = layers;
     this.pose = pose;
     return pose;
+  }
+
+  /** Exhausted: deep, slow breaths heave the chest and shoulders; head and guard sag. */
+  heavyBreathing(pose) {
+    this.breath = (this.breath || 0) + 1;
+    const s = Math.sin((this.breath / 46) * Math.PI * 2);
+    const p = { ...pose, fa: [...pose.fa], ba: [...pose.ba] };
+    p.y += -3 + 2.6 * s;
+    p.chest += 4 * s;
+    p.lean += 5;
+    p.neck = (p.neck || 0) - 4;
+    p.head = (p.head || 0) - 7 + 2 * s;
+    p.fa[0] -= 8 - 4 * s;
+    p.ba[0] -= 8 - 4 * s;
+    return p;
   }
 
   /** Clamps joint angular velocity and pelvis speed relative to the previous tick's pose. */

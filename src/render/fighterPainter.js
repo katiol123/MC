@@ -17,10 +17,23 @@ const fwdOf = (u) => ({ x: u.y, y: -u.x });
 const P = (o, d, k) => ({ x: o.x + d.x * k, y: o.y + d.y * k });
 const P2 = (o, d1, k1, d2, k2) => ({ x: o.x + d1.x * k1 + d2.x * k2, y: o.y + d1.y * k1 + d2.y * k2 });
 
+/** Look overrides: nested objects merge, null removes an item (a knocked-off hat, mask...). */
+function mergeLook(base, over) {
+  const out = { ...base };
+  for (const k in over) {
+    const v = over[k];
+    if (v === null) delete out[k];
+    else out[k] = v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object' ? mergeLook(base[k], v) : v;
+  }
+  return out;
+}
+
 export class FighterPainter {
   constructor(def) {
     this.def = def;
     this.look = def.look;
+    this.lookBase = def.look;
+    this.lookHurt = mergeLook(def.look, def.damaged?.look || {});
     this.pr = def.props;
     this.ow = 3.1; // outline half-width (local units)
     this.matCache = new Map();
@@ -101,9 +114,12 @@ export class FighterPainter {
    * opts: { layers, tint (0..1 white flash), chains: {name: [points local]}, time, blink }
    */
   draw(ctx, skel, opts = {}) {
+    this.look = opts.critical ? this.lookHurt : this.lookBase;
     const lk = this.look;
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
+    this.battered = !!opts.critical;
+    this.look = this.battered ? this.lookHurt : this.lookBase;
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
@@ -672,7 +688,17 @@ export class FighterPainter {
       }
       case 'henley': {
         this.line(ctx, [P2(N, fC, cw * 0.62, uC, -3), P2(N, fC, cw * 0.66, uC, -up * 0.45)], 1.6, outl, 0.6);
-        for (let i = 0; i < 3; i++) {
+        if (top.open) {
+          // buttons popped: the placket hangs open
+          ctx.beginPath();
+          ctx.moveTo(P2(N, fC, cw * 0.4, uC, -2).x, P2(N, fC, cw * 0.4, uC, -2).y);
+          const a = P2(N, fC, cw * 0.95, uC, -2), b = P2(N, fC, cw * 0.68, uC, -up * 0.42);
+          ctx.lineTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.closePath();
+          ctx.fillStyle = this.skin.base;
+          ctx.fill();
+          this.line(ctx, [P2(N, fC, cw * 0.4, uC, -2), b, a], 1.4, outl, 0.7);
+        }
+        for (let i = 0; i < (top.open ? 0 : 3); i++) {
           const b = P2(N, fC, cw * 0.7, uC, -6 - i * 7);
           ctx.beginPath();
           ctx.arc(b.x, b.y, 1.9, 0, Math.PI * 2);
@@ -1257,6 +1283,19 @@ export class FighterPainter {
     ctx.ellipse(ex - 0.02 * R, ey + 0.02 * R, ew * 1.15, ew * 0.75, 0, 0, Math.PI * 2);
     ctx.fillStyle = rgba('#2a1440', 0.16);
     ctx.fill();
+    if (this.battered) {
+      // black eye and a cut over the brow
+      ctx.beginPath();
+      ctx.ellipse(ex - 0.02 * R, ey - 0.1 * R, ew * 1.05, ew * 0.62, 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = rgba('#5a2a78', 0.45);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(ex, ey - 0.14 * R, ew * 0.7, ew * 0.35, 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = rgba('#3a5aa8', 0.3);
+      ctx.fill();
+      this.line(ctx, [{ x: ex - ew * 0.6, y: ey + 0.42 * R }, { x: ex + ew * 0.1, y: ey + 0.36 * R }], 2, '#b0202a', 0.9);
+      this.line(ctx, [{ x: ex - ew * 0.35, y: ey + 0.37 * R }, { x: ex - ew * 0.3, y: ey + 0.3 * R }], 1.4, '#b0202a', 0.8);
+    }
     const closed = lk.eyesClosed || opts.blink || hurt;
     if (closed) {
       this.line(ctx, [{ x: ex - ew, y: ey + 0.03 * R }, { x: ex, y: ey - 0.07 * R }, { x: ex + ew * 0.9, y: ey + 0.03 * R }], 2.6, outl);
@@ -1343,6 +1382,10 @@ export class FighterPainter {
       ctx.strokeStyle = outl;
       ctx.stroke();
       this.line(ctx, [{ x: 0.5 * R, y: -0.44 * R }, { x: 0.96 * R, y: -0.4 * R }], 0.9, outl, 0.6);
+      if (lk.toothGap) {
+        ctx.fillStyle = '#2a0e16';
+        ctx.fillRect(0.66 * R, -0.5 * R, 0.1 * R, 0.08 * R);
+      }
       if (mouth === 'grin') this.line(ctx, [{ x: 0.35 * R, y: -0.3 * R }, { x: 0.42 * R, y: -0.42 * R }, { x: 0.4 * R, y: -0.55 * R }], 1.3, outl, 0.7);
     } else if (mouth === 'lips') {
       ctx.beginPath();
@@ -1569,6 +1612,7 @@ export class FighterPainter {
     const quill = this.mat(hat.color, t).base, tip = this.mat(hat.tip, t).base;
     // back to front so the forward feathers overlap the ones behind
     for (let i = 0; i < 9; i++) {
+      if (hat.sparse && i % 2) continue; // half of them knocked out
       const a = (175 - i * 11) * DEG;
       const L = R * (1.9 + 0.4 * Math.sin(i * 1.7));
       const bx = Math.cos(a) * 0.82 * R, by = Math.sin(a) * 0.82 * R + 0.25 * R;

@@ -395,6 +395,7 @@ const TUNING = {
   superCooldown: 480, // 8 s without meter gain after using a super
   superFreeze: 48, // cinematic freeze when a super starts
   // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
+  criticalHealth: 0.3, // below this share of health a fighter looks battered (props fly off, heavy breathing)
   burnInterval: 30,
   armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,
@@ -572,6 +573,10 @@ class AudioSystem {
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
         break;
+      case 'critical':
+        this.tone(0.16, { freq: 900, to: 300, type: 'square', gain: 0.12 }); // comic "pop"
+        this.noise(0.12, { freq: 2400, q: 1.5, gain: 0.2, sweep: 0.4 });
+        break;
       case 'armor':
         this.tone(0.3, { freq: 110, to: 60, gain: 0.6 });
         this.noise(0.12, { freq: 900, q: 2, gain: 0.3 });
@@ -629,6 +634,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#3b2a20', sole: '#16110f' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { toothGap: true }, props: [{ type: 'tooth', from: 'mouth', vx: 3, vy: 7, spin: 0.5 }] },
     moves: {
       hp: { damage: 92, stun: 80 },
       s1: { name: 'Pier Breaker', damage: 125 },
@@ -654,6 +661,8 @@ const ROSTER = [
       tail: '#8a5a36',
       victory: 2,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: null }, props: [{ type: 'tophat', from: 'head', vx: -3.5, vy: 11, spin: -0.22 }] },
     moves: {
       lp: { damage: 28, startup: 3 },
       lk: { startup: 5 },
@@ -681,6 +690,8 @@ const ROSTER = [
       shoes: { type: 'sneakers', color: '#e9e4da', sole: '#8a1f6a' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { eyesClosed: false, mouth: 'teeth', top: { open: true } }, props: [{ type: 'button', from: 'chest', vx: 3, vy: 6, spin: 0.6 }, { type: 'button', from: 'chest', vx: 4.5, vy: 8, spin: -0.5 }, { type: 'button', from: 'chest', vx: 2, vy: 9, spin: 0.4 }] },
     moves: {
       lk: { damage: 48 },
       hk: { damage: 98, startup: 12 },
@@ -707,6 +718,8 @@ const ROSTER = [
       shoes: { type: 'sneakers', color: '#e8e2d6', sole: '#2a2a30' },
       victory: 0,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { headphones: null }, props: [{ type: 'headphones', from: 'head', vx: -3, vy: 9, spin: 0.25 }] },
     moves: {
       lp: { recovery: 6 },
       s1: { name: 'Feedback Fist', startup: 11 },
@@ -732,6 +745,8 @@ const ROSTER = [
       shoes: { type: 'shoes', color: '#151214', sole: '#0a0909' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'comb', from: 'head', vx: -2.5, vy: 10, spin: 0.45 }] },
     moves: {
       hp: { startup: 9, damage: 90 },
       s2: { name: 'Collar Rise' },
@@ -757,6 +772,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 9, spin: 0.3 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },
@@ -784,6 +801,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#2b2522', sole: '#100c0b' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: null }, props: [{ type: 'chefhat', from: 'head', vx: -2.5, vy: 12, spin: 0.18 }] },
     moves: {
       lp: { startup: 5, damage: 38 },
       hp: { startup: 10, damage: 108, hitstop: 13 },
@@ -812,6 +831,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#2a2018', sole: '#0c0a08' },
       victory: 2,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { mask: null, brows: 'angry', mouth: 'snarl' }, props: [{ type: 'mask', from: 'head', vx: 2.5, vy: 6, spin: 0.15 }] },
     moves: {
       s2: { name: 'Sun Pounce' },
       s3: { name: 'Jungle Arc', startup: 13 },
@@ -836,6 +857,8 @@ const ROSTER = [
       shoes: { type: 'sneakers', color: '#2a2a30', sole: '#e8e4dc' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hair: { streak: '#2a1a14' }, smoke: true }, props: [] },
     moves: {
       lp: { startup: 4 },
       s1: { name: 'Spark Fist' },
@@ -860,6 +883,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#6e4224', sole: '#3a2414' },
       victory: 3,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hood: null }, props: [{ type: 'bearhood', from: 'head', vx: -3, vy: 9, spin: -0.15 }] },
     moves: {
       hp: { damage: 90, stun: 80 },
       s1: { name: 'Honey Hammer' },
@@ -885,6 +910,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#6a4a30', sole: '#2a1a10' },
       victory: 1,
     },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { hat: { sparse: true } }, props: [{ type: 'feather', from: 'head', vx: -1.5, vy: 6, spin: 0.08 }, { type: 'feather', from: 'head', vx: 0.5, vy: 7.5, spin: -0.06 }, { type: 'feather', from: 'head', vx: -3, vy: 8, spin: 0.1 }, { type: 'feather', from: 'head', vx: 2, vy: 5, spin: -0.09 }] },
     moves: {
       hk: { damage: 82 },
       s1: { name: 'Hawk Strike' },
@@ -2285,8 +2312,21 @@ class Match {
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
     if (this.phase === 'fight') this.updateBurn();
+    this.updateCritical();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /** Low health: the fighter turns battered once per round (a prop flies off, heavy breathing). */
+  updateCritical() {
+    for (const f of this.fighters) {
+      const share = f.health / f.maxHealth;
+      if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
+        f.critical = true;
+        const head = f.skel.j.head;
+        this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
+      } else if (f.critical && share > 0.6) f.critical = false; // training refill
+    }
   }
 
   /** Burning fighters take a small hit every TUNING.burnInterval ticks; burn alone never KOs. */
@@ -2435,6 +2475,7 @@ class Fighter {
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
     this.pulled = null; // being reeled in by a pull
+    this.critical = false; // battered look + heavy breathing (health below TUNING.criticalHealth)
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -2985,6 +3026,7 @@ class Fighter {
       moveFrame: this.move ? this.move.frame : 0,
       stance: this.stance,
       throwRot: this.state === 'thrown' ? this.sd.rot : 0,
+      tired: this.critical,
     };
   }
 
@@ -3113,6 +3155,9 @@ const MAX_SPEED = { limb: 46, leg: 34, spine: 9, head: 10, rot: 45, pos: 22 };
 
 const SWAP_LAYER = { fa: 'ba', ba: 'fa', fl: 'bl', bl: 'fl' };
 
+/** Clips in which an exhausted fighter visibly pants. */
+const TIRED_CLIPS = new Set(['idle', 'walk', 'guardHigh', 'guardLow', 'crouch']);
+
 class Animator {
   constructor(props) {
     this.props = props;
@@ -3154,6 +3199,7 @@ class Animator {
         layers = l;
       }
     }
+    if (ctx.tired && TIRED_CLIPS.has(this.clipId)) pose = this.heavyBreathing(pose);
     if (this.blendFrom && this.frame < this.blendLen) {
       pose = blendPoses(this.blendFrom, pose, ease.smooth(this.frame / this.blendLen), this.props, emptyPose());
     } else {
@@ -3164,6 +3210,21 @@ class Animator {
     this.layers = layers;
     this.pose = pose;
     return pose;
+  }
+
+  /** Exhausted: deep, slow breaths heave the chest and shoulders; head and guard sag. */
+  heavyBreathing(pose) {
+    this.breath = (this.breath || 0) + 1;
+    const s = Math.sin((this.breath / 46) * Math.PI * 2);
+    const p = { ...pose, fa: [...pose.fa], ba: [...pose.ba] };
+    p.y += -3 + 2.6 * s;
+    p.chest += 4 * s;
+    p.lean += 5;
+    p.neck = (p.neck || 0) - 4;
+    p.head = (p.head || 0) - 7 + 2 * s;
+    p.fa[0] -= 8 - 4 * s;
+    p.ba[0] -= 8 - 4 * s;
+    return p;
   }
 
   /** Clamps joint angular velocity and pelvis speed relative to the previous tick's pose. */
@@ -4410,7 +4471,7 @@ class FightRenderer {
     });
     for (const f of fs) if (f.state === 'attack' && f.move?.frame === 1) this.drawOrder = [1 - f.index, f.index];
     this.trails.tick(fs);
-    this.effects.tick();
+    this.effects.tick(fs);
     this.arena.tick();
     if (this.hud.announce) this.hud.announce.t++;
   }
@@ -4495,6 +4556,7 @@ class FightRenderer {
       prop,
       fire,
       claws,
+      critical: f.critical,
       now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
@@ -4773,10 +4835,23 @@ const fwdOf = (u) => ({ x: u.y, y: -u.x });
 const P = (o, d, k) => ({ x: o.x + d.x * k, y: o.y + d.y * k });
 const P2 = (o, d1, k1, d2, k2) => ({ x: o.x + d1.x * k1 + d2.x * k2, y: o.y + d1.y * k1 + d2.y * k2 });
 
+/** Look overrides: nested objects merge, null removes an item (a knocked-off hat, mask...). */
+function mergeLook(base, over) {
+  const out = { ...base };
+  for (const k in over) {
+    const v = over[k];
+    if (v === null) delete out[k];
+    else out[k] = v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object' ? mergeLook(base[k], v) : v;
+  }
+  return out;
+}
+
 class FighterPainter {
   constructor(def) {
     this.def = def;
     this.look = def.look;
+    this.lookBase = def.look;
+    this.lookHurt = mergeLook(def.look, def.damaged?.look || {});
     this.pr = def.props;
     this.ow = 3.1; // outline half-width (local units)
     this.matCache = new Map();
@@ -4857,9 +4932,12 @@ class FighterPainter {
    * opts: { layers, tint (0..1 white flash), chains: {name: [points local]}, time, blink }
    */
   draw(ctx, skel, opts = {}) {
+    this.look = opts.critical ? this.lookHurt : this.lookBase;
     const lk = this.look;
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
+    this.battered = !!opts.critical;
+    this.look = this.battered ? this.lookHurt : this.lookBase;
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
@@ -5428,7 +5506,17 @@ class FighterPainter {
       }
       case 'henley': {
         this.line(ctx, [P2(N, fC, cw * 0.62, uC, -3), P2(N, fC, cw * 0.66, uC, -up * 0.45)], 1.6, outl, 0.6);
-        for (let i = 0; i < 3; i++) {
+        if (top.open) {
+          // buttons popped: the placket hangs open
+          ctx.beginPath();
+          ctx.moveTo(P2(N, fC, cw * 0.4, uC, -2).x, P2(N, fC, cw * 0.4, uC, -2).y);
+          const a = P2(N, fC, cw * 0.95, uC, -2), b = P2(N, fC, cw * 0.68, uC, -up * 0.42);
+          ctx.lineTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.closePath();
+          ctx.fillStyle = this.skin.base;
+          ctx.fill();
+          this.line(ctx, [P2(N, fC, cw * 0.4, uC, -2), b, a], 1.4, outl, 0.7);
+        }
+        for (let i = 0; i < (top.open ? 0 : 3); i++) {
           const b = P2(N, fC, cw * 0.7, uC, -6 - i * 7);
           ctx.beginPath();
           ctx.arc(b.x, b.y, 1.9, 0, Math.PI * 2);
@@ -6013,6 +6101,19 @@ class FighterPainter {
     ctx.ellipse(ex - 0.02 * R, ey + 0.02 * R, ew * 1.15, ew * 0.75, 0, 0, Math.PI * 2);
     ctx.fillStyle = rgba('#2a1440', 0.16);
     ctx.fill();
+    if (this.battered) {
+      // black eye and a cut over the brow
+      ctx.beginPath();
+      ctx.ellipse(ex - 0.02 * R, ey - 0.1 * R, ew * 1.05, ew * 0.62, 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = rgba('#5a2a78', 0.45);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(ex, ey - 0.14 * R, ew * 0.7, ew * 0.35, 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = rgba('#3a5aa8', 0.3);
+      ctx.fill();
+      this.line(ctx, [{ x: ex - ew * 0.6, y: ey + 0.42 * R }, { x: ex + ew * 0.1, y: ey + 0.36 * R }], 2, '#b0202a', 0.9);
+      this.line(ctx, [{ x: ex - ew * 0.35, y: ey + 0.37 * R }, { x: ex - ew * 0.3, y: ey + 0.3 * R }], 1.4, '#b0202a', 0.8);
+    }
     const closed = lk.eyesClosed || opts.blink || hurt;
     if (closed) {
       this.line(ctx, [{ x: ex - ew, y: ey + 0.03 * R }, { x: ex, y: ey - 0.07 * R }, { x: ex + ew * 0.9, y: ey + 0.03 * R }], 2.6, outl);
@@ -6099,6 +6200,10 @@ class FighterPainter {
       ctx.strokeStyle = outl;
       ctx.stroke();
       this.line(ctx, [{ x: 0.5 * R, y: -0.44 * R }, { x: 0.96 * R, y: -0.4 * R }], 0.9, outl, 0.6);
+      if (lk.toothGap) {
+        ctx.fillStyle = '#2a0e16';
+        ctx.fillRect(0.66 * R, -0.5 * R, 0.1 * R, 0.08 * R);
+      }
       if (mouth === 'grin') this.line(ctx, [{ x: 0.35 * R, y: -0.3 * R }, { x: 0.42 * R, y: -0.42 * R }, { x: 0.4 * R, y: -0.55 * R }], 1.3, outl, 0.7);
     } else if (mouth === 'lips') {
       ctx.beginPath();
@@ -6325,6 +6430,7 @@ class FighterPainter {
     const quill = this.mat(hat.color, t).base, tip = this.mat(hat.tip, t).base;
     // back to front so the forward feathers overlap the ones behind
     for (let i = 0; i < 9; i++) {
+      if (hat.sparse && i % 2) continue; // half of them knocked out
       const a = (175 - i * 11) * DEG;
       const L = R * (1.9 + 0.4 * Math.sin(i * 1.7));
       const bx = Math.cos(a) * 0.82 * R, by = Math.sin(a) * 0.82 * R + 0.25 * R;
@@ -6821,6 +6927,7 @@ __define("src/render/effects.js", function (__exports, __require) {
 // floating labels and camera shake. All in world space; driven by simulation events.
 const { rgba } = __require("src/render/color.js");
 const { drawGlow } = __require("src/render/fire.js");
+const { spawnProp, stepProp, drawProp } = __require("src/render/props.js");
 
 class Effects {
   constructor() {
@@ -6907,6 +7014,23 @@ class Effects {
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
         break;
+      case 'critical': {
+        // battered: the fighter's signature item flies off with a pop
+        const f = fighters?.[e.who];
+        const dmg = f?.def.damaged;
+        if (!f) break;
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 8, vr: 7, life: 14, max: 14, color: '#ffffff' });
+        this.parts.push({ kind: 'burst', x: e.x, y: e.y, r: 26, life: 6, max: 6, color: '#ffffff', dir: e.facing });
+        this.shake = Math.max(this.shake, 5);
+        for (const pr of dmg?.props || []) {
+          const from = pr.from === 'chest' ? { x: e.x - e.facing * 14, y: e.y - 70 } : pr.from === 'mouth' ? { x: e.x + e.facing * 16, y: e.y - 10 } : { x: e.x, y: e.y + 18 };
+          this.parts.push(spawnProp(pr.type, from.x, from.y, e.facing, pr, f.def.look));
+        }
+        break;
+      }
+      case 'roundIntro':
+        this.parts = this.parts.filter((p) => p.kind !== 'prop');
+        break;
       case 'armor':
         // the charge shrugs the hit off: amber flash ring + label
         this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffb347' });
@@ -6960,7 +7084,15 @@ class Effects {
     this.parts.push({ kind: 'fireball', x, y, r: 16, life: 12, max: 12 });
   }
 
-  tick() {
+  tick(fighters) {
+    // battered fighters sweat; an overheated Cinder smokes
+    for (const f of fighters || []) {
+      if (!f.critical || f.state === 'ko') continue;
+      this.clock = (this.clock || 0) + 1;
+      const head = f.skel.j.head, hx = f.body.x + f.facing * head.x, hy = f.body.y + head.y;
+      if (this.rnd() < 0.035) this.parts.push({ kind: 'sweat', x: hx + (this.rnd() - 0.3) * 20 * f.facing, y: hy + 6, vx: -f.facing * (0.5 + this.rnd()), vy: 1.5, life: 34, max: 34 });
+      if (f.def.damaged?.look?.smoke && this.rnd() < 0.25) this.parts.push({ kind: 'smoke', x: hx + (this.rnd() - 0.5) * 22, y: hy + 16, vx: (this.rnd() - 0.5) * 0.6, vy: 1.2 + this.rnd(), r: 5 + this.rnd() * 4, life: 40, max: 40 });
+    }
     for (const p of this.parts) {
       p.life--;
       if (p.kind === 'spark') { p.x += p.vx; p.y += p.vy; p.vx *= 0.86; p.vy = p.vy * 0.86 - 0.3; }
@@ -6968,6 +7100,9 @@ class Effects {
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
       else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
       else if (p.kind === 'fireball') p.r += 3.5;
+      else if (p.kind === 'prop') stepProp(p);
+      else if (p.kind === 'sweat') { p.x += p.vx; p.y += p.vy; p.vy -= 0.35; }
+      else if (p.kind === 'smoke') { p.x += p.vx + Math.sin(p.life * 0.2) * 0.4; p.y += p.vy; p.r += 0.35; }
       else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
@@ -7063,6 +7198,18 @@ class Effects {
           ctx.lineTo(t.x + dir * (60 + 20 * (1 - k)) * cam.zoom, t.y + i * 22 * cam.zoom);
           ctx.stroke();
         }
+      } else if (p.kind === 'prop') {
+        drawProp(ctx, p, s, cam.zoom);
+      } else if (p.kind === 'sweat') {
+        ctx.fillStyle = rgba('#bfefff', 0.85 * Math.min(1, k * 2));
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, 2.6 * cam.zoom, 4 * cam.zoom, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'smoke') {
+        ctx.fillStyle = rgba('#6a6470', 0.5 * k);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, p.r * cam.zoom, 0, Math.PI * 2);
+        ctx.fill();
       } else if (p.kind === 'mote') {
         const prev = ctx.globalCompositeOperation;
         ctx.globalCompositeOperation = 'lighter';
@@ -7157,6 +7304,174 @@ class Trails {
       }
     });
   }
+}
+
+});
+__define("src/render/props.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "spawnProp", { enumerable: true, get: () => spawnProp });
+  Object.defineProperty(__exports, "stepProp", { enumerable: true, get: () => stepProp });
+  Object.defineProperty(__exports, "drawProp", { enumerable: true, get: () => drawProp });
+// Knocked-off props (low-health look): hats, masks, headphones, a tooth... Each one flies off the
+// fighter, tumbles, bounces on the floor and stays there until the round ends. Purely cosmetic.
+// Drawn in prop-local space: origin at the prop centre, +y up, units ≈ fighter local units.
+const { rgba, darken, lighten } = __require("src/render/color.js");
+
+const OUT = '#140c10';
+
+function shape(ctx, fill, w = 2.2) {
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = w;
+  ctx.strokeStyle = OUT;
+  ctx.stroke();
+}
+
+const DRAW = {
+  tophat(ctx, lk) {
+    const h = lk.hat || { color: '#e0399b', band: '#2a2a2a', goggles: '#c99b4a' };
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 26, 6, 0, 0, Math.PI * 2);
+    shape(ctx, h.color);
+    ctx.beginPath();
+    ctx.rect(-15, -10, 30, 34);
+    shape(ctx, h.color);
+    ctx.fillStyle = h.band;
+    ctx.fillRect(-15, -6, 30, 7);
+    ctx.beginPath();
+    ctx.ellipse(0, 24, 15, 4, 0, 0, Math.PI * 2);
+    shape(ctx, lighten(h.color, 0.15), 1.6);
+    for (const x of [-6, 6]) {
+      ctx.beginPath();
+      ctx.arc(x, 4, 4.5, 0, Math.PI * 2);
+      shape(ctx, h.goggles || '#c99b4a', 1.4);
+    }
+  },
+  chefhat(ctx, lk) {
+    const h = lk.hat || { color: '#f1ede4', band: '#c9a24a' };
+    ctx.beginPath();
+    ctx.rect(-16, -14, 32, 12);
+    shape(ctx, h.color);
+    ctx.fillStyle = h.band;
+    ctx.fillRect(-16, -9, 32, 3);
+    ctx.beginPath();
+    for (const [x, y, r] of [[-12, 4, 11], [0, 10, 13], [12, 4, 11]]) ctx.moveTo(x + r, y), ctx.arc(x, y, r, 0, Math.PI * 2);
+    shape(ctx, h.color);
+  },
+  headphones(ctx, lk) {
+    ctx.beginPath();
+    ctx.arc(0, -2, 22, 0.15, Math.PI - 0.15);
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = OUT;
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = lk.headphones || '#b6a77a';
+    ctx.stroke();
+    for (const x of [-21, 21]) {
+      ctx.beginPath();
+      ctx.ellipse(x, -6, 7, 10, 0, 0, Math.PI * 2);
+      shape(ctx, '#2a2630');
+    }
+  },
+  mask(ctx, lk) {
+    const m = lk.mask || { color: '#c49a3c', markings: '#7a2a8a', visor: '#e6e23a' };
+    ctx.beginPath();
+    ctx.moveTo(-20, 16); ctx.quadraticCurveTo(0, 30, 20, 16); ctx.lineTo(16, -8); ctx.quadraticCurveTo(0, -24, -16, -8); ctx.closePath();
+    shape(ctx, m.color);
+    for (const x of [-8, 8]) {
+      ctx.beginPath();
+      ctx.ellipse(x, 6, 5, 3, 0, 0, Math.PI * 2);
+      shape(ctx, m.visor, 1.2);
+    }
+    ctx.fillStyle = m.markings;
+    for (const [x, y] of [[-12, -4], [12, -4], [0, -12], [-4, 18], [5, 17]]) { ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill(); }
+    // crack
+    ctx.beginPath(); ctx.moveTo(2, 24); ctx.lineTo(-2, 12); ctx.lineTo(4, 4); ctx.lineTo(0, -6);
+    ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke();
+  },
+  bearhood(ctx, lk) {
+    const h = lk.hood || { color: '#7a4a28', lining: '#d4318f', snout: '#c9a27a', teeth: '#f2ead8', eyes: '#4fb8a0' };
+    for (const x of [-16, 16]) {
+      ctx.beginPath(); ctx.arc(x, 18, 8, 0, Math.PI * 2); shape(ctx, h.color);
+      ctx.beginPath(); ctx.arc(x, 18, 4, 0, Math.PI * 2); ctx.fillStyle = h.lining; ctx.fill();
+    }
+    ctx.beginPath(); ctx.ellipse(0, 0, 24, 20, 0, 0, Math.PI * 2); shape(ctx, h.color);
+    ctx.beginPath(); ctx.ellipse(0, -8, 11, 8, 0, 0, Math.PI * 2); shape(ctx, h.snout, 1.6);
+    ctx.beginPath(); ctx.arc(0, -4, 3.5, 0, Math.PI * 2); ctx.fillStyle = '#3a1830'; ctx.fill();
+    for (const x of [-9, 9]) { ctx.beginPath(); ctx.arc(x, 6, 3.5, 0, Math.PI * 2); shape(ctx, '#f4f1ea', 1.2); ctx.beginPath(); ctx.arc(x, 6, 1.6, 0, Math.PI * 2); ctx.fillStyle = h.eyes; ctx.fill(); }
+    ctx.fillStyle = h.teeth;
+    for (const x of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(x - 2.5, -15); ctx.lineTo(x, -20); ctx.lineTo(x + 2.5, -15); ctx.fill(); }
+  },
+  feather(ctx, lk) {
+    const h = lk.hat || { color: '#e8dcc0', tip: '#d4318f' };
+    ctx.beginPath(); ctx.ellipse(0, 0, 22, 5, 0, 0, Math.PI * 2); shape(ctx, h.color, 1.4);
+    ctx.save(); ctx.clip(); ctx.fillStyle = h.tip; ctx.fillRect(8, -6, 20, 12); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(-24, 0); ctx.lineTo(18, 0); ctx.lineWidth = 1; ctx.strokeStyle = rgba(OUT, 0.6); ctx.stroke();
+  },
+  comb(ctx) {
+    ctx.beginPath(); ctx.rect(-14, 0, 28, 5); shape(ctx, '#e2b440', 1.4);
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#e2b440';
+    for (let x = -12; x <= 12; x += 3) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, -9); ctx.stroke(); }
+  },
+  hairtie(ctx, lk) {
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.lineWidth = 7; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 4.5; ctx.strokeStyle = lk.hair?.streak || '#e0399b'; ctx.stroke();
+  },
+  tooth(ctx) {
+    ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
+    shape(ctx, '#f6f1e6', 1.4);
+  },
+  button(ctx, lk) {
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); shape(ctx, lk.top?.buttons || '#8d8576', 1.2);
+    ctx.fillStyle = OUT;
+    for (const x of [-1.3, 1.3]) { ctx.beginPath(); ctx.arc(x, 0, 0.8, 0, Math.PI * 2); ctx.fill(); }
+  },
+};
+
+/** Light props flutter down (feathers), heavy ones fall and bounce. */
+const FLOAT = { feather: true };
+
+function spawnProp(type, x, y, dir, opt, look) {
+  return {
+    kind: 'prop', type, look, x, y,
+    vx: dir * (opt.vx ?? 2), vy: opt.vy ?? 8, rot: 0, vrot: dir * (opt.spin ?? 0.2),
+    life: 600, max: 600, float: !!FLOAT[type], t: Math.random() * 6,
+  };
+}
+
+function stepProp(p) {
+  p.t += 1;
+  if (p.float) {
+    // flutter: low gravity, side-to-side sway, rotation follows the sway
+    p.vy = Math.max(-1.6, p.vy - 0.12);
+    p.vx *= 0.97;
+    p.x += p.vx + Math.sin(p.t * 0.12) * 1.6;
+    p.rot = Math.sin(p.t * 0.12) * 0.7 + p.vrot * 4;
+  } else {
+    p.vy -= 0.55;
+    p.x += p.vx;
+    p.rot += p.vrot;
+  }
+  p.y += p.vy;
+  const floor = p.float ? 3 : 8;
+  if (p.y <= floor) {
+    p.y = floor;
+    if (p.float) { p.vy = 0; p.vx = 0; p.rot = 1.45; p.float = false; p.vrot = 0; }
+    else if (Math.abs(p.vy) > 2) { p.vy *= -0.38; p.vx *= 0.6; p.vrot *= -0.5; } // bounce
+    else { p.vy = 0; p.vx *= 0.8; p.vrot *= 0.7; p.rot += (Math.round(p.rot / Math.PI) * Math.PI - p.rot) * 0.2; } // settle
+  }
+}
+
+function drawProp(ctx, p, s, zoom) {
+  const fade = Math.min(1, p.life / 40);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  ctx.translate(s.x, s.y);
+  ctx.scale(zoom, -zoom);
+  ctx.rotate(p.rot);
+  ctx.lineJoin = 'round';
+  (DRAW[p.type] || DRAW.tooth)(ctx, p.look || {});
+  ctx.restore();
 }
 
 });

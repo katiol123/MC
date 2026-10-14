@@ -84,3 +84,16 @@ test('training mode never ends the round', () => {
   assert.equal(m.phase, 'fight');
   assert.ok(m.fighters[1].health > 0);
 });
+
+test('low health: once per round the fighter turns battered (event + tired breathing), and recovers next round', () => {
+  const m = fightingMatch({ p1: 'bruno', p2: 'rattigan' });
+  const b = m.fighters[1];
+  b.health = Math.floor(b.maxHealth * 0.25);
+  let ev = run(m, 5);
+  assert.equal(ev.filter((e) => e.type === 'critical' && e.who === 1).length, 1);
+  assert.ok(b.critical && b.animContext().tired);
+  ev = run(m, 60);
+  assert.ok(!ev.some((e) => e.type === 'critical'), 'only once');
+  m.startRound();
+  assert.equal(b.critical, false, 'fresh look next round');
+});
