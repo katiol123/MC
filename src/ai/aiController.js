@@ -24,6 +24,10 @@ const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [170, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
 };
+/** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
+const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
+const SHOOTER = { rattigan: true, jax: true }; // projectile users: also back off from a downed opponent
+const BACK_DASH = [{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }];
 const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 
 export class AIController {
@@ -146,6 +150,19 @@ export class AIController {
       this.queue(M.s4);
       return;
     }
+    // Zoners: make space for the signature move (back dash, back jump or a walk back), often
+    // finishing the retreat with it (coin / sonic wave / pounce).
+    const zoner = ZONER[me.def.id];
+    const downed = opF.state === 'knockdown' || opF.state === 'getup';
+    const threatened = op.move && op.phase !== 'recovery';
+    if (zoner && range && gap < range[0] && !me.projectileOut && !threatened && r.chance(downed ? (SHOOTER[me.def.id] ? zoner * 3 : 0) : zoner)) {
+      const roll = r.next();
+      const coin = r.chance(0.3) ? [{ d: '', n: r.int(4, 10) }, ...M.s4] : [];
+      if (roll < 0.45) this.queue([...BACK_DASH, ...coin]);
+      else if (roll < 0.7) this.queue([{ d: 'ub', n: 3 }, { d: '', n: 30 }, ...coin]); // back jump
+      else this.hold = { d: 'b', n: r.int(14, 26) };
+      return;
+    }
     // Throw a turtling or idle opponent at close range.
     if (gap < 24 && (opF.state === 'guardHigh' || opF.state === 'guardLow' || opF.actionable) && r.chance(cfg.throws)) {
       this.queue(M.throw);
@@ -178,7 +195,7 @@ export class AIController {
     }
     // Opponent knocked down: approach for pressure.
     if (opF.state === 'knockdown' || opF.state === 'getup') {
-      this.hold = { d: dist > 120 ? 'f' : '', n: 12 };
+      this.hold = { d: SHOOTER[me.def.id] ? 'b' : dist > 120 ? 'f' : '', n: 12 };
       return;
     }
     const aggr = cfg.aggression;
