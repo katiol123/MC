@@ -2883,7 +2883,7 @@ const ATTACK_POSES = {
     extend: P(AIR_FALL, { y: 100, lean: -8, chest: -14, neck: -14, head: -16, fa: [24, 124, 0], ba: [168, 8, 0], fl: [64, 90, 10], bl: [6, 34, 10] }),
   },
   whirl: {
-    base: 'stand', layers: { bl: 'front', fa: 'back' }, spin: true,
+    base: 'stand', layers: { bl: 'front' }, spin: true,
     windup: P(STANCE, { x: 4, y: 108, lean: 26, chest: 10, neck: 10, fa: [20, 60, 0], ba: [60, 80, 0], bl: [60, 120, 0], bf: null, ff: [10, 8, 0] }),
     contact: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [104, 2, 30], bf: null, ff: [4, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [100, 6, 30], bf: null, ff: [4, 8, 0] }),
@@ -3660,15 +3660,16 @@ class FighterPainter {
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
     push(8, (p) => this.drawArm(ctx, p, J, A, 'F'));
-    // Layer overrides from the current animation (e.g. rear-hand punch drawn in front of the torso).
+    // Layer overrides from the current animation. Depth order is always:
+    //   far arm < far leg < torso < near leg < near arm.
+    // An attack may bring a far limb in front of the torso, and a near leg in front of the torso,
+    // but a far limb never covers the matching near limb (that would swap left and right).
+    const Z_FRONT = { ba: 6.5, bl: 4.6, fl: 6.55 };
     const zFor = { ba: 1, bl: 2, fl: 5, fa: 8 };
     for (const k in layers) {
+      if (layers[k] !== 'front' || !(k in Z_FRONT)) continue;
       const g = groups.find((gr) => gr.z === zFor[k]);
-      if (!g) continue;
-      // A far-side limb brought forward by an attack may pass in front of the torso, but never in
-      // front of the near-side limb: otherwise the left leg/arm would read as the right one.
-      if (layers[k] === 'front') g.z = k === 'bl' ? 4.6 : 6.5;
-      else if (layers[k] === 'back') g.z = k === 'fa' ? 1.5 : 2.5;
+      if (g) g.z = Z_FRONT[k];
     }
     groups.sort((a, b) => a.z - b.z);
     for (const g of groups) {

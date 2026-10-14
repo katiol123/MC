@@ -153,3 +153,32 @@ test('feet stay planted while walking (no foot sliding during stance phase)', ()
   assert.ok(planted > 20, `planted samples ${planted}`);
   assert.ok(slid / planted < 0.1, `foot slid on ${slid}/${planted} planted frames`);
 });
+
+test('layer order: a far limb is never drawn over the matching near limb (any attack, any stance)', async () => {
+  const { ATTACK_POSES } = await import('../src/anim/attackPoses.js');
+  const { FighterPainter } = await import('../src/render/fighterPainter.js');
+  const def = buildFighterDef('jax');
+  const painter = new FighterPainter(def);
+  // Record the order in which limb groups are painted with a stub context.
+  const order = [];
+  const ctx = new Proxy({}, {
+    get: (t, k) => (k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop() {} }) : () => {}),
+    set: () => true,
+  });
+  for (const [name, fn] of [['drawArm', 'arm'], ['drawLeg', 'leg']]) {
+    const orig = painter[name].bind(painter);
+    painter[name] = (c, pass, J, A, side) => { if (pass === 'fill') order.push(fn + side); return orig(c, pass, J, A, side); };
+  }
+  const f = new Fighter(def, 0, 1000, 1);
+  const SWAP = { fa: 'ba', ba: 'fa', fl: 'bl', bl: 'fl' };
+  for (const [anim, ap] of Object.entries(ATTACK_POSES)) {
+    for (const stance of [0, 1]) {
+      let layers = ap.layers || null;
+      if (layers && stance === 1) layers = Object.fromEntries(Object.entries(layers).map(([k, v]) => [SWAP[k], v]));
+      order.length = 0;
+      painter.draw(ctx, f.skel, { layers });
+      assert.ok(order.indexOf('armB') < order.indexOf('armF'), `${anim} stance ${stance}: far arm over near arm`);
+      assert.ok(order.indexOf('legB') < order.indexOf('legF'), `${anim} stance ${stance}: far leg over near leg`);
+    }
+  }
+});

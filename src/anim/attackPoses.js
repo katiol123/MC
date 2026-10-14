@@ -78,7 +78,7 @@ export const ATTACK_POSES = {
     extend: P(AIR_FALL, { y: 100, lean: -8, chest: -14, neck: -14, head: -16, fa: [24, 124, 0], ba: [168, 8, 0], fl: [64, 90, 10], bl: [6, 34, 10] }),
   },
   whirl: {
-    base: 'stand', layers: { bl: 'front', fa: 'back' }, spin: true,
+    base: 'stand', layers: { bl: 'front' }, spin: true,
     windup: P(STANCE, { x: 4, y: 108, lean: 26, chest: 10, neck: 10, fa: [20, 60, 0], ba: [60, 80, 0], bl: [60, 120, 0], bf: null, ff: [10, 8, 0] }),
     contact: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [104, 2, 30], bf: null, ff: [4, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [100, 6, 30], bf: null, ff: [4, 8, 0] }),
