@@ -12,17 +12,22 @@
 
 ## Запуск
 
-Нужен только Node.js ≥ 18 (зависимостей нет):
+**Самый простой способ — открыть `index.html` двойным кликом.** Он подключает `boneforge.bundle.js`:
+все модули из `src/`, собранные в один обычный скрипт, поэтому игре не нужен сервер (портреты,
+музыка и настройки работают и из `file://`).
+
+Для разработки (Node.js ≥ 18, зависимостей нет):
 
 ```bash
-npm start            # = node scripts/serve.js  → http://localhost:8080
+npm start            # локальный сервер → http://localhost:8080 (index.html) или /dev.html
+npm run build        # пересобрать boneforge.bundle.js после правок в src/
 ```
 
-Любой статический сервер тоже подойдёт (`npx serve .`), но открыть `index.html` как файл нельзя —
-ES-модули требуют http.
+`dev.html` грузит ES-модули из `src/` напрямую: правки видны без пересборки, но нужен сервер —
+браузеры не загружают ES-модули из `file://`. `npm test` проверяет и то, что бандл не устарел.
 
 Быстрые ссылки для разработки:
-`#fight=brick:jax:cpu` (сразу бой; режимы `cpu`, `versus`, `training`, `watch`),
+`index.html#fight=brick:jax:cpu` (сразу бой; режимы `cpu`, `versus`, `training`, `watch`),
 `#select=versus`, а также `tools/gallery.html` — крупный просмотр бойцов и поз
 (`tools/gallery.html#fighter=roxy&clips=idle,attack:hk,attack:s3&scale=1.4`).
 
