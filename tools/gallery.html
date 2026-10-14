@@ -9,6 +9,7 @@ import { ROSTER, buildFighterDef } from '../src/data/fighters.js';
 import { Fighter } from '../src/fighter/fighter.js';
 import { FighterPainter } from '../src/render/fighterPainter.js';
 import { SecondaryMotion } from '../src/render/secondary.js';
+import { buildHitboxes } from '../src/combat/boxes.js';
 const q = new URLSearchParams(location.hash.slice(1));
 const c = document.getElementById('c'), ctx = c.getContext('2d');
 ctx.fillStyle = '#2a1838'; ctx.fillRect(0, 0, c.width, c.height);
@@ -31,7 +32,16 @@ function render(id, clipSpec, cx, cy, s, label) {
     for (let i = 0; i < frames; i++) { if (clip === 'walk') f.walkDist += 3; f.updatePose(); sec.tick(f); }
   }
   ctx.save(); ctx.translate(cx, cy); ctx.scale(s, -s);
-  new FighterPainter(def).draw(ctx, f.skel, { layers: f.anim.layers, chains: sec.localChains(1, f.body.x, f.body.y, 1) });
+  const prop = clip === 'attack' && f.move.def.prop ? f.move.def.prop : null;
+  new FighterPainter(def).draw(ctx, f.skel, { layers: f.anim.layers, prop, chains: sec.localChains(1, f.body.x, f.body.y, 1) });
+  if (q.get('hb') && clip === 'attack') {
+    f.state = 'attack';
+    ctx.strokeStyle = '#ff3355'; ctx.lineWidth = 2 / s;
+    for (const h of buildHitboxes(f)) {
+      const ax = h.a.x - f.body.x, ay = h.a.y - f.body.y, bx = h.b.x - f.body.x, by = h.b.y - f.body.y;
+      ctx.beginPath(); ctx.arc(ax, ay, h.r, 0, 7); ctx.moveTo(bx + h.r, by); ctx.arc(bx, by, h.r, 0, 7); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    }
+  }
   ctx.restore();
   ctx.fillStyle = '#fff'; ctx.fillText(label, cx - 60, cy + 20);
   ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(cx - 120, cy); ctx.lineTo(cx + 120, cy); ctx.stroke();

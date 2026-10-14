@@ -96,6 +96,13 @@ export const ATTACK_POSES = {
     contact: P(AIR_FALL, { lean: 26, chest: 12, neck: -10, fa: [102, 12, 0], ba: [96, 16, 0], fl: [60, 96, 10], bl: [30, 90, 10] }),
     extend: P(AIR_FALL, { lean: 30, chest: 14, neck: -10, fa: [92, 10, 0], ba: [88, 14, 0], fl: [50, 80, 10], bl: [20, 70, 10] }),
   },
+  // backhand swing of the lead arm (Bruno's frying pan)
+  panSwing: {
+    base: 'stand',
+    windup: P(STANCE, { x: -6, y: 114, lean: -4, chest: -16, fa: [-24, 96, 20], ba: guardB }),
+    contact: P(STANCE, { x: 16, y: 106, lean: 20, chest: 14, neck: -8, head: -8, fa: [98, 6, 0], ba: [30, 140, 10], ff: [38, 8, 0], bf: [-28, 8, 0] }),
+    extend: P(STANCE, { x: 18, y: 105, lean: 22, chest: 16, neck: -8, head: -8, fa: [104, 8, 0], ba: [30, 140, 10], ff: [38, 8, 0], bf: [-28, 8, 0] }),
+  },
   chop: {
     base: 'stand',
     windup: P(STANCE, { y: 116, lean: -10, chest: -10, fa: [150, 70, 0], ba: [146, 78, 0] }),

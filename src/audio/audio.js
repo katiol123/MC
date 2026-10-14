@@ -114,6 +114,12 @@ export class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.prop === 'pan') {
+          // cast-iron "BONG": inharmonic partials with a long ring
+          this.tone(0.7, { freq: 520, to: 505, type: 'triangle', gain: 0.32 });
+          this.tone(0.55, { freq: 1370, to: 1340, type: 'sine', gain: 0.16 });
+          this.tone(0.4, { freq: 2290, to: 2240, type: 'sine', gain: 0.08 });
+        }
         break;
       }
       case 'block':

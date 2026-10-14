@@ -125,7 +125,12 @@ export class FightRenderer {
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
     const expression = ['hitstun', 'juggle', 'stagger', 'knockdown', 'ko', 'dizzy', 'defeat'].includes(f.state) ? 'hurt' : null;
     const blink = (Math.floor((now + i * 1700) / 100) % 38) === 0;
+    // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
+    const prop = mv?.def.prop && f.state === 'attack'
+      ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
+      : null;
     this.painters[i].draw(ctx, skel, {
+      prop,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
       chains: sec.localChains(alpha, x, y, f.facing),

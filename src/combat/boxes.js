@@ -67,7 +67,14 @@ export function buildHitboxes(fighter) {
     }
     const an = fighter.stance === 1 ? swapSide(hb.a) : hb.a;
     const bn = fighter.stance === 1 ? swapSide(hb.b || hb.a) : hb.b || hb.a;
-    out.push({ a: W(j[an]), b: W(j[bn]), r: hb.r * (fighter.props.posScale ** 0.5) });
+    let b = j[bn];
+    if (hb.ext) {
+      // capsule reaching past the joint along the bone (held props such as Bruno's pan)
+      const d = j[fighter.stance === 1 ? swapSide(hb.dir) : hb.dir];
+      const ang = Math.atan2(b.y - d.y, b.x - d.x) + (hb.rot || 0);
+      b = { x: b.x + Math.cos(ang) * hb.ext, y: b.y + Math.sin(ang) * hb.ext };
+    }
+    out.push({ a: W(j[an]), b: W(b), r: hb.r * (fighter.props.posScale ** 0.5) });
   }
   return out;
 }

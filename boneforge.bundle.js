@@ -519,6 +519,12 @@ class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.prop === 'pan') {
+          // cast-iron "BONG": inharmonic partials with a long ring
+          this.tone(0.7, { freq: 520, to: 505, type: 'triangle', gain: 0.32 });
+          this.tone(0.55, { freq: 1370, to: 1340, type: 'sine', gain: 0.16 });
+          this.tone(0.4, { freq: 2290, to: 2240, type: 'sine', gain: 0.08 });
+        }
         break;
       }
       case 'block':
@@ -973,6 +979,7 @@ const SPECIAL_ORDER = ['su', 's2', 's1', 's4', 's3'];
 
 });
 __define("src/data/signatures.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "PAN_COCK", { enumerable: true, get: () => PAN_COCK });
   Object.defineProperty(__exports, "SIGNATURES", { enumerable: true, get: () => SIGNATURES });
 // Per-fighter signature special (s4, input ↓↙← + punch) and super (su, ↓↘→↓↘→ + punch).
 // Pure data: the generic systems (sequences, projectiles, throws, counter stance, air dives)
@@ -990,13 +997,17 @@ const SUPER = { super: true, isSpecial: true, strength: 'special', stance: 'stan
 // Small helpers to keep step lists readable.
 // the hit lands ~55% into the step, leaving time for the limb to come back before the next strike
 // big-arc strikes need more wind-up frames so the limb does not cross the screen in one frame
-const MIN_HIT_AT = { uppercut: 9, rising: 9, chop: 15, roundhouse: 9, whirl: 10, lunge: 9 };
+const MIN_HIT_AT = { panSwing: 9, uppercut: 9, rising: 9, chop: 15, roundhouse: 9, whirl: 10, lunge: 9 };
 const step = (anim, len, hit, extra = {}) => {
   const hitAt = Math.max(3, Math.round(len * 0.55), MIN_HIT_AT[anim] || 0);
   const kick = anim === 'roundhouse' || anim === 'frontKick' || anim === 'whirl';
   const finisher = hit && ['launch', 'knockdown', 'knockback'].includes(hit.reaction);
   return { anim, len: Math.max(len, hitAt + (kick ? 9 : 6)), hitAt, hitLen: finisher ? 4 : 2, vx: 2.6, hit, ...extra };
 };
+/** Wrist cock of the pan handle relative to the forearm (radians); the painter uses the same value. */
+const PAN_COCK = 0.35;
+/** Frying pan held in the lead hand: forearm + a capsule over the pan head beyond the fist. */
+const PAN = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
 const H = (damage, o = {}) => ({ damage, hitstun: 32, blockstun: 16, hitstop: 6, reaction: 'light', push: { hit: 1.4, block: 2.6 }, stun: 0, ...o });
 const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
   hitstun: 36, hitstop: 14, reaction, push: { hit: 4, block: 5 }, launch: { vx: 5, vy: reaction === 'launch' ? 13 : 8 }, shake: 9, ...o,
@@ -1106,8 +1117,8 @@ const SIGNATURES = {
       throwAnim: 'slam', duration: 44, release: 28, damage: 150, stun: 80, priority: 1,
     },
     su: {
-      ...SUPER, name: "Chef's Special", anim: 'sequence',
-      steps: [step('chop', 19, H(60)), step('cross', 10, H(55)), step('chop', 19, H(60)), step('chop', 19, FINISH(120, 'knockdown'))],
+      ...SUPER, name: "Chef's Special", anim: 'sequence', prop: { type: 'pan', hand: 'F' },
+      steps: [step('chop', 19, H(60, PAN)), step('panSwing', 14, H(55, PAN)), step('chop', 19, H(60, PAN)), step('chop', 19, FINISH(120, 'knockdown', PAN))],
       recoveryAfter: 18,
     },
   },
@@ -3334,6 +3345,13 @@ const ATTACK_POSES = {
     contact: P(AIR_FALL, { lean: 26, chest: 12, neck: -10, fa: [102, 12, 0], ba: [96, 16, 0], fl: [60, 96, 10], bl: [30, 90, 10] }),
     extend: P(AIR_FALL, { lean: 30, chest: 14, neck: -10, fa: [92, 10, 0], ba: [88, 14, 0], fl: [50, 80, 10], bl: [20, 70, 10] }),
   },
+  // backhand swing of the lead arm (Bruno's frying pan)
+  panSwing: {
+    base: 'stand',
+    windup: P(STANCE, { x: -6, y: 114, lean: -4, chest: -16, fa: [-24, 96, 20], ba: guardB }),
+    contact: P(STANCE, { x: 16, y: 106, lean: 20, chest: 14, neck: -8, head: -8, fa: [98, 6, 0], ba: [30, 140, 10], ff: [38, 8, 0], bf: [-28, 8, 0] }),
+    extend: P(STANCE, { x: 18, y: 105, lean: 22, chest: 16, neck: -8, head: -8, fa: [104, 8, 0], ba: [30, 140, 10], ff: [38, 8, 0], bf: [-28, 8, 0] }),
+  },
   chop: {
     base: 'stand',
     windup: P(STANCE, { y: 116, lean: -10, chest: -10, fa: [150, 70, 0], ba: [146, 78, 0] }),
@@ -3624,7 +3642,14 @@ function buildHitboxes(fighter) {
     }
     const an = fighter.stance === 1 ? swapSide(hb.a) : hb.a;
     const bn = fighter.stance === 1 ? swapSide(hb.b || hb.a) : hb.b || hb.a;
-    out.push({ a: W(j[an]), b: W(j[bn]), r: hb.r * (fighter.props.posScale ** 0.5) });
+    let b = j[bn];
+    if (hb.ext) {
+      // capsule reaching past the joint along the bone (held props such as Bruno's pan)
+      const d = j[fighter.stance === 1 ? swapSide(hb.dir) : hb.dir];
+      const ang = Math.atan2(b.y - d.y, b.x - d.x) + (hb.rot || 0);
+      b = { x: b.x + Math.cos(ang) * hb.ext, y: b.y + Math.sin(ang) * hb.ext };
+    }
+    out.push({ a: W(j[an]), b: W(b), r: hb.r * (fighter.props.posScale ** 0.5) });
   }
   return out;
 }
@@ -3909,7 +3934,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super,
+    super: !!spec.super, prop: spec.prop,
   };
 }
 
@@ -4242,7 +4267,12 @@ class FightRenderer {
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
     const expression = ['hitstun', 'juggle', 'stagger', 'knockdown', 'ko', 'dizzy', 'defeat'].includes(f.state) ? 'hurt' : null;
     const blink = (Math.floor((now + i * 1700) / 100) % 38) === 0;
+    // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
+    const prop = mv?.def.prop && f.state === 'attack'
+      ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
+      : null;
     this.painters[i].draw(ctx, skel, {
+      prop,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
       chains: sec.localChains(alpha, x, y, f.facing),
@@ -4383,6 +4413,7 @@ __define("src/render/fighterPainter.js", function (__exports, __require) {
 const { limbPath, smoothClosed, smoothOpen, boxAlong, along } = __require("src/render/shapes.js");
 const { mix, lighten, darken, rgba } = __require("src/render/color.js");
 const { dirUp, dirFwd, DEG } = __require("src/core/math.js");
+const { PAN_COCK } = __require("src/data/signatures.js");
 
 const LIGHT = { x: 0.45, y: 0.89 };
 const SHADOW_TINT = '#2a1440';
@@ -4478,6 +4509,7 @@ class FighterPainter {
     const lk = this.look;
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
+    this.prop = opts.prop || null;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
     const layers = opts.layers || {};
@@ -4565,9 +4597,62 @@ class FighterPainter {
       ctx.fill();
       for (const k of [0.7, 0.8, 0.9]) this.line(ctx, [along(E, Wr, k, rf1 + 1), along(E, Wr, k + 0.04, -(rf1 + 1))], 0.9, this.outline, 0.4);
     }
+    if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // Armour pauldron on the lead shoulder.
     if ((top.type === 'armor' || top.type === 'punkvest') && !back) this.drawPauldron(ctx, pass, S, E, A['upperArm' + side]);
+  }
+
+  /** Cast-iron frying pan gripped in the fist: handle along the hand, round pan beyond it. */
+  drawPan(ctx, pass, E, H, depth) {
+    const t = this.tint;
+    // handle follows the forearm with a slight wrist cock (same geometry as the pan hitbox)
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + PAN_COCK;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    const ang = Math.atan2(dy, dx);
+    const c = at(44);
+    const iron = this.mat(darken('#3a3b44', depth), t).base;
+    const handleC = this.mat(darken('#4a2c1a', depth), t).base;
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-8), at(26), 5.5, 5);
+      this.outlineFill(ctx);
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 22, 19, ang, 0, Math.PI * 2);
+      return this.outlineFill(ctx);
+    }
+    // wooden handle with a steel collar
+    ctx.beginPath();
+    limbPath(ctx, at(-8), at(26), 3.6, 3.2);
+    ctx.fillStyle = handleC;
+    ctx.fill();
+    this.line(ctx, [at(-6, 1.4), at(14, 1.4)], 1, rgba('#ffffff', 0.25), 1);
+    ctx.beginPath();
+    limbPath(ctx, at(16), at(26), 3.8, 4.4);
+    ctx.fillStyle = iron;
+    ctx.fill();
+    // pan body: outer rim, darker cooking surface, rim highlight
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, 22, 19, ang, 0, Math.PI * 2);
+    ctx.fillStyle = iron;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(c.x + dx * 1.5, c.y + dy * 1.5, 17, 14.5, ang, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(darken('#22232a', depth), t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = rgba(this.outline, 0.7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, 20, 17, ang, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = rgba('#c9cbd6', 0.75);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x - dx * 3, c.y - dy * 3, 7, 3.5, ang + 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = rgba('#ffffff', 0.12);
+    ctx.fill();
   }
 
   drawFist(ctx, pass, Wr, H, side, depth) {

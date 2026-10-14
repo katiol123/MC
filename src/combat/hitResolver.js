@@ -199,7 +199,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super,
+    super: !!spec.super, prop: spec.prop,
   };
 }
 

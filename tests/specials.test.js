@@ -103,6 +103,7 @@ test('supers: need a full bar, freeze the action, hit with every step for every 
     const steps = f.def.moves.su.steps.filter((s) => s.spec).length;
     const hits = ev.filter((e) => e.type === 'hit' && e.who === 0 && e.super).length;
     assert.equal(hits, steps, `${r.id}: ${hits}/${steps} super hits connected`);
+    if (r.id === 'bruno') assert.ok(ev.filter((e) => e.type === 'hit' && e.super).every((e) => e.prop === 'pan'), 'Bruno hits with the frying pan');
   }
 });
 

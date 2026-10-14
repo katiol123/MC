@@ -14,13 +14,17 @@ const SUPER = { super: true, isSpecial: true, strength: 'special', stance: 'stan
 // Small helpers to keep step lists readable.
 // the hit lands ~55% into the step, leaving time for the limb to come back before the next strike
 // big-arc strikes need more wind-up frames so the limb does not cross the screen in one frame
-const MIN_HIT_AT = { uppercut: 9, rising: 9, chop: 15, roundhouse: 9, whirl: 10, lunge: 9 };
+const MIN_HIT_AT = { panSwing: 9, uppercut: 9, rising: 9, chop: 15, roundhouse: 9, whirl: 10, lunge: 9 };
 const step = (anim, len, hit, extra = {}) => {
   const hitAt = Math.max(3, Math.round(len * 0.55), MIN_HIT_AT[anim] || 0);
   const kick = anim === 'roundhouse' || anim === 'frontKick' || anim === 'whirl';
   const finisher = hit && ['launch', 'knockdown', 'knockback'].includes(hit.reaction);
   return { anim, len: Math.max(len, hitAt + (kick ? 9 : 6)), hitAt, hitLen: finisher ? 4 : 2, vx: 2.6, hit, ...extra };
 };
+/** Wrist cock of the pan handle relative to the forearm (radians); the painter uses the same value. */
+export const PAN_COCK = 0.35;
+/** Frying pan held in the lead hand: forearm + a capsule over the pan head beyond the fist. */
+const PAN = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
 const H = (damage, o = {}) => ({ damage, hitstun: 32, blockstun: 16, hitstop: 6, reaction: 'light', push: { hit: 1.4, block: 2.6 }, stun: 0, ...o });
 const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
   hitstun: 36, hitstop: 14, reaction, push: { hit: 4, block: 5 }, launch: { vx: 5, vy: reaction === 'launch' ? 13 : 8 }, shake: 9, ...o,
@@ -130,8 +134,8 @@ export const SIGNATURES = {
       throwAnim: 'slam', duration: 44, release: 28, damage: 150, stun: 80, priority: 1,
     },
     su: {
-      ...SUPER, name: "Chef's Special", anim: 'sequence',
-      steps: [step('chop', 19, H(60)), step('cross', 10, H(55)), step('chop', 19, H(60)), step('chop', 19, FINISH(120, 'knockdown'))],
+      ...SUPER, name: "Chef's Special", anim: 'sequence', prop: { type: 'pan', hand: 'F' },
+      steps: [step('chop', 19, H(60, PAN)), step('panSwing', 14, H(55, PAN)), step('chop', 19, H(60, PAN)), step('chop', 19, FINISH(120, 'knockdown', PAN))],
       recoveryAfter: 18,
     },
   },

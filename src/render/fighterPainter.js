@@ -7,6 +7,7 @@
 import { limbPath, smoothClosed, smoothOpen, boxAlong, along } from './shapes.js';
 import { mix, lighten, darken, rgba } from './color.js';
 import { dirUp, dirFwd, DEG } from '../core/math.js';
+import { PAN_COCK } from '../data/signatures.js';
 
 const LIGHT = { x: 0.45, y: 0.89 };
 const SHADOW_TINT = '#2a1440';
@@ -102,6 +103,7 @@ export class FighterPainter {
     const lk = this.look;
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
+    this.prop = opts.prop || null;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
     const layers = opts.layers || {};
@@ -189,9 +191,62 @@ export class FighterPainter {
       ctx.fill();
       for (const k of [0.7, 0.8, 0.9]) this.line(ctx, [along(E, Wr, k, rf1 + 1), along(E, Wr, k + 0.04, -(rf1 + 1))], 0.9, this.outline, 0.4);
     }
+    if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // Armour pauldron on the lead shoulder.
     if ((top.type === 'armor' || top.type === 'punkvest') && !back) this.drawPauldron(ctx, pass, S, E, A['upperArm' + side]);
+  }
+
+  /** Cast-iron frying pan gripped in the fist: handle along the hand, round pan beyond it. */
+  drawPan(ctx, pass, E, H, depth) {
+    const t = this.tint;
+    // handle follows the forearm with a slight wrist cock (same geometry as the pan hitbox)
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + PAN_COCK;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    const ang = Math.atan2(dy, dx);
+    const c = at(44);
+    const iron = this.mat(darken('#3a3b44', depth), t).base;
+    const handleC = this.mat(darken('#4a2c1a', depth), t).base;
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-8), at(26), 5.5, 5);
+      this.outlineFill(ctx);
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 22, 19, ang, 0, Math.PI * 2);
+      return this.outlineFill(ctx);
+    }
+    // wooden handle with a steel collar
+    ctx.beginPath();
+    limbPath(ctx, at(-8), at(26), 3.6, 3.2);
+    ctx.fillStyle = handleC;
+    ctx.fill();
+    this.line(ctx, [at(-6, 1.4), at(14, 1.4)], 1, rgba('#ffffff', 0.25), 1);
+    ctx.beginPath();
+    limbPath(ctx, at(16), at(26), 3.8, 4.4);
+    ctx.fillStyle = iron;
+    ctx.fill();
+    // pan body: outer rim, darker cooking surface, rim highlight
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, 22, 19, ang, 0, Math.PI * 2);
+    ctx.fillStyle = iron;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(c.x + dx * 1.5, c.y + dy * 1.5, 17, 14.5, ang, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(darken('#22232a', depth), t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = rgba(this.outline, 0.7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, 20, 17, ang, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = rgba('#c9cbd6', 0.75);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x - dx * 3, c.y - dy * 3, 7, 3.5, ang + 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = rgba('#ffffff', 0.12);
+    ctx.fill();
   }
 
   drawFist(ctx, pass, Wr, H, side, depth) {
