@@ -524,6 +524,7 @@ class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.heal > 0) this.tone(0.3, { freq: 660, to: 1320, type: 'triangle', gain: 0.12 }); // heal chime
         if (e.claw) this.noise(0.14, { freq: 4200, q: 1.5, gain: 0.3, sweep: 0.5 }); // claw rake
         if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
         if (e.prop === 'pan') {
@@ -600,7 +601,7 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All ten are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All eleven are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
@@ -864,6 +865,31 @@ const ROSTER = [
       s1: { name: 'Honey Hammer' },
     },
   },
+  {
+    id: 'hawk',
+    name: 'SILAS "HAWK" GREYWATER',
+    title: 'The Unbending Elder',
+    blurb: 'Thirty years of dock fights and still standing. Once he hooks you in, you stay for the whole lesson.',
+    body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
+    stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
+    look: {
+      skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
+      eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
+      hair: { style: 'ponytail', color: '#1a1414', tie: '#3fb8a8' },
+      earrings: '#e2b440', hoops: true,
+      hat: { type: 'feathers', color: '#e8dcc0', tip: '#d4318f', band: '#2f9a8a', pattern: '#e2b440', disc: '#e2b440' },
+      top: { type: 'opencoat', color: '#7d7a3e', color2: '#2f9a8a', medallion: '#e2b440', pattern: '#2f9a8a', fringe: true, beads: '#e8e4d8' },
+      pants: { type: 'pants', color: '#5a3a24' },
+      belt: { color: '#3a2618', buckle: '#e2b440' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#6a4a30', sole: '#2a1a10' },
+      victory: 1,
+    },
+    moves: {
+      hk: { damage: 82 },
+      s1: { name: 'Hawk Strike' },
+    },
+  },
 ];
 
 const deepMerge = (base, over) => {
@@ -1083,6 +1109,9 @@ const FIRE = { fire: true, burn: 600 };
 const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
 const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
 
+/** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
+const HEAL = { lifesteal: 0.5 };
+
 const SIGNATURES = {
   brick: {
     s4: {
@@ -1236,6 +1265,22 @@ const SIGNATURES = {
       ...SUPER, name: 'Grizzly Fury', anim: 'sequence', claws: true,
       steps: [step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('chop', 19, FINISH(115, 'knockdown', CLAW_F))],
       recoveryAfter: 18,
+    },
+  },
+  hawk: {
+    // long reaching hook that drags the opponent in (negative push) with time to follow up
+    s4: {
+      name: 'Talon Pull', anim: 'lunge', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, pull: true,
+      startup: 13, active: 4, recovery: 22, motion: [{ from: 6, to: 14, vx: 5 }],
+      damage: 55, stun: 50, hitstun: 34, blockstun: 14, hitstop: 10,
+      height: 'mid', reaction: 'light', push: { hit: -7, block: 3 },
+      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 26, r: 16 }],
+      priority: 3,
+    },
+    su: {
+      ...SUPER, name: 'Second Wind', anim: 'sequence', heal: true,
+      steps: [step('jab', 9, H(40, HEAL)), step('cross', 10, H(50, HEAL)), step('frontKick', 14, H(45, HEAL)), step('cross', 10, H(50, HEAL)), step('lunge', 18, FINISH(100, 'knockback', HEAL), { vx: 6 })],
+      recoveryAfter: 16,
     },
   },
 };
@@ -4078,6 +4123,9 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
   ownHitstop(hitstop);
   if (!projectile) cornerPushback(att, def, spec.push.hit);
+  // second wind (Old Hawk's super): heal for a share of the damage dealt
+  const heal = spec.lifesteal && !projectile ? Math.min(att.maxHealth - att.health, Math.round(damage * spec.lifesteal)) : 0;
+  if (heal > 0 && att.health > 0) att.health += heal;
   // set on fire (Cinder's super): every fire hit restarts the burn timer
   if (spec.burn && def.health > 0) def.burn = Math.max(def.burn, spec.burn);
   if (!spec.super) att.gainMeter(damage * TUNING.meterOnHit);
@@ -4087,7 +4135,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: spec.push.hit < 0,
   };
 }
 
@@ -4109,6 +4157,7 @@ function applyParry(att, def, point) {
 /** If the defender is pinned against a wall, the attacker is pushed back instead. */
 function cornerPushback(att, def, push) {
   const dirAway = Math.sign(def.body.x - att.body.x) || att.facing;
+  if (push <= 0) return; // pulls never push the attacker back
   if (def.body.wall === dirAway || Math.abs(def.body.x - (dirAway > 0 ? STAGE.right - def.body.pushW : STAGE.left + def.body.pushW)) < 4) {
     if (att.body.onGround) att.body.vx = -dirAway * push * 0.9;
   }
@@ -5514,6 +5563,38 @@ class FighterPainter {
         ctx.fillStyle = this.mat(top.color, t).base;
         ctx.fill();
         this.line(ctx, [P2(N, fC, cw * 0.33, uC, 4), P2(N, fC, cw * 0.38, uC, -up * 0.6), P2(Pv, fS, ww * 0.37, uS, -10)], 3, this.mat(top.color2, t).base);
+        if (top.pattern) {
+          // stepped diamonds woven into the coat
+          for (const [a, b] of [[-0.5, 0.3], [-1.0, 0.45], [-0.6, 0.62], [-1.2, 0.75]]) {
+            const c = P2(N, fC, cw * a, uC, -up * b);
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y + 6); ctx.lineTo(c.x + 5, c.y); ctx.lineTo(c.x, c.y - 6); ctx.lineTo(c.x - 5, c.y);
+            ctx.fillStyle = this.mat(top.pattern, t).base;
+            ctx.fill();
+          }
+        }
+        if (top.fringe) {
+          // leather fringe hanging off the front edge and the hem
+          const fr = this.mat(darken(top.color, 0.12), t).base;
+          for (let i = 0; i <= 6; i++) {
+            const p = P2(N, fC, cw * (0.36 + i * 0.002), uC, -up * (0.2 + i * 0.07));
+            this.line(ctx, [p, { x: p.x + fC.x * 7 - uC.x * 5, y: p.y + fC.y * 7 - uC.y * 5 }], 2, fr);
+          }
+          for (let i = 0; i <= 7; i++) {
+            const p = P2(Pv, fS, ww * (0.3 - i * 0.28), uS, -10);
+            this.line(ctx, [p, { x: p.x - uS.x * 9, y: p.y - uS.y * 9 }], 2, fr);
+          }
+        }
+        if (top.beads) {
+          // bead necklace above the medallion
+          for (let i = 0; i < 7; i++) {
+            const b = P2(N, fC, cw * (0.05 + i * 0.14), uC, -4 - Math.sin((i / 6) * Math.PI) * up * 0.22);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 2.6, 0, Math.PI * 2);
+            ctx.fillStyle = this.mat(i % 2 ? top.beads : top.medallion, t).base;
+            ctx.fill();
+          }
+        }
         const chain = [P2(N, fC, -2, uC, -2), P2(N, fC, cw * 0.55, uC, -up * 0.42), P2(N, fC, cw * 0.95, uC, -2)];
         this.line(ctx, chain, 2, this.mat(top.medallion, t).base);
         const md = chain[1];
@@ -5729,6 +5810,13 @@ class FighterPainter {
       ctx.fill();
     }
     if (lk.beard) this.drawBeard(ctx, R, lk.beard);
+    if (lk.facepaint) {
+      // painted band across the eyes
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: -0.1 * R, y: 0.02 * R }, { x: 0.6 * R, y: 0.12 * R }, { x: 1.25 * R, y: 0.18 * R }, { x: 1.25 * R, y: -0.12 * R }, { x: 0.6 * R, y: -0.2 * R }, { x: -0.1 * R, y: -0.18 * R }], 0.3);
+      ctx.fillStyle = rgba(this.mat(lk.facepaint, t).base, 0.85);
+      ctx.fill();
+    }
     this.headShade(ctx, R);
     ctx.restore();
     this.drawEars(ctx, 'fill', R, weasel);
@@ -6184,9 +6272,68 @@ class FighterPainter {
     ], 0.45);
   }
 
+  /** Feather headdress: a fan of feathers over the crown, a patterned headband and a gold disc. */
+  drawFeathers(ctx, R, hat) {
+    const t = this.tint, outl = this.outline;
+    const quill = this.mat(hat.color, t).base, tip = this.mat(hat.tip, t).base;
+    // back to front so the forward feathers overlap the ones behind
+    for (let i = 0; i < 9; i++) {
+      const a = (175 - i * 11) * DEG;
+      const L = R * (1.9 + 0.4 * Math.sin(i * 1.7));
+      const bx = Math.cos(a) * 0.82 * R, by = Math.sin(a) * 0.82 * R + 0.25 * R;
+      const mx = bx + Math.cos(a) * L * 0.5, my = by + Math.sin(a) * L * 0.5;
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, L * 0.5, 0.24 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = quill;
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = tip;
+      ctx.fillRect(L * 0.12, -R, L, 2 * R);
+      ctx.restore();
+      this.line(ctx, [{ x: -L * 0.5, y: 0 }, { x: L * 0.42, y: 0 }], 1, outl, 0.5);
+      ctx.restore();
+    }
+    // headband
+    ctx.beginPath();
+    smoothOpen(ctx, [{ x: -1.0 * R, y: 0.42 * R }, { x: 0.0, y: 0.62 * R }, { x: 0.98 * R, y: 0.56 * R }]);
+    ctx.lineWidth = 0.3 * R + 2.5;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    ctx.lineWidth = 0.3 * R;
+    ctx.strokeStyle = this.mat(hat.band, t).base;
+    ctx.stroke();
+    for (const x of [-0.6, -0.1, 0.4]) {
+      ctx.beginPath();
+      const y = 0.55 * R + (x < 0 ? x * 0.12 * R : 0);
+      ctx.moveTo(x * R, y - 0.1 * R); ctx.lineTo((x + 0.12) * R, y); ctx.lineTo(x * R, y + 0.1 * R); ctx.lineTo((x - 0.12) * R, y);
+      ctx.fillStyle = this.mat(hat.pattern, t).base;
+      ctx.fill();
+    }
+    // gold disc at the temple
+    ctx.beginPath();
+    ctx.arc(-0.5 * R, 0.5 * R, 0.24 * R, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(hat.disc, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-0.5 * R, 0.5 * R, 0.11 * R, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(outl, 0.6);
+    ctx.stroke();
+  }
+
   drawHat(ctx, R) {
     const hat = this.look.hat, t = this.tint;
     const c = this.mat(hat.color, t);
+    if (hat.type === 'feathers') return this.drawFeathers(ctx, R, hat);
     if (hat.type === 'chef') {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: -0.85 * R, y: 0.55 * R }, { x: -1.15 * R, y: 1.5 * R }, { x: -0.6 * R, y: 2.2 * R }, { x: 0.1 * R, y: 2.05 * R }, { x: 0.7 * R, y: 2.25 * R }, { x: 1.2 * R, y: 1.55 * R }, { x: 0.85 * R, y: 0.6 * R }], 0.45);
@@ -6649,6 +6796,14 @@ class Effects {
         const n = heavy ? 18 : 10;
         const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
         if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
+        if (e.heal > 0) {
+          // life flows from the target back to the attacker
+          const a = fighters?.[e.who];
+          if (a) {
+            for (let i = 0; i < 8; i++) this.parts.push({ kind: 'mote', x: e.x + (this.rnd() - 0.5) * 30, y: e.y + (this.rnd() - 0.5) * 30, tx: a.body.x, ty: a.body.y + 130, life: 26 + i * 2, max: 26 + i * 2, w: this.rnd() });
+            this.labels.push({ text: `+${e.heal}`, x: a.body.x, y: a.body.y + 250, life: 40, color: '#5ff0b8' });
+          }
+        }
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
@@ -6760,6 +6915,7 @@ class Effects {
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
       else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
       else if (p.kind === 'fireball') p.r += 3.5;
+      else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
     for (const l of this.labels) { l.life--; l.y += 0.8; }
@@ -6819,6 +6975,11 @@ class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'mote') {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, s.x, s.y, 9 * cam.zoom, 0.8 * Math.min(1, k * 2), '95,240,184');
+        ctx.globalCompositeOperation = prev;
       } else if (p.kind === 'claw') {
         // three parallel claw slashes that draw in, then fade
         const draw = Math.min(1, (p.max - p.life) / 4);
@@ -7661,7 +7822,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170], grizz: [100, 190],
+  cinder: [60, 170], grizz: [100, 190], hawk: [90, 170],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
@@ -7757,6 +7918,7 @@ class AIController {
     else if (id === 'clk') this.queue(r.chance(0.6) ? M.s1 : press('hk', 'd'));
     else if (id === 'lk') this.queue(r.chance(0.5) ? press('hk') : M.s3);
     else if ((id === 'hp' || id === 'chp') && mv.contact === 'hit') this.queue(r.chance(0.5) ? M.s1 : M.s2);
+    else if (id === 's4' && mv.def.pull && mv.contact === 'hit') this.queue(r.chance(0.5) ? press('hp') : [{ d: '', n: 6 }, ...press('lp'), ...press('hp')]); // reel in, then punish
   }
 
   decide(match, me, op) {

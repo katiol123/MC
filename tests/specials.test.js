@@ -41,7 +41,7 @@ test('command grab (Bruno) cannot be teched', () => {
 });
 
 test('every fighter has a working signature special that connects in its intended range', () => {
-  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60 };
+  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60, hawk: 100 };
   for (const r of ROSTER) {
     if (!(r.id in range)) continue; // vellaro: counter stance, tested separately
     const m = fightingMatch({ p1: r.id, p2: 'jax' });
@@ -98,6 +98,36 @@ test('Grizzly Charge: supers break through the armour', () => {
   const ev = run(m, 140, (i) => [raw(S4[Math.floor((i - 8) / 2)] || {}), raw(SU2[Math.floor(i / 2)] || {})]);
   assert.ok(!ev.some((e) => e.type === 'armor'), 'no armour against a super');
   assert.ok(ev.some((e) => e.type === 'hit' && e.who === 1 && e.super));
+});
+
+test('Talon Pull drags the opponent in and leaves time for a follow-up', () => {
+  const m = fightingMatch({ p1: 'hawk', p2: 'brick' });
+  const [h, o] = m.fighters;
+  place(m, 800, 800 + h.body.pushW + o.body.pushW + 100);
+  const gap0 = o.body.x - h.body.x;
+  let ev = run(m, 40, p1seq(S4));
+  assert.ok(ev.some((e) => e.type === 'hit' && e.who === 0 && e.move === 's4' && e.pull), 'pull connected');
+  assert.ok(o.body.x - h.body.x < gap0 - 40, 'opponent pulled closer');
+  // a jab right after recovery still catches the pulled opponent (still in hitstun)
+  for (let i = 0; i < 40 && h.state === 'attack'; i++) run(m, 1);
+  assert.equal(o.state, 'hitstun', 'Old Hawk recovers while the opponent is still reeling (frame advantage)');
+  ev = run(m, 30, (i) => [raw({ lp: i === 0 }), raw()]);
+  assert.ok(ev.some((e) => e.type === 'hit' && e.who === 0 && e.move === 'lp'), 'follow-up connects');
+});
+
+test('Second Wind: every super hit heals Old Hawk for half the damage dealt', () => {
+  const m = fightingMatch({ p1: 'hawk', p2: 'brick' });
+  const [h] = m.fighters;
+  place(m, 800, 880);
+  h.health = 400;
+  h.meter = 100;
+  const ev = run(m, 220, p1seq(SU));
+  const hits = ev.filter((e) => e.type === 'hit' && e.who === 0 && e.super);
+  assert.equal(hits.length, 5);
+  const dealt = hits.reduce((a, e) => a + e.damage, 0), healed = hits.reduce((a, e) => a + e.heal, 0);
+  assert.ok(hits.every((e) => e.heal > 0));
+  assert.ok(Math.abs(healed - dealt / 2) <= 3, `healed ${healed} of ${dealt}`);
+  assert.equal(h.health, 400 + healed);
 });
 
 test('projectiles: one on screen per fighter, blockable, cancel each other', () => {

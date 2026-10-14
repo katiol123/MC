@@ -37,6 +37,9 @@ const FIRE = { fire: true, burn: 600 };
 const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
 const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
 
+/** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
+const HEAL = { lifesteal: 0.5 };
+
 export const SIGNATURES = {
   brick: {
     s4: {
@@ -190,6 +193,22 @@ export const SIGNATURES = {
       ...SUPER, name: 'Grizzly Fury', anim: 'sequence', claws: true,
       steps: [step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('chop', 19, FINISH(115, 'knockdown', CLAW_F))],
       recoveryAfter: 18,
+    },
+  },
+  hawk: {
+    // long reaching hook that drags the opponent in (negative push) with time to follow up
+    s4: {
+      name: 'Talon Pull', anim: 'lunge', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, pull: true,
+      startup: 13, active: 4, recovery: 22, motion: [{ from: 6, to: 14, vx: 5 }],
+      damage: 55, stun: 50, hitstun: 34, blockstun: 14, hitstop: 10,
+      height: 'mid', reaction: 'light', push: { hit: -7, block: 3 },
+      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 26, r: 16 }],
+      priority: 3,
+    },
+    su: {
+      ...SUPER, name: 'Second Wind', anim: 'sequence', heal: true,
+      steps: [step('jab', 9, H(40, HEAL)), step('cross', 10, H(50, HEAL)), step('frontKick', 14, H(45, HEAL)), step('cross', 10, H(50, HEAL)), step('lunge', 18, FINISH(100, 'knockback', HEAL), { vx: 6 })],
+      recoveryAfter: 16,
     },
   },
 };

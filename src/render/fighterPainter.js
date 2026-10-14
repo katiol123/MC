@@ -854,6 +854,38 @@ export class FighterPainter {
         ctx.fillStyle = this.mat(top.color, t).base;
         ctx.fill();
         this.line(ctx, [P2(N, fC, cw * 0.33, uC, 4), P2(N, fC, cw * 0.38, uC, -up * 0.6), P2(Pv, fS, ww * 0.37, uS, -10)], 3, this.mat(top.color2, t).base);
+        if (top.pattern) {
+          // stepped diamonds woven into the coat
+          for (const [a, b] of [[-0.5, 0.3], [-1.0, 0.45], [-0.6, 0.62], [-1.2, 0.75]]) {
+            const c = P2(N, fC, cw * a, uC, -up * b);
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y + 6); ctx.lineTo(c.x + 5, c.y); ctx.lineTo(c.x, c.y - 6); ctx.lineTo(c.x - 5, c.y);
+            ctx.fillStyle = this.mat(top.pattern, t).base;
+            ctx.fill();
+          }
+        }
+        if (top.fringe) {
+          // leather fringe hanging off the front edge and the hem
+          const fr = this.mat(darken(top.color, 0.12), t).base;
+          for (let i = 0; i <= 6; i++) {
+            const p = P2(N, fC, cw * (0.36 + i * 0.002), uC, -up * (0.2 + i * 0.07));
+            this.line(ctx, [p, { x: p.x + fC.x * 7 - uC.x * 5, y: p.y + fC.y * 7 - uC.y * 5 }], 2, fr);
+          }
+          for (let i = 0; i <= 7; i++) {
+            const p = P2(Pv, fS, ww * (0.3 - i * 0.28), uS, -10);
+            this.line(ctx, [p, { x: p.x - uS.x * 9, y: p.y - uS.y * 9 }], 2, fr);
+          }
+        }
+        if (top.beads) {
+          // bead necklace above the medallion
+          for (let i = 0; i < 7; i++) {
+            const b = P2(N, fC, cw * (0.05 + i * 0.14), uC, -4 - Math.sin((i / 6) * Math.PI) * up * 0.22);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 2.6, 0, Math.PI * 2);
+            ctx.fillStyle = this.mat(i % 2 ? top.beads : top.medallion, t).base;
+            ctx.fill();
+          }
+        }
         const chain = [P2(N, fC, -2, uC, -2), P2(N, fC, cw * 0.55, uC, -up * 0.42), P2(N, fC, cw * 0.95, uC, -2)];
         this.line(ctx, chain, 2, this.mat(top.medallion, t).base);
         const md = chain[1];
@@ -1069,6 +1101,13 @@ export class FighterPainter {
       ctx.fill();
     }
     if (lk.beard) this.drawBeard(ctx, R, lk.beard);
+    if (lk.facepaint) {
+      // painted band across the eyes
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: -0.1 * R, y: 0.02 * R }, { x: 0.6 * R, y: 0.12 * R }, { x: 1.25 * R, y: 0.18 * R }, { x: 1.25 * R, y: -0.12 * R }, { x: 0.6 * R, y: -0.2 * R }, { x: -0.1 * R, y: -0.18 * R }], 0.3);
+      ctx.fillStyle = rgba(this.mat(lk.facepaint, t).base, 0.85);
+      ctx.fill();
+    }
     this.headShade(ctx, R);
     ctx.restore();
     this.drawEars(ctx, 'fill', R, weasel);
@@ -1524,9 +1563,68 @@ export class FighterPainter {
     ], 0.45);
   }
 
+  /** Feather headdress: a fan of feathers over the crown, a patterned headband and a gold disc. */
+  drawFeathers(ctx, R, hat) {
+    const t = this.tint, outl = this.outline;
+    const quill = this.mat(hat.color, t).base, tip = this.mat(hat.tip, t).base;
+    // back to front so the forward feathers overlap the ones behind
+    for (let i = 0; i < 9; i++) {
+      const a = (175 - i * 11) * DEG;
+      const L = R * (1.9 + 0.4 * Math.sin(i * 1.7));
+      const bx = Math.cos(a) * 0.82 * R, by = Math.sin(a) * 0.82 * R + 0.25 * R;
+      const mx = bx + Math.cos(a) * L * 0.5, my = by + Math.sin(a) * L * 0.5;
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, L * 0.5, 0.24 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = quill;
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = tip;
+      ctx.fillRect(L * 0.12, -R, L, 2 * R);
+      ctx.restore();
+      this.line(ctx, [{ x: -L * 0.5, y: 0 }, { x: L * 0.42, y: 0 }], 1, outl, 0.5);
+      ctx.restore();
+    }
+    // headband
+    ctx.beginPath();
+    smoothOpen(ctx, [{ x: -1.0 * R, y: 0.42 * R }, { x: 0.0, y: 0.62 * R }, { x: 0.98 * R, y: 0.56 * R }]);
+    ctx.lineWidth = 0.3 * R + 2.5;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    ctx.lineWidth = 0.3 * R;
+    ctx.strokeStyle = this.mat(hat.band, t).base;
+    ctx.stroke();
+    for (const x of [-0.6, -0.1, 0.4]) {
+      ctx.beginPath();
+      const y = 0.55 * R + (x < 0 ? x * 0.12 * R : 0);
+      ctx.moveTo(x * R, y - 0.1 * R); ctx.lineTo((x + 0.12) * R, y); ctx.lineTo(x * R, y + 0.1 * R); ctx.lineTo((x - 0.12) * R, y);
+      ctx.fillStyle = this.mat(hat.pattern, t).base;
+      ctx.fill();
+    }
+    // gold disc at the temple
+    ctx.beginPath();
+    ctx.arc(-0.5 * R, 0.5 * R, 0.24 * R, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(hat.disc, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-0.5 * R, 0.5 * R, 0.11 * R, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(outl, 0.6);
+    ctx.stroke();
+  }
+
   drawHat(ctx, R) {
     const hat = this.look.hat, t = this.tint;
     const c = this.mat(hat.color, t);
+    if (hat.type === 'feathers') return this.drawFeathers(ctx, R, hat);
     if (hat.type === 'chef') {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: -0.85 * R, y: 0.55 * R }, { x: -1.15 * R, y: 1.5 * R }, { x: -0.6 * R, y: 2.2 * R }, { x: 0.1 * R, y: 2.05 * R }, { x: 0.7 * R, y: 2.25 * R }, { x: 1.2 * R, y: 1.55 * R }, { x: 0.85 * R, y: 0.6 * R }], 0.45);

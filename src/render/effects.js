@@ -24,6 +24,14 @@ export class Effects {
         const n = heavy ? 18 : 10;
         const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
         if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
+        if (e.heal > 0) {
+          // life flows from the target back to the attacker
+          const a = fighters?.[e.who];
+          if (a) {
+            for (let i = 0; i < 8; i++) this.parts.push({ kind: 'mote', x: e.x + (this.rnd() - 0.5) * 30, y: e.y + (this.rnd() - 0.5) * 30, tx: a.body.x, ty: a.body.y + 130, life: 26 + i * 2, max: 26 + i * 2, w: this.rnd() });
+            this.labels.push({ text: `+${e.heal}`, x: a.body.x, y: a.body.y + 250, life: 40, color: '#5ff0b8' });
+          }
+        }
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
@@ -135,6 +143,7 @@ export class Effects {
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
       else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
       else if (p.kind === 'fireball') p.r += 3.5;
+      else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
     for (const l of this.labels) { l.life--; l.y += 0.8; }
@@ -194,6 +203,11 @@ export class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'mote') {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, s.x, s.y, 9 * cam.zoom, 0.8 * Math.min(1, k * 2), '95,240,184');
+        ctx.globalCompositeOperation = prev;
       } else if (p.kind === 'claw') {
         // three parallel claw slashes that draw in, then fade
         const draw = Math.min(1, (p.max - p.life) / 4);

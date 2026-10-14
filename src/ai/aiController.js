@@ -23,7 +23,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170], grizz: [100, 190],
+  cinder: [60, 170], grizz: [100, 190], hawk: [90, 170],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
@@ -119,6 +119,7 @@ export class AIController {
     else if (id === 'clk') this.queue(r.chance(0.6) ? M.s1 : press('hk', 'd'));
     else if (id === 'lk') this.queue(r.chance(0.5) ? press('hk') : M.s3);
     else if ((id === 'hp' || id === 'chp') && mv.contact === 'hit') this.queue(r.chance(0.5) ? M.s1 : M.s2);
+    else if (id === 's4' && mv.def.pull && mv.contact === 'hit') this.queue(r.chance(0.5) ? press('hp') : [{ d: '', n: 6 }, ...press('lp'), ...press('hp')]); // reel in, then punish
   }
 
   decide(match, me, op) {

@@ -1,7 +1,7 @@
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All ten are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All eleven are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
@@ -263,6 +263,31 @@ export const ROSTER = [
     moves: {
       hp: { damage: 90, stun: 80 },
       s1: { name: 'Honey Hammer' },
+    },
+  },
+  {
+    id: 'hawk',
+    name: 'SILAS "HAWK" GREYWATER',
+    title: 'The Unbending Elder',
+    blurb: 'Thirty years of dock fights and still standing. Once he hooks you in, you stay for the whole lesson.',
+    body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
+    stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
+    look: {
+      skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
+      eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
+      hair: { style: 'ponytail', color: '#1a1414', tie: '#3fb8a8' },
+      earrings: '#e2b440', hoops: true,
+      hat: { type: 'feathers', color: '#e8dcc0', tip: '#d4318f', band: '#2f9a8a', pattern: '#e2b440', disc: '#e2b440' },
+      top: { type: 'opencoat', color: '#7d7a3e', color2: '#2f9a8a', medallion: '#e2b440', pattern: '#2f9a8a', fringe: true, beads: '#e8e4d8' },
+      pants: { type: 'pants', color: '#5a3a24' },
+      belt: { color: '#3a2618', buckle: '#e2b440' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#6a4a30', sole: '#2a1a10' },
+      victory: 1,
+    },
+    moves: {
+      hk: { damage: 82 },
+      s1: { name: 'Hawk Strike' },
     },
   },
 ];
