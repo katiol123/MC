@@ -60,6 +60,15 @@ export class Effects {
         }
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
         if (e.fire) this.fireBurst(e.x, e.y, 6, 0);
+        if (e.guardBreak) {
+          // the guard shatters into shards
+          for (let i = 0; i < 16; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 4 + this.rnd() * 6;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 2, life: 22, max: 22, color: '#7fe8ff', w: 3 });
+          }
+          this.labels.push({ text: 'GUARD BREAK!', x: e.x, y: e.y + 70, life: 55, color: '#ffd23f' });
+          this.shake = Math.max(this.shake, 7);
+        }
         break;
       }
       case 'parry':
@@ -162,6 +171,10 @@ export class Effects {
   tick(fighters) {
     // battered fighters sweat; an overheated Cinder smokes
     for (const f of fighters || []) {
+      if (f.focus > 0 && this.rnd() < 0.3) {
+        // Focus: golden motes rising around the body
+        this.parts.push({ kind: 'ember', x: f.body.x + (this.rnd() - 0.5) * 90, y: f.body.y + this.rnd() * 160, vx: 0, vy: 1.2 + this.rnd(), life: 30, max: 46, r: 1.6 + this.rnd() * 1.5 });
+      }
       if (!f.critical || f.state === 'ko') continue;
       this.clock = (this.clock || 0) + 1;
       const head = f.skel.j.head, hx = f.body.x + f.facing * head.x, hy = f.body.y + head.y;

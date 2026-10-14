@@ -48,6 +48,8 @@ export const TUNING = {
   superFreeze: 48, // cinematic freeze when a super starts
   // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
   criticalHealth: 0.3, // below this share of health a fighter looks battered (props fly off, heavy breathing)
+  focusDamage: 1.3, // damage multiplier while in Focus (Tao's super)
+  guardBreakStagger: 36, // ticks of stagger after a guard-breaking blocked strike
   burnInterval: 30,
   armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,

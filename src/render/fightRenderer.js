@@ -122,6 +122,7 @@ export class FightRenderer {
     }
     const z = this.cam.zoom;
     const sq = sec.squash;
+    if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s);
     ctx.save();
     ctx.translate(s.x + jitter, s.y);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
@@ -134,10 +135,12 @@ export class FightRenderer {
     // flaming fists only on fire moves (specials / super), never on normal attacks
     const fire = !!(mv?.def.fire && f.state === 'attack');
     const claws = !!(mv?.def.claws && f.state === 'attack');
+    const flurry = !!(mv?.def.flurry && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
       claws,
+      flurry,
       critical: f.critical,
       now,
       layers: f.anim.layers,
@@ -150,6 +153,25 @@ export class FightRenderer {
     if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Focus (Tao's super buff): a pulsing golden aura behind the fighter (screen space). */
+  drawFocusAura(ctx, f, skel, now, z, s) {
+    const t = now / 1000, fade = Math.min(1, f.focus / 60);
+    const prev = ctx.globalCompositeOperation;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const cy = s.y - 120 * z * f.props.posScale;
+    drawGlow(ctx, s.x, cy, (110 + 8 * Math.sin(t * 6)) * z, 0.32 * fade, '255,210,90');
+    ctx.globalCompositeOperation = prev;
+    ctx.strokeStyle = `rgba(255,214,90,${0.5 * fade})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.ellipse(s.x, cy, (70 + i * 14 + 6 * Math.sin(t * 5 + i)) * z, (130 + i * 10) * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */

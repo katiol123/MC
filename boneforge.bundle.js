@@ -396,6 +396,8 @@ const TUNING = {
   superFreeze: 48, // cinematic freeze when a super starts
   // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
   criticalHealth: 0.3, // below this share of health a fighter looks battered (props fly off, heavy breathing)
+  focusDamage: 1.3, // damage multiplier while in Focus (Tao's super)
+  guardBreakStagger: 36, // ticks of stagger after a guard-breaking blocked strike
   burnInterval: 30,
   armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,
@@ -537,6 +539,7 @@ class AudioSystem {
         break;
       }
       case 'block':
+        if (e.guardBreak) { this.noise(0.35, { freq: 2600, q: 0.8, gain: 0.5, sweep: 0.5 }); this.tone(0.3, { freq: 220, to: 70, gain: 0.5 }); break; }
         this.noise(0.08, { freq: 3200, q: 3, gain: 0.35 });
         this.tone(0.07, { freq: 700, to: 400, type: 'triangle', gain: 0.15 });
         break;
@@ -606,7 +609,7 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All eleven are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All twelve are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
@@ -917,6 +920,31 @@ const ROSTER = [
       s1: { name: 'Hawk Strike' },
     },
   },
+  {
+    id: 'tao',
+    name: 'TAO "STONE FIST" WEN',
+    title: 'Ten Thousand Repetitions',
+    blurb: 'Shaved head, wrapped fists, zero small talk. Every punch he throws he has practised ten thousand times.',
+    body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
+    stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
+    look: {
+      skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
+      eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
+      hair: { style: 'bald', color: '#4a3a30' },
+      top: { type: 'gi', color: '#d9d4cc', color2: '#d4318f', knots: '#8a8a92', emblem: '#e2b440', emblem2: '#c42f8f' },
+      pants: { type: 'pants', color: '#cfc9bf' },
+      belt: { color: '#1a1a1e', buckle: '#1a1a1e' },
+      gloves: { type: 'fingerless', color: '#6a6e72' },
+      shoes: { type: 'shoes', color: '#1c1a1e', sole: '#0c0b0d' },
+      victory: 0,
+    },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { belt: null, top: { open: true } }, props: [{ type: 'belt', from: 'chest', vx: -2, vy: 7, spin: 0.05 }] },
+    moves: {
+      lp: { startup: 3 },
+      s1: { name: 'Stone Fist' },
+    },
+  },
 ];
 
 const deepMerge = (base, over) => {
@@ -1142,6 +1170,9 @@ const TALON_REACH = 120;
 /** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
 const HEAL = { lifesteal: 0.5 };
 
+/** Flurry jabs (Tao): tiny hits that keep the opponent locked; afterimage fists are drawn. */
+const JAB = (damage) => H(damage, { hitstun: 22, blockstun: 12, hitstop: 3, push: { hit: 0.6, block: 1.0 } });
+
 const SIGNATURES = {
   brick: {
     s4: {
@@ -1310,6 +1341,22 @@ const SIGNATURES = {
     su: {
       ...SUPER, name: 'Second Wind', anim: 'sequence', heal: true,
       steps: [step('jab', 9, H(40, HEAL)), step('cross', 10, H(50, HEAL)), step('frontKick', 14, H(45, HEAL)), step('cross', 10, H(50, HEAL)), step('lunge', 18, FINISH(100, 'knockback', HEAL), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+  tao: {
+    // six blurring jabs; the closing palm breaks a guard that held through the flurry
+    s4: {
+      name: 'Hundred Fists', anim: 'sequence', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, priority: 4, flurry: true,
+      steps: [step('jab', 6, JAB(12)), step('cross', 6, JAB(12)), step('jab', 6, JAB(12)), step('cross', 6, JAB(12)), step('jab', 6, JAB(12)), step('cross', 6, JAB(12)),
+        step('lunge', 14, FINISH(44, 'knockback', { guardBreak: true, hitstop: 12, launch: { vx: 4, vy: 6 } }), { vx: 4 })],
+      recoveryAfter: 18, chip: true,
+    },
+    // longer flurry; starting it puts Tao in Focus: +30% damage for 8 s (golden aura)
+    su: {
+      ...SUPER, name: 'Ten Thousand Fists', anim: 'sequence', flurry: true, focus: 480,
+      steps: [step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)),
+        step('lunge', 18, FINISH(95, 'knockback'), { vx: 6 })],
       recoveryAfter: 16,
     },
   },
@@ -2475,6 +2522,7 @@ class Fighter {
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
     this.pulled = null; // being reeled in by a pull
+    this.focus = 0; // ticks of Focus left (+damage)
     this.critical = false; // battered look + heavy breathing (health below TUNING.criticalHealth)
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
@@ -2572,6 +2620,7 @@ class Fighter {
     }
     this.stateFrame++;
     if (this.throwProtect > 0) this.throwProtect--;
+    if (this.focus > 0) this.focus--;
     // the stun meter only recovers after a pause in the punishment
     this.sinceHit++;
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
@@ -2808,6 +2857,7 @@ class Fighter {
       this.meter -= m.cost ?? TUNING.superCost;
       this.superLock = TUNING.superCooldown;
       this.emit({ type: 'superStart', who: this.index, name: m.name });
+      if (m.focus) this.focus = m.focus;
     }
     // Cross-fade into the move: short for fast normals, longer when the body must change posture
     // (cancels, stand -> crouch) so no limb snaps across the screen in a single frame.
@@ -4168,6 +4218,13 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     const hs = Math.round(spec.hitstop * TUNING.blockHitstopScale);
     def.receiveBlock(from, spec, hs);
     ownHitstop(hs);
+    if (spec.guardBreak) {
+      // the guard shatters: a long stagger instead of blockstun
+      const d = TUNING.guardBreakStagger;
+      def.setState('stagger', { duration: d }, 'stagger', { blend: 5, params: { duration: d } });
+      note(att, 'GUARD BREAK');
+      return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low, guardBreak: true };
+    }
     if (!projectile) cornerPushback(att, def, spec.push.block);
     if (!spec.super) att.gainMeter(spec.damage * TUNING.meterOnBlock);
     def.gainMeter(spec.damage * TUNING.meterOnDamaged * 0.5);
@@ -4182,7 +4239,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
   const partMul = TUNING.partDamage[res.part] ?? 1;
-  const dmgMul = att.stats.damage ?? 1;
+  const dmgMul = (att.stats.damage ?? 1) * (att.focus > 0 ? TUNING.focusDamage : 1);
   const damage = Math.max(1, Math.round(spec.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
   const decay = spec.comboExempt ? 0 : Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
   const hitstun = Math.max(TUNING.minHitstun, spec.hitstun + (counter ? TUNING.counterHitStun : 0) - decay);
@@ -4540,6 +4597,7 @@ class FightRenderer {
     }
     const z = this.cam.zoom;
     const sq = sec.squash;
+    if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s);
     ctx.save();
     ctx.translate(s.x + jitter, s.y);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
@@ -4552,10 +4610,12 @@ class FightRenderer {
     // flaming fists only on fire moves (specials / super), never on normal attacks
     const fire = !!(mv?.def.fire && f.state === 'attack');
     const claws = !!(mv?.def.claws && f.state === 'attack');
+    const flurry = !!(mv?.def.flurry && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
       claws,
+      flurry,
       critical: f.critical,
       now,
       layers: f.anim.layers,
@@ -4568,6 +4628,25 @@ class FightRenderer {
     if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Focus (Tao's super buff): a pulsing golden aura behind the fighter (screen space). */
+  drawFocusAura(ctx, f, skel, now, z, s) {
+    const t = now / 1000, fade = Math.min(1, f.focus / 60);
+    const prev = ctx.globalCompositeOperation;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const cy = s.y - 120 * z * f.props.posScale;
+    drawGlow(ctx, s.x, cy, (110 + 8 * Math.sin(t * 6)) * z, 0.32 * fade, '255,210,90');
+    ctx.globalCompositeOperation = prev;
+    ctx.strokeStyle = `rgba(255,214,90,${0.5 * fade})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.ellipse(s.x, cy, (70 + i * 14 + 6 * Math.sin(t * 5 + i)) * z, (130 + i * 10) * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */
@@ -4941,6 +5020,7 @@ class FighterPainter {
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
+    this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
@@ -4982,7 +5062,7 @@ class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -5032,6 +5112,23 @@ class FighterPainter {
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
+    // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
+    if (this.flurry && pass === 'fill') {
+      const dx = H.x - E.x, dy = H.y - E.y, l = Math.hypot(dx, dy) || 1;
+      ctx.save();
+      for (const [k, off, a] of [[16, 9, 0.35], [30, -7, 0.22], [44, 12, 0.12]]) {
+        const cx = H.x + (dx / l) * k - (dy / l) * off, cy = H.y + (dy / l) * k + (dx / l) * off;
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(cx, cy, this.pr.rHand * 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(this.look.skin, 0).light;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     // flaming fists (Cinder's specials / super only; normal attacks stay clean)
     if (this.fire && pass === 'fill') {
       const c = along(Wr, H, 0.7);
@@ -5741,6 +5838,39 @@ class FighterPainter {
         ctx.strokeStyle = this.outline;
         ctx.stroke();
         this.line(ctx, [P2(N, fC, cw * 0.9, uC, -up * 0.55), P2(N, fC, cw * 0.2, uC, -up * 0.6)], 1.3, outl, 0.4);
+        break;
+      }
+      case 'gi': {
+        // kung-fu jacket: crossed collar, frog closures, a yin-yang emblem; falls open when battered
+        if (top.open) {
+          ctx.beginPath();
+          smoothClosed(ctx, [P2(N, fC, cw * 0.2, uC, -2), P2(N, fC, cw * 0.95, uC, -2), P2(W, fS, ww * 0.85, uS, 6), P2(W, fS, ww * 0.35, uS, 4)], 0.3);
+          ctx.fillStyle = this.skin.base;
+          ctx.fill();
+          this.line(ctx, [P2(N, fC, cw * 0.55, uC, -up * 0.3), P2(N, fC, cw * 0.65, uC, -up * 0.6)], 1.2, outl, 0.35); // abs line
+        }
+        this.line(ctx, [P2(N, fC, cw * 0.1, uC, 3), P2(N, fC, cw * 0.72, uC, -up * 0.35), P2(W, fS, ww * 0.7, uS, top.open ? 8 : 2)], 3.2, this.mat(top.color2, t).base);
+        this.line(ctx, [P2(N, fC, cw * 0.1, uC, 3), P2(N, fC, cw * 0.72, uC, -up * 0.35), P2(W, fS, ww * 0.7, uS, top.open ? 8 : 2)], 1.2, outl, 0.7);
+        if (!top.open) {
+          for (let i = 0; i < 3; i++) {
+            const c = P2(N, fC, cw * 0.95, uC, -up * (0.62 + i * 0.13));
+            this.line(ctx, [{ x: c.x - 6, y: c.y }, { x: c.x + 6, y: c.y }], 2.2, this.mat(top.knots, t).base);
+            ctx.beginPath();
+            ctx.arc(c.x + 6, c.y, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = this.mat(top.knots, t).base;
+            ctx.fill();
+          }
+        }
+        // yin-yang on the chest
+        const yy = P2(N, fC, cw * 0.55, uC, -up * 0.6), r = 6.5;
+        ctx.beginPath(); ctx.arc(yy.x, yy.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(top.emblem, t).base; ctx.fill();
+        ctx.lineWidth = 1.2; ctx.strokeStyle = outl; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(yy.x, yy.y, r, Math.PI / 2, -Math.PI / 2);
+        ctx.arc(yy.x, yy.y - r / 2, r / 2, Math.PI / 2, -Math.PI / 2, true);
+        ctx.arc(yy.x, yy.y + r / 2, r / 2, -Math.PI / 2, Math.PI / 2);
+        ctx.fillStyle = this.mat(top.emblem2, t).base; ctx.fill();
         break;
       }
       case 'chefcoat': {
@@ -6985,6 +7115,15 @@ class Effects {
         }
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
         if (e.fire) this.fireBurst(e.x, e.y, 6, 0);
+        if (e.guardBreak) {
+          // the guard shatters into shards
+          for (let i = 0; i < 16; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 4 + this.rnd() * 6;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 2, life: 22, max: 22, color: '#7fe8ff', w: 3 });
+          }
+          this.labels.push({ text: 'GUARD BREAK!', x: e.x, y: e.y + 70, life: 55, color: '#ffd23f' });
+          this.shake = Math.max(this.shake, 7);
+        }
         break;
       }
       case 'parry':
@@ -7087,6 +7226,10 @@ class Effects {
   tick(fighters) {
     // battered fighters sweat; an overheated Cinder smokes
     for (const f of fighters || []) {
+      if (f.focus > 0 && this.rnd() < 0.3) {
+        // Focus: golden motes rising around the body
+        this.parts.push({ kind: 'ember', x: f.body.x + (this.rnd() - 0.5) * 90, y: f.body.y + this.rnd() * 160, vx: 0, vy: 1.2 + this.rnd(), life: 30, max: 46, r: 1.6 + this.rnd() * 1.5 });
+      }
       if (!f.critical || f.state === 'ko') continue;
       this.clock = (this.clock || 0) + 1;
       const head = f.skel.j.head, hx = f.body.x + f.facing * head.x, hy = f.body.y + head.y;
@@ -7417,6 +7560,15 @@ const DRAW = {
     ctx.lineWidth = 7; ctx.strokeStyle = OUT; ctx.stroke();
     ctx.lineWidth = 4.5; ctx.strokeStyle = lk.hair?.streak || '#e0399b'; ctx.stroke();
   },
+  belt(ctx, lk) {
+    // a martial-arts belt, flapping as it falls
+    ctx.beginPath();
+    ctx.moveTo(-26, 0);
+    for (let x = -26; x <= 26; x += 4) ctx.lineTo(x, Math.sin(x * 0.18) * 4);
+    ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 6; ctx.strokeStyle = lk.belt?.color || '#1a1a1e'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); shape(ctx, lk.belt?.color || '#1a1a1e', 1.6);
+  },
   tooth(ctx) {
     ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
     shape(ctx, '#f6f1e6', 1.4);
@@ -7429,7 +7581,7 @@ const DRAW = {
 };
 
 /** Light props flutter down (feathers), heavy ones fall and bounce. */
-const FLOAT = { feather: true };
+const FLOAT = { feather: true, belt: true };
 
 function spawnProp(type, x, y, dir, opt, look) {
   return {
@@ -7970,6 +8122,17 @@ function drawHud(ctx, match, hud, portraits) {
     ctx.fillStyle = sk > 0.8 ? '#ff4040' : '#7fe8ff';
     ctx.fillRect(left ? x + barW - 220 * sk : x, top + barH + 9, 220 * sk, 6);
     // burn status: flame icon + seconds left, next to the stun meter
+    if (f.focus > 0) {
+      const fx = left ? x + barW - 236 : x + 236, fy = top + barH + 14 + (f.burn > 0 ? 18 : 0);
+      ctx.font = `900 14px ${FONT}`;
+      ctx.textAlign = left ? 'right' : 'left';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#120816';
+      const txt = `FOCUS ${Math.ceil(f.focus / 60)}`;
+      ctx.strokeText(txt, fx + (left ? -4 : 4), fy + 6);
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText(txt, fx + (left ? -4 : 4), fy + 6);
+    }
     if (f.burn > 0) {
       const bx = left ? x + barW - 236 : x + 236, by = top + barH + 14;
       const t = performance.now() / 1000;
@@ -8225,7 +8388,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170], grizz: [100, 190], hawk: [120, 280],
+  cinder: [60, 170], grizz: [100, 190], hawk: [120, 280], tao: [30, 130],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22, hawk: 0.1 };
@@ -8348,8 +8511,9 @@ class AIController {
       this.queue(M.s4);
       return;
     }
-    // Counter stance (Vellaro): read an incoming strike.
-    if (me.def.id === 'vellaro' && op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) {
+    // Counter stance (Vellaro): read an incoming strike, or anticipate one when the opponent is in poke range.
+    const anticipate = gap < 110 && opF.actionable && !opF.crouching && r.chance(cfg.signature * 0.6);
+    if (me.def.id === 'vellaro' && ((op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) || anticipate)) {
       this.queue(M.s4);
       return;
     }
@@ -8395,6 +8559,11 @@ class AIController {
         return;
       }
       this.hold = { d: 'b', n: 20 };
+      return;
+    }
+    // Broken guard (Tao's flurry): punish the stagger.
+    if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {
+      this.queue(r.chance(0.5) ? press('hp') : M.s1);
       return;
     }
     // Whiff punish.

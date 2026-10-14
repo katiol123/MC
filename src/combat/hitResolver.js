@@ -178,6 +178,13 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     const hs = Math.round(spec.hitstop * TUNING.blockHitstopScale);
     def.receiveBlock(from, spec, hs);
     ownHitstop(hs);
+    if (spec.guardBreak) {
+      // the guard shatters: a long stagger instead of blockstun
+      const d = TUNING.guardBreakStagger;
+      def.setState('stagger', { duration: d }, 'stagger', { blend: 5, params: { duration: d } });
+      note(att, 'GUARD BREAK');
+      return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low, guardBreak: true };
+    }
     if (!projectile) cornerPushback(att, def, spec.push.block);
     if (!spec.super) att.gainMeter(spec.damage * TUNING.meterOnBlock);
     def.gainMeter(spec.damage * TUNING.meterOnDamaged * 0.5);
@@ -192,7 +199,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
   const partMul = TUNING.partDamage[res.part] ?? 1;
-  const dmgMul = att.stats.damage ?? 1;
+  const dmgMul = (att.stats.damage ?? 1) * (att.focus > 0 ? TUNING.focusDamage : 1);
   const damage = Math.max(1, Math.round(spec.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
   const decay = spec.comboExempt ? 0 : Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
   const hitstun = Math.max(TUNING.minHitstun, spec.hitstun + (counter ? TUNING.counterHitStun : 0) - decay);

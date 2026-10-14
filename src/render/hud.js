@@ -110,6 +110,17 @@ export function drawHud(ctx, match, hud, portraits) {
     ctx.fillStyle = sk > 0.8 ? '#ff4040' : '#7fe8ff';
     ctx.fillRect(left ? x + barW - 220 * sk : x, top + barH + 9, 220 * sk, 6);
     // burn status: flame icon + seconds left, next to the stun meter
+    if (f.focus > 0) {
+      const fx = left ? x + barW - 236 : x + 236, fy = top + barH + 14 + (f.burn > 0 ? 18 : 0);
+      ctx.font = `900 14px ${FONT}`;
+      ctx.textAlign = left ? 'right' : 'left';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#120816';
+      const txt = `FOCUS ${Math.ceil(f.focus / 60)}`;
+      ctx.strokeText(txt, fx + (left ? -4 : 4), fy + 6);
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText(txt, fx + (left ? -4 : 4), fy + 6);
+    }
     if (f.burn > 0) {
       const bx = left ? x + barW - 236 : x + 236, by = top + barH + 14;
       const t = performance.now() / 1000;

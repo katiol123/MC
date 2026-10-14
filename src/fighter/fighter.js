@@ -52,6 +52,7 @@ export class Fighter {
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
     this.pulled = null; // being reeled in by a pull
+    this.focus = 0; // ticks of Focus left (+damage)
     this.critical = false; // battered look + heavy breathing (health below TUNING.criticalHealth)
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
@@ -149,6 +150,7 @@ export class Fighter {
     }
     this.stateFrame++;
     if (this.throwProtect > 0) this.throwProtect--;
+    if (this.focus > 0) this.focus--;
     // the stun meter only recovers after a pause in the punishment
     this.sinceHit++;
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
@@ -385,6 +387,7 @@ export class Fighter {
       this.meter -= m.cost ?? TUNING.superCost;
       this.superLock = TUNING.superCooldown;
       this.emit({ type: 'superStart', who: this.index, name: m.name });
+      if (m.focus) this.focus = m.focus;
     }
     // Cross-fade into the move: short for fast normals, longer when the body must change posture
     // (cancels, stand -> crouch) so no limb snaps across the screen in a single frame.

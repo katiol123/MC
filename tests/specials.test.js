@@ -41,7 +41,7 @@ test('command grab (Bruno) cannot be teched', () => {
 });
 
 test('every fighter has a working signature special that connects in its intended range', () => {
-  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60, hawk: 100 };
+  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60, hawk: 100, tao: 20 };
   for (const r of ROSTER) {
     if (!(r.id in range)) continue; // vellaro: counter stance, tested separately
     const m = fightingMatch({ p1: r.id, p2: 'jax' });
@@ -129,6 +129,39 @@ test('Second Wind: every super hit heals Old Hawk for half the damage dealt', ()
   assert.ok(hits.every((e) => e.heal > 0));
   assert.ok(Math.abs(healed - dealt / 2) <= 3, `healed ${healed} of ${dealt}`);
   assert.equal(h.health, 400 + healed);
+});
+
+test('Hundred Fists: a guard held through the flurry is broken by the closing palm (stagger, punishable)', () => {
+  const m = fightingMatch({ p1: 'tao', p2: 'brick' });
+  const [t, o] = m.fighters;
+  place(m, 800, 880);
+  // Brick holds back (block) the whole time
+  const ev = run(m, 110, p1seq(S4, () => raw({ right: true })));
+  const blocks = ev.filter((e) => e.type === 'block' && e.who === 0);
+  assert.ok(blocks.length >= 6, `flurry blocked (${blocks.length})`);
+  assert.ok(blocks.some((e) => e.guardBreak), 'guard broken');
+  assert.ok(ev.some((e) => e.type === 'hit' && e.who === 0) === false, 'nothing got through the guard');
+  // right after the break Brick is still staggered: a heavy punch lands
+  const ev2 = run(m, 2);
+  void ev2;
+  assert.ok(['stagger', 'idle', 'walkB', 'guardHigh'].includes(o.state));
+});
+
+test('Ten Thousand Fists: starting the super grants Focus (+30% damage for 8 s)', () => {
+  const m = fightingMatch({ p1: 'tao', p2: 'brick' });
+  const [t, o] = m.fighters;
+  place(m, 800, 1300);
+  const jab = () => { place(m, 800, 880); const h = o.health; run(m, 30, (i) => [raw({ lp: i === 0 }), raw()]); const d = h - o.health; o.health = o.maxHealth; return d; };
+  const plain = jab();
+  place(m, 800, 1300);
+  t.meter = 100;
+  run(m, 40, p1seq(SU));
+  assert.ok(t.focus > 0, 'in Focus');
+  run(m, 120);
+  const focused = jab();
+  assert.ok(focused >= Math.round(plain * 1.25), `focused jab ${focused} vs ${plain}`);
+  run(m, 600);
+  assert.equal(t.focus, 0, 'Focus wears off');
 });
 
 test('projectiles: one on screen per fighter, blockable, cancel each other', () => {

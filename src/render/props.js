@@ -104,6 +104,15 @@ const DRAW = {
     ctx.lineWidth = 7; ctx.strokeStyle = OUT; ctx.stroke();
     ctx.lineWidth = 4.5; ctx.strokeStyle = lk.hair?.streak || '#e0399b'; ctx.stroke();
   },
+  belt(ctx, lk) {
+    // a martial-arts belt, flapping as it falls
+    ctx.beginPath();
+    ctx.moveTo(-26, 0);
+    for (let x = -26; x <= 26; x += 4) ctx.lineTo(x, Math.sin(x * 0.18) * 4);
+    ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 6; ctx.strokeStyle = lk.belt?.color || '#1a1a1e'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); shape(ctx, lk.belt?.color || '#1a1a1e', 1.6);
+  },
   tooth(ctx) {
     ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
     shape(ctx, '#f6f1e6', 1.4);
@@ -116,7 +125,7 @@ const DRAW = {
 };
 
 /** Light props flutter down (feathers), heavy ones fall and bounce. */
-const FLOAT = { feather: true };
+const FLOAT = { feather: true, belt: true };
 
 export function spawnProp(type, x, y, dir, opt, look) {
   return {

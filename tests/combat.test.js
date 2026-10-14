@@ -50,7 +50,11 @@ test('every hit/block event happens while the attacker is in its active window (
         if ((e.type !== 'hit' && e.type !== 'block') || e.trade || String(e.move).startsWith('proj:') || e.throw) continue;
         const f = m.fighters[e.who];
         const mv = f.move;
-        assert.ok(mv, 'attacker has a move');
+        if (!mv) {
+          // the attacker can lose its move in the same tick only by being hit itself (e.g. by a projectile)
+          assert.ok(ev.some((x) => x.type === 'hit' && x.target === e.who), 'attacker has a move');
+          continue;
+        }
         assert.ok(mv.frame > mv.def.startup && mv.frame <= mv.def.startup + mv.def.active, `${mv.def.id} hit on frame ${mv.frame}`);
       }
     }

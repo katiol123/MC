@@ -23,7 +23,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170], grizz: [100, 190], hawk: [120, 280],
+  cinder: [60, 170], grizz: [100, 190], hawk: [120, 280], tao: [30, 130],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22, hawk: 0.1 };
@@ -146,8 +146,9 @@ export class AIController {
       this.queue(M.s4);
       return;
     }
-    // Counter stance (Vellaro): read an incoming strike.
-    if (me.def.id === 'vellaro' && op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) {
+    // Counter stance (Vellaro): read an incoming strike, or anticipate one when the opponent is in poke range.
+    const anticipate = gap < 110 && opF.actionable && !opF.crouching && r.chance(cfg.signature * 0.6);
+    if (me.def.id === 'vellaro' && ((op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) || anticipate)) {
       this.queue(M.s4);
       return;
     }
@@ -193,6 +194,11 @@ export class AIController {
         return;
       }
       this.hold = { d: 'b', n: 20 };
+      return;
+    }
+    // Broken guard (Tao's flurry): punish the stagger.
+    if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {
+      this.queue(r.chance(0.5) ? press('hp') : M.s1);
       return;
     }
     // Whiff punish.

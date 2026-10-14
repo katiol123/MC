@@ -1,7 +1,7 @@
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All eleven are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All twelve are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
@@ -310,6 +310,31 @@ export const ROSTER = [
     moves: {
       hk: { damage: 82 },
       s1: { name: 'Hawk Strike' },
+    },
+  },
+  {
+    id: 'tao',
+    name: 'TAO "STONE FIST" WEN',
+    title: 'Ten Thousand Repetitions',
+    blurb: 'Shaved head, wrapped fists, zero small talk. Every punch he throws he has practised ten thousand times.',
+    body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
+    stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
+    look: {
+      skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
+      eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
+      hair: { style: 'bald', color: '#4a3a30' },
+      top: { type: 'gi', color: '#d9d4cc', color2: '#d4318f', knots: '#8a8a92', emblem: '#e2b440', emblem2: '#c42f8f' },
+      pants: { type: 'pants', color: '#cfc9bf' },
+      belt: { color: '#1a1a1e', buckle: '#1a1a1e' },
+      gloves: { type: 'fingerless', color: '#6a6e72' },
+      shoes: { type: 'shoes', color: '#1c1a1e', sole: '#0c0b0d' },
+      victory: 0,
+    },
+    // low-health look: what gets knocked off (flies away as a prop) and what changes
+    damaged: { look: { belt: null, top: { open: true } }, props: [{ type: 'belt', from: 'chest', vx: -2, vy: 7, spin: 0.05 }] },
+    moves: {
+      lp: { startup: 3 },
+      s1: { name: 'Stone Fist' },
     },
   },
 ];

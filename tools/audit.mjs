@@ -45,6 +45,7 @@ for (let rep = 0; rep < perPair; rep++) {
             if (e.part === 'head') inc('hit: head hit');
           }
           if (e.type === 'block') inc(e.low ? 'block: low' : 'block: high');
+          if (e.type === 'block' && e.guardBreak) inc('block: guard break (Tao)');
           if (e.type === 'attackStart') pinc(who, e.move);
           if (e.type === 'projectile') inc(`projectile spawned: ${e.kind}`);
           if (e.type === 'dash') inc(e.dir === -1 ? 'dash: back' : 'dash: forward');
@@ -61,6 +62,7 @@ for (let rep = 0; rep < perPair; rep++) {
           }
           prevReason[i] = r; prevState[i] = f.state; prevHealth[i] = f.health;
           if (f.burn > 0) inc('burning (ticks)');
+          if (f.focus > 0) inc('focus (ticks)');
           if (f.stance === 1) inc('stance: switched (ticks)');
           if (f.state === 'run') inc('run (ticks)');
           if (f.combo.juggle >= 2) inc('juggle chain (2+)');
@@ -81,8 +83,8 @@ const want = [
   ['Reactions', ['state:hitstun', 'state:stagger', 'state:juggle', 'juggle chain (2+)', 'state:knockdown', 'state:getup', 'event:dizzy', 'state:dizzy', 'state:ko', 'state:victory', 'state:defeat']],
   ['Combo protection', ['reason: juggle limit', 'reason: repeated move limit', 'reason: combo hit cap']],
   ['Throws', ['event:grab', 'state:throwing', 'state:thrown', 'hit: throw damage', 'event:tech', 'reason: throw whiff']],
-  ['Specials', ['projectile spawned: coin', 'projectile spawned: wave', 'projectile spawned: flame', 'hit: projectile coin', 'hit: projectile wave', 'hit: projectile flame', 'event:projectileEnd', 'event:teleport', 'reason: invulnerable', 'event:armor', 'hit: pull (Old Hawk)']],
-  ['Supers', ['event:superStart', 'super freeze (cinematic)', 'hit: super hit', 'hit: frying pan (Bruno)', 'hit: fire hit (Cinder)', 'burning (ticks)', 'event:burn', 'hit: claws (Grizz)', 'hit: heal (Old Hawk)']],
+  ['Specials', ['projectile spawned: coin', 'projectile spawned: wave', 'projectile spawned: flame', 'hit: projectile coin', 'hit: projectile wave', 'hit: projectile flame', 'event:projectileEnd', 'event:teleport', 'reason: invulnerable', 'event:armor', 'hit: pull (Old Hawk)', 'block: guard break (Tao)']],
+  ['Supers', ['event:superStart', 'super freeze (cinematic)', 'hit: super hit', 'hit: frying pan (Bruno)', 'hit: fire hit (Cinder)', 'burning (ticks)', 'event:burn', 'hit: claws (Grizz)', 'hit: heal (Old Hawk)', 'focus (ticks)']],
   ['Misc', ['event:critical', 'event:stance', 'stance: switched (ticks)', 'announce: TIME', 'announce: K.O.', 'event:roundEnd', 'event:matchEnd']],
 ];
 // safety nets that well-played CPU fights rarely reach; each has its own unit test

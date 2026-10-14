@@ -42,6 +42,9 @@ export const TALON_REACH = 120;
 /** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
 const HEAL = { lifesteal: 0.5 };
 
+/** Flurry jabs (Tao): tiny hits that keep the opponent locked; afterimage fists are drawn. */
+const JAB = (damage) => H(damage, { hitstun: 22, blockstun: 12, hitstop: 3, push: { hit: 0.6, block: 1.0 } });
+
 export const SIGNATURES = {
   brick: {
     s4: {
@@ -210,6 +213,22 @@ export const SIGNATURES = {
     su: {
       ...SUPER, name: 'Second Wind', anim: 'sequence', heal: true,
       steps: [step('jab', 9, H(40, HEAL)), step('cross', 10, H(50, HEAL)), step('frontKick', 14, H(45, HEAL)), step('cross', 10, H(50, HEAL)), step('lunge', 18, FINISH(100, 'knockback', HEAL), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+  tao: {
+    // six blurring jabs; the closing palm breaks a guard that held through the flurry
+    s4: {
+      name: 'Hundred Fists', anim: 'sequence', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, priority: 4, flurry: true,
+      steps: [step('jab', 6, JAB(12)), step('cross', 6, JAB(12)), step('jab', 6, JAB(12)), step('cross', 6, JAB(12)), step('jab', 6, JAB(12)), step('cross', 6, JAB(12)),
+        step('lunge', 14, FINISH(44, 'knockback', { guardBreak: true, hitstop: 12, launch: { vx: 4, vy: 6 } }), { vx: 4 })],
+      recoveryAfter: 18, chip: true,
+    },
+    // longer flurry; starting it puts Tao in Focus: +30% damage for 8 s (golden aura)
+    su: {
+      ...SUPER, name: 'Ten Thousand Fists', anim: 'sequence', flurry: true, focus: 480,
+      steps: [step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)),
+        step('lunge', 18, FINISH(95, 'knockback'), { vx: 6 })],
       recoveryAfter: 16,
     },
   },

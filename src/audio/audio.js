@@ -126,6 +126,7 @@ export class AudioSystem {
         break;
       }
       case 'block':
+        if (e.guardBreak) { this.noise(0.35, { freq: 2600, q: 0.8, gain: 0.5, sweep: 0.5 }); this.tone(0.3, { freq: 220, to: 70, gain: 0.5 }); break; }
         this.noise(0.08, { freq: 3200, q: 3, gain: 0.35 });
         this.tone(0.07, { freq: 700, to: 400, type: 'triangle', gain: 0.15 });
         break;

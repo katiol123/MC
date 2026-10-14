@@ -123,6 +123,7 @@ export class FighterPainter {
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
+    this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
@@ -164,7 +165,7 @@ export class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -214,6 +215,23 @@ export class FighterPainter {
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
+    // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
+    if (this.flurry && pass === 'fill') {
+      const dx = H.x - E.x, dy = H.y - E.y, l = Math.hypot(dx, dy) || 1;
+      ctx.save();
+      for (const [k, off, a] of [[16, 9, 0.35], [30, -7, 0.22], [44, 12, 0.12]]) {
+        const cx = H.x + (dx / l) * k - (dy / l) * off, cy = H.y + (dy / l) * k + (dx / l) * off;
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(cx, cy, this.pr.rHand * 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(this.look.skin, 0).light;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     // flaming fists (Cinder's specials / super only; normal attacks stay clean)
     if (this.fire && pass === 'fill') {
       const c = along(Wr, H, 0.7);
@@ -923,6 +941,39 @@ export class FighterPainter {
         ctx.strokeStyle = this.outline;
         ctx.stroke();
         this.line(ctx, [P2(N, fC, cw * 0.9, uC, -up * 0.55), P2(N, fC, cw * 0.2, uC, -up * 0.6)], 1.3, outl, 0.4);
+        break;
+      }
+      case 'gi': {
+        // kung-fu jacket: crossed collar, frog closures, a yin-yang emblem; falls open when battered
+        if (top.open) {
+          ctx.beginPath();
+          smoothClosed(ctx, [P2(N, fC, cw * 0.2, uC, -2), P2(N, fC, cw * 0.95, uC, -2), P2(W, fS, ww * 0.85, uS, 6), P2(W, fS, ww * 0.35, uS, 4)], 0.3);
+          ctx.fillStyle = this.skin.base;
+          ctx.fill();
+          this.line(ctx, [P2(N, fC, cw * 0.55, uC, -up * 0.3), P2(N, fC, cw * 0.65, uC, -up * 0.6)], 1.2, outl, 0.35); // abs line
+        }
+        this.line(ctx, [P2(N, fC, cw * 0.1, uC, 3), P2(N, fC, cw * 0.72, uC, -up * 0.35), P2(W, fS, ww * 0.7, uS, top.open ? 8 : 2)], 3.2, this.mat(top.color2, t).base);
+        this.line(ctx, [P2(N, fC, cw * 0.1, uC, 3), P2(N, fC, cw * 0.72, uC, -up * 0.35), P2(W, fS, ww * 0.7, uS, top.open ? 8 : 2)], 1.2, outl, 0.7);
+        if (!top.open) {
+          for (let i = 0; i < 3; i++) {
+            const c = P2(N, fC, cw * 0.95, uC, -up * (0.62 + i * 0.13));
+            this.line(ctx, [{ x: c.x - 6, y: c.y }, { x: c.x + 6, y: c.y }], 2.2, this.mat(top.knots, t).base);
+            ctx.beginPath();
+            ctx.arc(c.x + 6, c.y, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = this.mat(top.knots, t).base;
+            ctx.fill();
+          }
+        }
+        // yin-yang on the chest
+        const yy = P2(N, fC, cw * 0.55, uC, -up * 0.6), r = 6.5;
+        ctx.beginPath(); ctx.arc(yy.x, yy.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(top.emblem, t).base; ctx.fill();
+        ctx.lineWidth = 1.2; ctx.strokeStyle = outl; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(yy.x, yy.y, r, Math.PI / 2, -Math.PI / 2);
+        ctx.arc(yy.x, yy.y - r / 2, r / 2, Math.PI / 2, -Math.PI / 2, true);
+        ctx.arc(yy.x, yy.y + r / 2, r / 2, -Math.PI / 2, Math.PI / 2);
+        ctx.fillStyle = this.mat(top.emblem2, t).base; ctx.fill();
         break;
       }
       case 'chefcoat': {
