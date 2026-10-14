@@ -33,7 +33,7 @@ export class SelectScene {
     clearUI();
     const ui = document.getElementById('ui');
     this.cards = ROSTER.map((f, i) =>
-      el('div', { class: 'card', style: { '--i': i, '--n': ROSTER.length }, onclick: () => this.click(i) }, [
+      el('div', { class: 'card', style: { '--i': i, '--n': ROSTER.length }, onclick: () => this.click(i), onmouseenter: () => this.hover(i) }, [
         el('div', { class: 'card-img', style: { backgroundImage: `url(${this.app.portraitURL(f.id)})` } }),
         el('div', { class: 'card-num' }, [String(i + 1).padStart(2, '0')]),
         el('div', { class: 'card-name' }, [f.name.replace(/".*"\s*/, '')]),
@@ -81,8 +81,22 @@ export class SelectScene {
     return { root, preview, shown: null };
   }
 
+  /** Side controlled by the mouse: P1 until it locks, then P2 (versus) / the CPU slot. */
+  mouseSide() {
+    return this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.active;
+  }
+
+  /** Mouse hover selects the card, exactly like moving the cursor with the keys. */
+  hover(i) {
+    const s = this.mouseSide();
+    if (this.locked[s] || this.cursor[s] === i) return;
+    this.cursor[s] = i;
+    this.app.audio.ui('move');
+    this.refresh();
+  }
+
   click(i) {
-    const s = this.mode === 'versus' ? (this.locked[0] ? 1 : 0) : this.active;
+    const s = this.mouseSide();
     if (this.locked[s]) return;
     this.cursor[s] = i;
     this.lock(s);
