@@ -3,6 +3,7 @@
 import { VIEW } from '../config/constants.js';
 import { lerp } from '../core/math.js';
 import { blendPoses, computeSkeleton, emptyPose, clonePose } from '../anim/skeleton.js';
+import { drawFlame, drawGlow } from './fire.js';
 import { ATTACK_POSES } from '../anim/attackPoses.js';
 import { FighterPainter } from './fighterPainter.js';
 import { SecondaryMotion } from './secondary.js';
@@ -129,16 +130,40 @@ export class FightRenderer {
     const prop = mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
       : null;
+    // flaming fists only on fire moves (specials / super), never on normal attacks
+    const fire = !!(mv?.def.fire && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
+      fire,
+      now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
       chains: sec.localChains(alpha, x, y, f.facing),
       expression,
       blink,
     });
+    if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Burn status: flames licking up from the body (fighter-local space, +y up). */
+  drawBurning(ctx, f, skel, now) {
+    const t = now / 1000, J = skel.j;
+    const fade = Math.min(1, f.burn / 60);
+    ctx.save();
+    ctx.globalAlpha = 0.9 * fade;
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow(ctx, (J.pelvis.x + J.neck.x) / 2, (J.pelvis.y + J.neck.y) / 2, 90, 0.28);
+    ctx.globalCompositeOperation = prev;
+    const spots = [['neck', 12, 34], ['shoulderB', 10, 28], ['pelvis', 13, 34], ['kneeF', 9, 26], ['elbowF', 9, 24], ['head', 10, 30], ['kneeB', 8, 22], ['shoulderF', 10, 28]];
+    spots.forEach(([j, w, h], k) => {
+      const p = J[j];
+      if (!p) return;
+      drawFlame(ctx, p.x + Math.sin(t * 3 + k) * 4, p.y, w, h * (0.8 + 0.3 * Math.sin(t * 5 + k * 1.3)), t, k * 2.3);
+    });
+    ctx.restore();
   }
 
   drawProjectiles(ctx, now) {
@@ -147,7 +172,21 @@ export class FightRenderer {
       const z = this.cam.zoom;
       ctx.save();
       ctx.translate(s.x, s.y);
-      if (p.kind === 'coin') {
+      if (p.kind === 'flame') {
+        // roiling fire burst: glow + a ring of tongues streaming backwards
+        const t = now / 1000, dir = Math.sign(p.vx) || 1;
+        const grow = Math.min(1, p.age / 6) * (1 - Math.max(0, p.age - p.life + 8) / 12);
+        const R = p.r * z * (0.7 + 0.3 * grow);
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, 0, 0, R * 2.2, 0.6);
+        ctx.globalCompositeOperation = prev;
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2 + t * 4;
+          drawFlame(ctx, Math.cos(a) * R * 0.45 - dir * 6 * z, Math.sin(a) * R * 0.45, R * 0.42, R * 1.1, t, i * 1.9, -1);
+        }
+        drawGlow(ctx, 0, 0, R * 0.7, 0.9, '255,236,170');
+      } else if (p.kind === 'coin') {
         // spinning gold coin with a glint trail
         for (let i = 1; i <= 4; i++) {
           ctx.fillStyle = `rgba(255,210,63,${0.18 / i})`;

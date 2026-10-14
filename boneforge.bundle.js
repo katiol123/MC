@@ -393,6 +393,9 @@ const TUNING = {
   superCost: 100,
   superCooldown: 480, // 8 s without meter gain after using a super
   superFreeze: 48, // cinematic freeze when a super starts
+  // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
+  burnInterval: 30,
+  burnDamage: 5,
   superMotionWindow: 26,
   meterOnHit: 0.09, // fraction of damage dealt
   meterOnBlock: 0.05,
@@ -519,6 +522,7 @@ class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
         if (e.prop === 'pan') {
           // cast-iron "BONG": inharmonic partials with a long ring
           this.tone(0.7, { freq: 520, to: 505, type: 'triangle', gain: 0.32 });
@@ -564,7 +568,11 @@ class AudioSystem {
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
         break;
+      case 'burn':
+        this.noise(0.07, { freq: 2600, q: 2, gain: 0.12 }); // crackle
+        break;
       case 'projectile':
+        if (e.kind === 'flame') { this.noise(0.5, { freq: 700, gain: 0.5, type: 'lowpass', sweep: 0.5, attack: 0.03 }); break; }
         this.tone(0.25, { freq: e.kind === 'coin' ? 1400 : 300, to: e.kind === 'coin' ? 2200 : 160, type: e.kind === 'coin' ? 'triangle' : 'sawtooth', gain: 0.15 });
         break;
       case 'teleport':
@@ -585,7 +593,7 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All eight are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All nine are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
@@ -801,6 +809,30 @@ const ROSTER = [
       s3: { name: 'Jungle Arc', startup: 13 },
     },
   },
+  {
+    id: 'cinder',
+    name: 'KAI "CINDER" VOSS',
+    title: 'Pocket Wildfire',
+    blurb: 'Moody street kid with fire in his fists. Keeps it caged until the bar is full, then lets it burn.',
+    body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
+    stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 950, pushW: 32 },
+    look: {
+      skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
+      eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
+      hair: { style: 'spiky', color: '#3a2618', streak: '#b8306f' },
+      earrings: '#c9c9d2',
+      top: { type: 'jacket', sleeves: 'short', color: '#2c3328', color2: '#3fb89a', inner: '#c42f8f', pendant: '#b8c0c8' },
+      pants: { type: 'pants', color: '#26232c' },
+      belt: { color: '#1a1416', buckle: '#9a9aa2' },
+      gloves: { type: 'wraps', color: '#d9c9a6' },
+      shoes: { type: 'sneakers', color: '#2a2a30', sole: '#e8e4dc' },
+      victory: 1,
+    },
+    moves: {
+      lp: { startup: 4 },
+      s1: { name: 'Spark Fist' },
+    },
+  },
 ];
 
 const deepMerge = (base, over) => {
@@ -1007,11 +1039,14 @@ const step = (anim, len, hit, extra = {}) => {
 /** Wrist cock of the pan handle relative to the forearm (radians); the painter uses the same value. */
 const PAN_COCK = 0.35;
 /** Frying pan held in the lead hand: forearm + a capsule over the pan head beyond the fist. */
-const PAN = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
+const PAN = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
 const H = (damage, o = {}) => ({ damage, hitstun: 32, blockstun: 16, hitstop: 6, reaction: 'light', push: { hit: 1.4, block: 2.6 }, stun: 0, ...o });
 const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
   hitstun: 36, hitstop: 14, reaction, push: { hit: 4, block: 5 }, launch: { vx: 5, vy: reaction === 'launch' ? 13 : 8 }, shake: 9, ...o,
 });
+
+/** Fire strikes (Cinder's super): flaming fists, fire sparks, and a burn lasting 10 s (600 ticks). */
+const FIRE = { fire: true, burn: 600 };
 
 const SIGNATURES = {
   brick: {
@@ -1073,7 +1108,7 @@ const SIGNATURES = {
     },
     su: {
       ...SUPER, name: 'Mosh Pit', anim: 'sequence',
-      steps: [step('jab', 8, H(40)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('frontKick', 14, H(50)), step('uppercut', 18, FINISH(100))],
+      steps: [step('jab', 8, H(40)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('frontKick', 14, H(50)), step('uppercut', 18, FINISH(100), { vx: 6 })],
       recoveryAfter: 16,
     },
   },
@@ -1137,6 +1172,21 @@ const SIGNATURES = {
       recoveryAfter: 16,
     },
   },
+  cinder: {
+    // a short-range fire burst from both palms: two hits, pushes the opponent away
+    s4: {
+      name: 'Flash Point', anim: 'pushWave', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, fire: true,
+      startup: 12, active: 2, recovery: 24, hitboxes: [],
+      projectile: { at: 13, kind: 'flame', speed: 4.2, y: 130, r: 34, life: 30, hits: 2, interval: 9,
+        hit: { damage: 36, hitstun: 20, blockstun: 13, hitstop: 7, reaction: 'light', push: { hit: 3.5, block: 4 }, stun: 40, height: 'mid', fire: true } },
+      priority: 2,
+    },
+    su: {
+      ...SUPER, name: 'Wildfire Rush', anim: 'sequence', fire: true,
+      steps: [step('jab', 9, H(45, FIRE)), step('cross', 10, H(50, FIRE)), step('jab', 8, H(40, FIRE)), step('cross', 10, H(50, FIRE)), step('lunge', 18, FINISH(100, 'launch', FIRE), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
 };
 
 });
@@ -1150,6 +1200,8 @@ const { MOVES } = __require("src/data/moves.js");
 /** Default hitboxes per animation, taken from the base move that uses that animation. */
 const ANIM_HITBOXES = {};
 for (const m of Object.values(MOVES)) if (m.hitboxes?.length && !ANIM_HITBOXES[m.anim]) ANIM_HITBOXES[m.anim] = m.hitboxes;
+// sequence finishers: the whole lead arm, so point-blank lunges still connect on narrow opponents
+ANIM_HITBOXES.lunge = [{ a: 'shoulderF', b: 'elbowF', r: 13 }, { a: 'elbowF', b: 'handF', r: 15 }];
 ANIM_HITBOXES.chop = [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }];
 
 const SPEC_DEFAULTS = {
@@ -2133,8 +2185,23 @@ class Match {
     for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
+    if (this.phase === 'fight') this.updateBurn();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /** Burning fighters take a small hit every TUNING.burnInterval ticks; burn alone never KOs. */
+  updateBurn() {
+    for (const f of this.fighters) {
+      if (f.burn <= 0) continue;
+      f.burn--;
+      if (f.health <= 0) { f.burn = 0; continue; }
+      if (f.burn % TUNING.burnInterval === 0 && f.health > 1) {
+        const damage = Math.min(TUNING.burnDamage, f.health - 1);
+        f.health -= damage;
+        this.events.push({ type: 'burn', who: f.index, damage, x: f.body.x, y: f.body.y + 120 * f.props.posScale });
+      }
+    }
   }
 
   updateFight() {
@@ -2266,6 +2333,7 @@ class Fighter {
     this.hitstop = 0;
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
+    this.burn = 0; // ticks left on fire
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -3288,7 +3356,8 @@ const ATTACK_POSES = {
   uppercut: {
     base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 60, lean: 28, chest: 8, fa: [54, 112, 0], ba: [44, 112, 0] }),
-    contact: P(STANCE, { x: 18, y: 106, lean: 10, chest: -8, neck: -12, head: -14, fa: [20, 124, 0], ba: [126, 12, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
+    // contact forward-up at chin height (connects on short opponents too); extend finishes overhead
+    contact: P(STANCE, { x: 20, y: 106, lean: 14, chest: -4, neck: -12, head: -14, fa: [20, 124, 0], ba: [112, 14, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 110, lean: 4, chest: -12, neck: -12, head: -14, fa: [20, 124, 0], ba: [150, 8, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
   },
   crouchJab: {
@@ -3326,7 +3395,9 @@ const ATTACK_POSES = {
   rising: {
     base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 58, lean: 30, chest: 10, ba: [44, 114, 0], fa: [50, 112, 0] }),
-    contact: P(AIR_FALL, { y: 96, lean: 2, chest: -10, neck: -12, head: -14, fa: [24, 124, 0], ba: [126, 22, 0], fl: [70, 96, 10], bl: [10, 40, 10] }),
+    // the fist leaves forward-up at head height (so it connects with short opponents), then
+    // drives straight up in the extend pose
+    contact: P(AIR_FALL, { x: 8, y: 92, lean: 14, chest: 6, neck: -10, head: -12, fa: [24, 124, 0], ba: [98, 16, 0], fl: [70, 96, 10], bl: [10, 40, 10] }),
     extend: P(AIR_FALL, { y: 100, lean: -8, chest: -14, neck: -14, head: -16, fa: [24, 124, 0], ba: [168, 8, 0], fl: [64, 90, 10], bl: [6, 34, 10] }),
   },
   whirl: {
@@ -3906,7 +3977,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     if (!spec.super) att.gainMeter(spec.damage * TUNING.meterOnBlock);
     def.gainMeter(spec.damage * TUNING.meterOnDamaged * 0.5);
     note(att, `BLOCKED (${block.low ? 'low' : 'high'} guard)`);
-    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low };
+    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low, fire: !!spec.fire };
   }
 
   holder.contact = 'hit';
@@ -3930,6 +4001,8 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
   ownHitstop(hitstop);
   if (!projectile) cornerPushback(att, def, spec.push.hit);
+  // set on fire (Cinder's super): every fire hit restarts the burn timer
+  if (spec.burn && def.health > 0) def.burn = Math.max(def.burn, spec.burn);
   if (!spec.super) att.gainMeter(damage * TUNING.meterOnHit);
   def.gainMeter(damage * TUNING.meterOnDamaged);
   note(att, `HIT ${res.part}${counter ? ' COUNTER' : ''}${punish ? ' PUNISH' : ''}${trade ? ' TRADE' : ''} dmg ${damage} stun ${hitstun}`);
@@ -3937,7 +4010,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire,
   };
 }
 
@@ -4148,6 +4221,7 @@ __define("src/render/fightRenderer.js", function (__exports, __require) {
 const { VIEW } = __require("src/config/constants.js");
 const { lerp } = __require("src/core/math.js");
 const { blendPoses, computeSkeleton, emptyPose, clonePose } = __require("src/anim/skeleton.js");
+const { drawFlame, drawGlow } = __require("src/render/fire.js");
 const { ATTACK_POSES } = __require("src/anim/attackPoses.js");
 const { FighterPainter } = __require("src/render/fighterPainter.js");
 const { SecondaryMotion } = __require("src/render/secondary.js");
@@ -4274,16 +4348,40 @@ class FightRenderer {
     const prop = mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
       : null;
+    // flaming fists only on fire moves (specials / super), never on normal attacks
+    const fire = !!(mv?.def.fire && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
+      fire,
+      now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
       chains: sec.localChains(alpha, x, y, f.facing),
       expression,
       blink,
     });
+    if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Burn status: flames licking up from the body (fighter-local space, +y up). */
+  drawBurning(ctx, f, skel, now) {
+    const t = now / 1000, J = skel.j;
+    const fade = Math.min(1, f.burn / 60);
+    ctx.save();
+    ctx.globalAlpha = 0.9 * fade;
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow(ctx, (J.pelvis.x + J.neck.x) / 2, (J.pelvis.y + J.neck.y) / 2, 90, 0.28);
+    ctx.globalCompositeOperation = prev;
+    const spots = [['neck', 12, 34], ['shoulderB', 10, 28], ['pelvis', 13, 34], ['kneeF', 9, 26], ['elbowF', 9, 24], ['head', 10, 30], ['kneeB', 8, 22], ['shoulderF', 10, 28]];
+    spots.forEach(([j, w, h], k) => {
+      const p = J[j];
+      if (!p) return;
+      drawFlame(ctx, p.x + Math.sin(t * 3 + k) * 4, p.y, w, h * (0.8 + 0.3 * Math.sin(t * 5 + k * 1.3)), t, k * 2.3);
+    });
+    ctx.restore();
   }
 
   drawProjectiles(ctx, now) {
@@ -4292,7 +4390,21 @@ class FightRenderer {
       const z = this.cam.zoom;
       ctx.save();
       ctx.translate(s.x, s.y);
-      if (p.kind === 'coin') {
+      if (p.kind === 'flame') {
+        // roiling fire burst: glow + a ring of tongues streaming backwards
+        const t = now / 1000, dir = Math.sign(p.vx) || 1;
+        const grow = Math.min(1, p.age / 6) * (1 - Math.max(0, p.age - p.life + 8) / 12);
+        const R = p.r * z * (0.7 + 0.3 * grow);
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, 0, 0, R * 2.2, 0.6);
+        ctx.globalCompositeOperation = prev;
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2 + t * 4;
+          drawFlame(ctx, Math.cos(a) * R * 0.45 - dir * 6 * z, Math.sin(a) * R * 0.45, R * 0.42, R * 1.1, t, i * 1.9, -1);
+        }
+        drawGlow(ctx, 0, 0, R * 0.7, 0.9, '255,236,170');
+      } else if (p.kind === 'coin') {
         // spinning gold coin with a glint trail
         for (let i = 1; i <= 4; i++) {
           ctx.fillStyle = `rgba(255,210,63,${0.18 / i})`;
@@ -4405,6 +4517,66 @@ class FightRenderer {
 }
 
 });
+__define("src/render/fire.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "drawFlame", { enumerable: true, get: () => drawFlame });
+  Object.defineProperty(__exports, "drawGlow", { enumerable: true, get: () => drawGlow });
+  Object.defineProperty(__exports, "drawFireFist", { enumerable: true, get: () => drawFireFist });
+// Procedural fire: flickering flame tongues and glows, shared by the fighter painter (flaming
+// fists), the burn status overlay, fire projectiles and fire hit effects. Purely cosmetic.
+
+const LAYERS = [
+  ['rgba(214,48,20,0.85)', 1.0],
+  ['rgba(255,128,32,0.9)', 0.72],
+  ['rgba(255,214,90,0.95)', 0.42],
+];
+
+/**
+ * One flame tongue (three nested colour layers) rising from (x, y).
+ * up: +1 when +y points up on screen (fighter-local space), -1 in screen space.
+ * t: time in seconds; seed decorrelates neighbouring flames.
+ */
+function drawFlame(ctx, x, y, w, h, t, seed = 0, up = 1) {
+  const flick = 0.82 + 0.18 * Math.sin(t * 17 + seed * 3.1) + 0.08 * Math.sin(t * 29 + seed);
+  const sway = Math.sin(t * 9 + seed * 1.7) * w * 0.55;
+  for (const [color, k] of LAYERS) {
+    const ww = w * k, hh = h * k * flick;
+    ctx.beginPath();
+    ctx.moveTo(x - ww, y);
+    ctx.quadraticCurveTo(x - ww * 1.05, y + up * hh * 0.55, x + sway * k, y + up * hh);
+    ctx.quadraticCurveTo(x + ww * 1.05, y + up * hh * 0.5, x + ww, y);
+    ctx.arc(x, y, ww, 0, Math.PI, up > 0);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+}
+
+/** Soft additive glow. */
+function drawGlow(ctx, x, y, r, alpha = 0.55, color = '255,140,40') {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${color},${alpha})`);
+  g.addColorStop(1, `rgba(${color},0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** A fist wrapped in fire: glow plus a crown of tongues around the knuckles. */
+function drawFireFist(ctx, x, y, size, t, seed = 0, up = 1) {
+  const prev = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = 'lighter';
+  drawGlow(ctx, x, y, size * 2.8, 0.6);
+  ctx.globalCompositeOperation = prev;
+  for (let i = 0; i < 5; i++) {
+    const ox = (i - 2) * size * 0.36;
+    drawFlame(ctx, x + ox, y - up * size * 0.35, size * (0.52 - Math.abs(i - 2) * 0.07), size * (1.9 - Math.abs(i - 2) * 0.3 + 0.4 * Math.sin(t * 7 + i * 2 + seed)), t, seed + i, up);
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  drawGlow(ctx, x, y, size * 0.9, 0.8, '255,230,150');
+  ctx.globalCompositeOperation = prev;
+}
+
+});
 __define("src/render/fighterPainter.js", function (__exports, __require) {
   Object.defineProperty(__exports, "FighterPainter", { enumerable: true, get: () => FighterPainter });
 // Procedural fighter painter. Draws a fighter from its skeleton (joint positions in local fighter
@@ -4417,6 +4589,7 @@ const { limbPath, smoothClosed, smoothOpen, boxAlong, along } = __require("src/r
 const { mix, lighten, darken, rgba } = __require("src/render/color.js");
 const { dirUp, dirFwd, DEG } = __require("src/core/math.js");
 const { PAN_COCK } = __require("src/data/signatures.js");
+const { drawFireFist } = __require("src/render/fire.js");
 
 const LIGHT = { x: 0.45, y: 0.89 };
 const SHADOW_TINT = '#2a1440';
@@ -4513,6 +4686,8 @@ class FighterPainter {
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
     this.prop = opts.prop || null;
+    this.fire = !!opts.fire;
+    this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
     const layers = opts.layers || {};
@@ -4552,8 +4727,9 @@ class FighterPainter {
     const depth = back ? 0.16 : 0;
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
-    const fullSleeve = ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
-    const shortSleeve = ['tee', 'henley'].includes(top.type);
+    const shortCut = top.sleeves === 'short';
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
+    const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
     const muscle = (this.def.body.bulk || 1) * (this.def.body.armBulk || 1);
@@ -4602,6 +4778,11 @@ class FighterPainter {
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
+    // flaming fists (Cinder's specials / super only; normal attacks stay clean)
+    if (this.fire && pass === 'fill') {
+      const c = along(Wr, H, 0.7);
+      drawFireFist(ctx, c.x, c.y, this.pr.rHand * 2.5, this.time, side === 'F' ? 0 : 5);
+    }
     // Armour pauldron on the lead shoulder.
     if ((top.type === 'armor' || top.type === 'punkvest') && !back) this.drawPauldron(ctx, pass, S, E, A['upperArm' + side]);
   }
@@ -5073,6 +5254,23 @@ class FighterPainter {
           ctx.strokeStyle = outl;
           ctx.stroke();
         });
+        // pendant on a thin cord over the shirt
+        if (top.pendant) {
+          const cord = [P2(N, fC, 2, uC, -2), P2(N, fC, cw * 0.32, uC, -up * 0.36), P2(N, fC, cw * 0.62, uC, -3)];
+          this.line(ctx, cord, 1.4, outl, 0.8);
+          const pd = cord[1];
+          ctx.beginPath();
+          ctx.arc(pd.x, pd.y - 4, 5, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(top.pendant, t).base;
+          ctx.fill();
+          ctx.lineWidth = 1.3;
+          ctx.strokeStyle = outl;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(pd.x, pd.y - 4, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(top.color2, t).base;
+          ctx.fill();
+        }
         // studs
         const st = P2(N, fC, cw * 0.4, uC, -up * 0.16);
         ctx.beginPath();
@@ -5458,7 +5656,10 @@ class FighterPainter {
       return;
     }
     ctx.beginPath();
-    ctx.ellipse(-0.16 * R, -0.06 * R, 0.2 * R, 0.29 * R, 0.15, 0, Math.PI * 2);
+    if (lk.ears === 'pointed') {
+      // elf-like ear sweeping up and back
+      smoothClosed(ctx, [{ x: -0.04 * R, y: -0.34 * R }, { x: -0.3 * R, y: -0.2 * R }, { x: -0.62 * R, y: 0.42 * R }, { x: -0.2 * R, y: 0.16 * R }, { x: -0.02 * R, y: 0.12 * R }], 0.35);
+    } else ctx.ellipse(-0.16 * R, -0.06 * R, 0.2 * R, 0.29 * R, 0.15, 0, Math.PI * 2);
     if (pass === 'outline') return this.outlineFill(ctx);
     ctx.fillStyle = this.skin.base;
     ctx.fill();
@@ -6256,6 +6457,7 @@ __define("src/render/effects.js", function (__exports, __require) {
 // Procedural combat effects: hit sparks, impact rings, block shields, dust, attack trails,
 // floating labels and camera shake. All in world space; driven by simulation events.
 const { rgba } = __require("src/render/color.js");
+const { drawGlow } = __require("src/render/fire.js");
 
 class Effects {
   constructor() {
@@ -6276,7 +6478,8 @@ class Effects {
       case 'hit': {
         const heavy = e.strength !== 'light';
         const n = heavy ? 18 : 10;
-        const color = e.counter ? '#ffd23f' : '#ffffff';
+        const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
+        if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
           const sp = (heavy ? 7 : 4.5) + this.rnd() * 6;
@@ -6296,6 +6499,7 @@ class Effects {
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 5, vy: Math.sin(a) * 5, life: 10, max: 10, color: '#7fe8ff', w: 2 });
         }
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
+        if (e.fire) this.fireBurst(e.x, e.y, 6, 0);
         break;
       }
       case 'parry':
@@ -6322,8 +6526,12 @@ class Effects {
       case 'projectileEnd':
         for (let i = 0; i < 6; i++) {
           const a = this.rnd() * Math.PI * 2;
-          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : '#3fe6d0', w: 2 });
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
+        break;
+      case 'burn':
+        // burn tick: a puff of embers off the burning body
+        for (let i = 0; i < 4; i++) this.ember(e.x + (this.rnd() - 0.5) * 50, e.y + (this.rnd() - 0.5) * 80, 0);
         break;
       case 'whiff':
         // a faint air-cut arc: readable as a miss, clearly different from hit sparks / block shields
@@ -6357,12 +6565,24 @@ class Effects {
     }
   }
 
+  /** Embers: glowing specks that float up and flicker out. */
+  ember(x, y, dir) {
+    this.parts.push({ kind: 'ember', x, y, vx: dir * 2 + (this.rnd() - 0.5) * 3, vy: 1.5 + this.rnd() * 3, life: 26 + this.rnd() * 20, max: 46, r: 2 + this.rnd() * 2.5 });
+  }
+
+  fireBurst(x, y, n, dir) {
+    for (let i = 0; i < n; i++) this.ember(x, y, dir);
+    this.parts.push({ kind: 'fireball', x, y, r: 16, life: 12, max: 12 });
+  }
+
   tick() {
     for (const p of this.parts) {
       p.life--;
       if (p.kind === 'spark') { p.x += p.vx; p.y += p.vy; p.vx *= 0.86; p.vy = p.vy * 0.86 - 0.3; }
       else if (p.kind === 'ring') p.r += p.vr *= 0.82;
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
+      else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
+      else if (p.kind === 'fireball') p.r += 3.5;
     }
     this.parts = this.parts.filter((p) => p.life > 0);
     for (const l of this.labels) { l.life--; l.y += 0.8; }
@@ -6422,6 +6642,17 @@ class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'ember') {
+        const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';
+        ctx.fillStyle = rgba(hot, Math.min(1, k * 1.6) * (0.75 + 0.25 * Math.sin(p.life * 1.7)));
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, p.r * cam.zoom * (0.5 + k * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'fireball') {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, s.x, s.y, p.r * cam.zoom * 1.6, 0.7 * k);
+        ctx.globalCompositeOperation = prev;
       } else if (p.kind === 'dust') {
         ctx.fillStyle = rgba('#d8c8e8', 0.28 * k);
         ctx.beginPath();
@@ -6455,7 +6686,7 @@ class Trails {
       // follow the tip of the strike that is actually active this tick (works for any move type)
       if (f.hitboxes?.length && f.hitSpec) {
         const hb = f.hitboxes[f.hitboxes.length - 1];
-        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength });
+        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength, fire: !!f.hitSpec.fire });
       }
       for (const p of h) p.life--;
       while (h.length && h[0].life <= 0) h.shift();
@@ -6469,14 +6700,14 @@ class Trails {
         const a = cam.toScreen(h[k - 1].x, h[k - 1].y), b = cam.toScreen(h[k].x, h[k].y);
         const t = k / h.length;
         const w = (h[k].strength === 'light' ? 7 : 12) * t * cam.zoom;
-        ctx.strokeStyle = rgba(rim[i], 0.45 * t * Math.min(1, h[k].life / 4));
+        ctx.strokeStyle = rgba(h[k].fire ? '#ff7a1a' : rim[i], (h[k].fire ? 0.7 : 0.45) * t * Math.min(1, h[k].life / 4));
         ctx.lineWidth = w;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
-        ctx.strokeStyle = rgba('#ffffff', 0.5 * t * Math.min(1, h[k].life / 4));
+        ctx.strokeStyle = rgba(h[k].fire ? '#ffe08a' : '#ffffff', 0.5 * t * Math.min(1, h[k].life / 4));
         ctx.lineWidth = w * 0.35;
         ctx.stroke();
       }
@@ -6870,6 +7101,7 @@ __define("src/render/hud.js", function (__exports, __require) {
   Object.defineProperty(__exports, "drawHud", { enumerable: true, get: () => drawHud });
 // Fight HUD: slanted health bars with damage trail, stun meters, portraits, timer, round pips,
 // combo counters and round announcements.
+const { drawFlame } = __require("src/render/fire.js");
 const { VIEW } = __require("src/config/constants.js");
 const { rgba } = __require("src/render/color.js");
 
@@ -6978,6 +7210,20 @@ function drawHud(ctx, match, hud, portraits) {
     ctx.fillRect(left ? x + barW - 220 : x, top + barH + 9, 220, 6);
     ctx.fillStyle = sk > 0.8 ? '#ff4040' : '#7fe8ff';
     ctx.fillRect(left ? x + barW - 220 * sk : x, top + barH + 9, 220 * sk, 6);
+    // burn status: flame icon + seconds left, next to the stun meter
+    if (f.burn > 0) {
+      const bx = left ? x + barW - 236 : x + 236, by = top + barH + 14;
+      const t = performance.now() / 1000;
+      drawFlame(ctx, bx + (left ? -8 : 8), by + 6, 6, 16, t, i * 3, -1);
+      ctx.font = `900 14px ${FONT}`;
+      ctx.textAlign = left ? 'right' : 'left';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#120816';
+      const txt = `BURN ${Math.ceil(f.burn / 60)}`;
+      ctx.strokeText(txt, bx + (left ? -20 : 20), by + 6);
+      ctx.fillStyle = '#ffb040';
+      ctx.fillText(txt, bx + (left ? -20 : 20), by + 6);
+    }
     // name
     ctx.font = `900 19px ${FONT}`;
     ctx.textAlign = left ? 'left' : 'right';
@@ -7220,6 +7466,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
+  cinder: [60, 170],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };

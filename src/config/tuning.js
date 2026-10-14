@@ -45,6 +45,9 @@ export const TUNING = {
   superCost: 100,
   superCooldown: 480, // 8 s without meter gain after using a super
   superFreeze: 48, // cinematic freeze when a super starts
+  // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
+  burnInterval: 30,
+  burnDamage: 5,
   superMotionWindow: 26,
   meterOnHit: 0.09, // fraction of damage dealt
   meterOnBlock: 0.05,

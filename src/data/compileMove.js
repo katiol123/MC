@@ -6,6 +6,8 @@ import { MOVES } from './moves.js';
 /** Default hitboxes per animation, taken from the base move that uses that animation. */
 const ANIM_HITBOXES = {};
 for (const m of Object.values(MOVES)) if (m.hitboxes?.length && !ANIM_HITBOXES[m.anim]) ANIM_HITBOXES[m.anim] = m.hitboxes;
+// sequence finishers: the whole lead arm, so point-blank lunges still connect on narrow opponents
+ANIM_HITBOXES.lunge = [{ a: 'shoulderF', b: 'elbowF', r: 13 }, { a: 'elbowF', b: 'handF', r: 15 }];
 ANIM_HITBOXES.chop = [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }];
 
 const SPEC_DEFAULTS = {

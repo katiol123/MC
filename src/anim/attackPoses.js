@@ -36,7 +36,8 @@ export const ATTACK_POSES = {
   uppercut: {
     base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 60, lean: 28, chest: 8, fa: [54, 112, 0], ba: [44, 112, 0] }),
-    contact: P(STANCE, { x: 18, y: 106, lean: 10, chest: -8, neck: -12, head: -14, fa: [20, 124, 0], ba: [126, 12, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
+    // contact forward-up at chin height (connects on short opponents too); extend finishes overhead
+    contact: P(STANCE, { x: 20, y: 106, lean: 14, chest: -4, neck: -12, head: -14, fa: [20, 124, 0], ba: [112, 14, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 110, lean: 4, chest: -12, neck: -12, head: -14, fa: [20, 124, 0], ba: [150, 8, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
   },
   crouchJab: {
@@ -74,7 +75,9 @@ export const ATTACK_POSES = {
   rising: {
     base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 58, lean: 30, chest: 10, ba: [44, 114, 0], fa: [50, 112, 0] }),
-    contact: P(AIR_FALL, { y: 96, lean: 2, chest: -10, neck: -12, head: -14, fa: [24, 124, 0], ba: [126, 22, 0], fl: [70, 96, 10], bl: [10, 40, 10] }),
+    // the fist leaves forward-up at head height (so it connects with short opponents), then
+    // drives straight up in the extend pose
+    contact: P(AIR_FALL, { x: 8, y: 92, lean: 14, chest: 6, neck: -10, head: -12, fa: [24, 124, 0], ba: [98, 16, 0], fl: [70, 96, 10], bl: [10, 40, 10] }),
     extend: P(AIR_FALL, { y: 100, lean: -8, chest: -14, neck: -14, head: -16, fa: [24, 124, 0], ba: [168, 8, 0], fl: [64, 90, 10], bl: [6, 34, 10] }),
   },
   whirl: {

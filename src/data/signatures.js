@@ -24,11 +24,14 @@ const step = (anim, len, hit, extra = {}) => {
 /** Wrist cock of the pan handle relative to the forearm (radians); the painter uses the same value. */
 export const PAN_COCK = 0.35;
 /** Frying pan held in the lead hand: forearm + a capsule over the pan head beyond the fist. */
-const PAN = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
+const PAN = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 14 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: PAN_COCK, ext: 50, r: 20 }], prop: 'pan' };
 const H = (damage, o = {}) => ({ damage, hitstun: 32, blockstun: 16, hitstop: 6, reaction: 'light', push: { hit: 1.4, block: 2.6 }, stun: 0, ...o });
 const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
   hitstun: 36, hitstop: 14, reaction, push: { hit: 4, block: 5 }, launch: { vx: 5, vy: reaction === 'launch' ? 13 : 8 }, shake: 9, ...o,
 });
+
+/** Fire strikes (Cinder's super): flaming fists, fire sparks, and a burn lasting 10 s (600 ticks). */
+const FIRE = { fire: true, burn: 600 };
 
 export const SIGNATURES = {
   brick: {
@@ -90,7 +93,7 @@ export const SIGNATURES = {
     },
     su: {
       ...SUPER, name: 'Mosh Pit', anim: 'sequence',
-      steps: [step('jab', 8, H(40)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('frontKick', 14, H(50)), step('uppercut', 18, FINISH(100))],
+      steps: [step('jab', 8, H(40)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('frontKick', 14, H(50)), step('uppercut', 18, FINISH(100), { vx: 6 })],
       recoveryAfter: 16,
     },
   },
@@ -151,6 +154,21 @@ export const SIGNATURES = {
     su: {
       ...SUPER, name: 'Sun Eclipse', anim: 'sequence',
       steps: [step('jab', 8, H(40)), step('cross', 10, H(50)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('lunge', 18, FINISH(100), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+  cinder: {
+    // a short-range fire burst from both palms: two hits, pushes the opponent away
+    s4: {
+      name: 'Flash Point', anim: 'pushWave', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, fire: true,
+      startup: 12, active: 2, recovery: 24, hitboxes: [],
+      projectile: { at: 13, kind: 'flame', speed: 4.2, y: 130, r: 34, life: 30, hits: 2, interval: 9,
+        hit: { damage: 36, hitstun: 20, blockstun: 13, hitstop: 7, reaction: 'light', push: { hit: 3.5, block: 4 }, stun: 40, height: 'mid', fire: true } },
+      priority: 2,
+    },
+    su: {
+      ...SUPER, name: 'Wildfire Rush', anim: 'sequence', fire: true,
+      steps: [step('jab', 9, H(45, FIRE)), step('cross', 10, H(50, FIRE)), step('jab', 8, H(40, FIRE)), step('cross', 10, H(50, FIRE)), step('lunge', 18, FINISH(100, 'launch', FIRE), { vx: 6 })],
       recoveryAfter: 16,
     },
   },

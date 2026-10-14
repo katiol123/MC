@@ -168,7 +168,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     if (!spec.super) att.gainMeter(spec.damage * TUNING.meterOnBlock);
     def.gainMeter(spec.damage * TUNING.meterOnDamaged * 0.5);
     note(att, `BLOCKED (${block.low ? 'low' : 'high'} guard)`);
-    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low };
+    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low, fire: !!spec.fire };
   }
 
   holder.contact = 'hit';
@@ -192,6 +192,8 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
   def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
   ownHitstop(hitstop);
   if (!projectile) cornerPushback(att, def, spec.push.hit);
+  // set on fire (Cinder's super): every fire hit restarts the burn timer
+  if (spec.burn && def.health > 0) def.burn = Math.max(def.burn, spec.burn);
   if (!spec.super) att.gainMeter(damage * TUNING.meterOnHit);
   def.gainMeter(damage * TUNING.meterOnDamaged);
   note(att, `HIT ${res.part}${counter ? ' COUNTER' : ''}${punish ? ' PUNISH' : ''}${trade ? ' TRADE' : ''} dmg ${damage} stun ${hitstun}`);
@@ -199,7 +201,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire,
   };
 }
 

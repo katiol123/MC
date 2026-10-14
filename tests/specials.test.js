@@ -41,7 +41,7 @@ test('command grab (Bruno) cannot be teched', () => {
 });
 
 test('every fighter has a working signature special that connects in its intended range', () => {
-  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150 };
+  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90 };
   for (const r of ROSTER) {
     if (!(r.id in range)) continue; // vellaro: counter stance, tested separately
     const m = fightingMatch({ p1: r.id, p2: 'jax' });
@@ -50,6 +50,31 @@ test('every fighter has a working signature special that connects in its intende
     assert.equal(ev.find((e) => e.type === 'attackStart')?.move, 's4', `${r.id} started s4`);
     assert.ok(ev.some((e) => e.type === 'hit'), `${r.id} s4 hit`);
   }
+});
+
+test('Cinder: the super sets the opponent on fire for 10 s with small ticks that never KO; normals are not fire', () => {
+  const m = fightingMatch({ p1: 'cinder', p2: 'brick' });
+  const [f, o] = m.fighters;
+  place(m, 800, 880);
+  f.meter = 100;
+  let ev = run(m, 200, p1seq(SU));
+  const fireHits = ev.filter((e) => e.type === 'hit' && e.who === 0 && e.fire);
+  assert.equal(fireHits.length, 5, 'every super hit deals damage and is a fire hit');
+  assert.ok(fireHits.every((e) => e.damage > 0));
+  assert.ok(o.burn > 0 && o.burn <= TUNING.superFreeze + 600, 'opponent is burning');
+  const before = o.health;
+  ev = run(m, 120);
+  const ticks = ev.filter((e) => e.type === 'burn' && e.who === 1);
+  assert.equal(ticks.length, 4, 'one burn tick every half second');
+  assert.equal(before - o.health, 4 * TUNING.burnDamage);
+  // runs out after 10 s and cannot KO
+  o.health = 3;
+  run(m, 700);
+  assert.equal(o.burn, 0, 'burn expired');
+  assert.equal(o.health, 1, 'burn alone leaves the opponent at 1 HP');
+  // normal attacks carry no fire
+  for (const id of ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk', 'jp', 'jk', 's1', 's2', 's3']) assert.ok(!f.def.moves[id].fire, `${id} is not a fire move`);
+  assert.ok(f.def.moves.s4.fire && f.def.moves.su.fire);
 });
 
 test('projectiles: one on screen per fighter, blockable, cancel each other', () => {

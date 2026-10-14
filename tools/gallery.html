@@ -33,7 +33,7 @@ function render(id, clipSpec, cx, cy, s, label) {
   }
   ctx.save(); ctx.translate(cx, cy); ctx.scale(s, -s);
   const prop = clip === 'attack' && f.move.def.prop ? f.move.def.prop : null;
-  new FighterPainter(def).draw(ctx, f.skel, { layers: f.anim.layers, prop, chains: sec.localChains(1, f.body.x, f.body.y, 1) });
+  new FighterPainter(def).draw(ctx, f.skel, { layers: f.anim.layers, prop, fire: clip === 'attack' && !!f.move.def.fire, now: 400, chains: sec.localChains(1, f.body.x, f.body.y, 1) });
   if (q.get('hb') && clip === 'attack') {
     f.state = 'attack';
     ctx.strokeStyle = '#ff3355'; ctx.lineWidth = 2 / s;

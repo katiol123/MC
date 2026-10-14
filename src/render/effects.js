@@ -1,6 +1,7 @@
 // Procedural combat effects: hit sparks, impact rings, block shields, dust, attack trails,
 // floating labels and camera shake. All in world space; driven by simulation events.
 import { rgba } from './color.js';
+import { drawGlow } from './fire.js';
 
 export class Effects {
   constructor() {
@@ -21,7 +22,8 @@ export class Effects {
       case 'hit': {
         const heavy = e.strength !== 'light';
         const n = heavy ? 18 : 10;
-        const color = e.counter ? '#ffd23f' : '#ffffff';
+        const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
+        if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
           const sp = (heavy ? 7 : 4.5) + this.rnd() * 6;
@@ -41,6 +43,7 @@ export class Effects {
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 5, vy: Math.sin(a) * 5, life: 10, max: 10, color: '#7fe8ff', w: 2 });
         }
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
+        if (e.fire) this.fireBurst(e.x, e.y, 6, 0);
         break;
       }
       case 'parry':
@@ -67,8 +70,12 @@ export class Effects {
       case 'projectileEnd':
         for (let i = 0; i < 6; i++) {
           const a = this.rnd() * Math.PI * 2;
-          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : '#3fe6d0', w: 2 });
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
+        break;
+      case 'burn':
+        // burn tick: a puff of embers off the burning body
+        for (let i = 0; i < 4; i++) this.ember(e.x + (this.rnd() - 0.5) * 50, e.y + (this.rnd() - 0.5) * 80, 0);
         break;
       case 'whiff':
         // a faint air-cut arc: readable as a miss, clearly different from hit sparks / block shields
@@ -102,12 +109,24 @@ export class Effects {
     }
   }
 
+  /** Embers: glowing specks that float up and flicker out. */
+  ember(x, y, dir) {
+    this.parts.push({ kind: 'ember', x, y, vx: dir * 2 + (this.rnd() - 0.5) * 3, vy: 1.5 + this.rnd() * 3, life: 26 + this.rnd() * 20, max: 46, r: 2 + this.rnd() * 2.5 });
+  }
+
+  fireBurst(x, y, n, dir) {
+    for (let i = 0; i < n; i++) this.ember(x, y, dir);
+    this.parts.push({ kind: 'fireball', x, y, r: 16, life: 12, max: 12 });
+  }
+
   tick() {
     for (const p of this.parts) {
       p.life--;
       if (p.kind === 'spark') { p.x += p.vx; p.y += p.vy; p.vx *= 0.86; p.vy = p.vy * 0.86 - 0.3; }
       else if (p.kind === 'ring') p.r += p.vr *= 0.82;
       else if (p.kind === 'dust') { p.x += p.vx; p.y += p.vy; p.vx *= 0.92; p.r += 0.4; }
+      else if (p.kind === 'ember') { p.x += p.vx + Math.sin(p.life * 0.4) * 0.6; p.y += p.vy; p.vx *= 0.95; p.vy = p.vy * 0.97 + 0.08; }
+      else if (p.kind === 'fireball') p.r += 3.5;
     }
     this.parts = this.parts.filter((p) => p.life > 0);
     for (const l of this.labels) { l.life--; l.y += 0.8; }
@@ -167,6 +186,17 @@ export class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'ember') {
+        const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';
+        ctx.fillStyle = rgba(hot, Math.min(1, k * 1.6) * (0.75 + 0.25 * Math.sin(p.life * 1.7)));
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, p.r * cam.zoom * (0.5 + k * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'fireball') {
+        const prev = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, s.x, s.y, p.r * cam.zoom * 1.6, 0.7 * k);
+        ctx.globalCompositeOperation = prev;
       } else if (p.kind === 'dust') {
         ctx.fillStyle = rgba('#d8c8e8', 0.28 * k);
         ctx.beginPath();
@@ -200,7 +230,7 @@ export class Trails {
       // follow the tip of the strike that is actually active this tick (works for any move type)
       if (f.hitboxes?.length && f.hitSpec) {
         const hb = f.hitboxes[f.hitboxes.length - 1];
-        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength });
+        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength, fire: !!f.hitSpec.fire });
       }
       for (const p of h) p.life--;
       while (h.length && h[0].life <= 0) h.shift();
@@ -214,14 +244,14 @@ export class Trails {
         const a = cam.toScreen(h[k - 1].x, h[k - 1].y), b = cam.toScreen(h[k].x, h[k].y);
         const t = k / h.length;
         const w = (h[k].strength === 'light' ? 7 : 12) * t * cam.zoom;
-        ctx.strokeStyle = rgba(rim[i], 0.45 * t * Math.min(1, h[k].life / 4));
+        ctx.strokeStyle = rgba(h[k].fire ? '#ff7a1a' : rim[i], (h[k].fire ? 0.7 : 0.45) * t * Math.min(1, h[k].life / 4));
         ctx.lineWidth = w;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
-        ctx.strokeStyle = rgba('#ffffff', 0.5 * t * Math.min(1, h[k].life / 4));
+        ctx.strokeStyle = rgba(h[k].fire ? '#ffe08a' : '#ffffff', 0.5 * t * Math.min(1, h[k].life / 4));
         ctx.lineWidth = w * 0.35;
         ctx.stroke();
       }

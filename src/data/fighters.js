@@ -1,7 +1,7 @@
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All eight are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All nine are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
@@ -215,6 +215,30 @@ export const ROSTER = [
     moves: {
       s2: { name: 'Sun Pounce' },
       s3: { name: 'Jungle Arc', startup: 13 },
+    },
+  },
+  {
+    id: 'cinder',
+    name: 'KAI "CINDER" VOSS',
+    title: 'Pocket Wildfire',
+    blurb: 'Moody street kid with fire in his fists. Keeps it caged until the bar is full, then lets it burn.',
+    body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
+    stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 950, pushW: 32 },
+    look: {
+      skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
+      eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
+      hair: { style: 'spiky', color: '#3a2618', streak: '#b8306f' },
+      earrings: '#c9c9d2',
+      top: { type: 'jacket', sleeves: 'short', color: '#2c3328', color2: '#3fb89a', inner: '#c42f8f', pendant: '#b8c0c8' },
+      pants: { type: 'pants', color: '#26232c' },
+      belt: { color: '#1a1416', buckle: '#9a9aa2' },
+      gloves: { type: 'wraps', color: '#d9c9a6' },
+      shoes: { type: 'sneakers', color: '#2a2a30', sole: '#e8e4dc' },
+      victory: 1,
+    },
+    moves: {
+      lp: { startup: 4 },
+      s1: { name: 'Spark Fist' },
     },
   },
 ];

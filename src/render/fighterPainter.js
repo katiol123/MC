@@ -8,6 +8,7 @@ import { limbPath, smoothClosed, smoothOpen, boxAlong, along } from './shapes.js
 import { mix, lighten, darken, rgba } from './color.js';
 import { dirUp, dirFwd, DEG } from '../core/math.js';
 import { PAN_COCK } from '../data/signatures.js';
+import { drawFireFist } from './fire.js';
 
 const LIGHT = { x: 0.45, y: 0.89 };
 const SHADOW_TINT = '#2a1440';
@@ -104,6 +105,8 @@ export class FighterPainter {
     this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
     this.prop = opts.prop || null;
+    this.fire = !!opts.fire;
+    this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
     const layers = opts.layers || {};
@@ -143,8 +146,9 @@ export class FighterPainter {
     const depth = back ? 0.16 : 0;
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
-    const fullSleeve = ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
-    const shortSleeve = ['tee', 'henley'].includes(top.type);
+    const shortCut = top.sleeves === 'short';
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
+    const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
     const muscle = (this.def.body.bulk || 1) * (this.def.body.armBulk || 1);
@@ -193,6 +197,11 @@ export class FighterPainter {
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
+    // flaming fists (Cinder's specials / super only; normal attacks stay clean)
+    if (this.fire && pass === 'fill') {
+      const c = along(Wr, H, 0.7);
+      drawFireFist(ctx, c.x, c.y, this.pr.rHand * 2.5, this.time, side === 'F' ? 0 : 5);
+    }
     // Armour pauldron on the lead shoulder.
     if ((top.type === 'armor' || top.type === 'punkvest') && !back) this.drawPauldron(ctx, pass, S, E, A['upperArm' + side]);
   }
@@ -664,6 +673,23 @@ export class FighterPainter {
           ctx.strokeStyle = outl;
           ctx.stroke();
         });
+        // pendant on a thin cord over the shirt
+        if (top.pendant) {
+          const cord = [P2(N, fC, 2, uC, -2), P2(N, fC, cw * 0.32, uC, -up * 0.36), P2(N, fC, cw * 0.62, uC, -3)];
+          this.line(ctx, cord, 1.4, outl, 0.8);
+          const pd = cord[1];
+          ctx.beginPath();
+          ctx.arc(pd.x, pd.y - 4, 5, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(top.pendant, t).base;
+          ctx.fill();
+          ctx.lineWidth = 1.3;
+          ctx.strokeStyle = outl;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(pd.x, pd.y - 4, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(top.color2, t).base;
+          ctx.fill();
+        }
         // studs
         const st = P2(N, fC, cw * 0.4, uC, -up * 0.16);
         ctx.beginPath();
@@ -1049,7 +1075,10 @@ export class FighterPainter {
       return;
     }
     ctx.beginPath();
-    ctx.ellipse(-0.16 * R, -0.06 * R, 0.2 * R, 0.29 * R, 0.15, 0, Math.PI * 2);
+    if (lk.ears === 'pointed') {
+      // elf-like ear sweeping up and back
+      smoothClosed(ctx, [{ x: -0.04 * R, y: -0.34 * R }, { x: -0.3 * R, y: -0.2 * R }, { x: -0.62 * R, y: 0.42 * R }, { x: -0.2 * R, y: 0.16 * R }, { x: -0.02 * R, y: 0.12 * R }], 0.35);
+    } else ctx.ellipse(-0.16 * R, -0.06 * R, 0.2 * R, 0.29 * R, 0.15, 0, Math.PI * 2);
     if (pass === 'outline') return this.outlineFill(ctx);
     ctx.fillStyle = this.skin.base;
     ctx.fill();

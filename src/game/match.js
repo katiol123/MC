@@ -144,8 +144,23 @@ export class Match {
     for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
+    if (this.phase === 'fight') this.updateBurn();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /** Burning fighters take a small hit every TUNING.burnInterval ticks; burn alone never KOs. */
+  updateBurn() {
+    for (const f of this.fighters) {
+      if (f.burn <= 0) continue;
+      f.burn--;
+      if (f.health <= 0) { f.burn = 0; continue; }
+      if (f.burn % TUNING.burnInterval === 0 && f.health > 1) {
+        const damage = Math.min(TUNING.burnDamage, f.health - 1);
+        f.health -= damage;
+        this.events.push({ type: 'burn', who: f.index, damage, x: f.body.x, y: f.body.y + 120 * f.props.posScale });
+      }
+    }
   }
 
   updateFight() {

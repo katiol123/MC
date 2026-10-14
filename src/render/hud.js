@@ -1,5 +1,6 @@
 // Fight HUD: slanted health bars with damage trail, stun meters, portraits, timer, round pips,
 // combo counters and round announcements.
+import { drawFlame } from './fire.js';
 import { VIEW } from '../config/constants.js';
 import { rgba } from './color.js';
 
@@ -108,6 +109,20 @@ export function drawHud(ctx, match, hud, portraits) {
     ctx.fillRect(left ? x + barW - 220 : x, top + barH + 9, 220, 6);
     ctx.fillStyle = sk > 0.8 ? '#ff4040' : '#7fe8ff';
     ctx.fillRect(left ? x + barW - 220 * sk : x, top + barH + 9, 220 * sk, 6);
+    // burn status: flame icon + seconds left, next to the stun meter
+    if (f.burn > 0) {
+      const bx = left ? x + barW - 236 : x + 236, by = top + barH + 14;
+      const t = performance.now() / 1000;
+      drawFlame(ctx, bx + (left ? -8 : 8), by + 6, 6, 16, t, i * 3, -1);
+      ctx.font = `900 14px ${FONT}`;
+      ctx.textAlign = left ? 'right' : 'left';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#120816';
+      const txt = `BURN ${Math.ceil(f.burn / 60)}`;
+      ctx.strokeText(txt, bx + (left ? -20 : 20), by + 6);
+      ctx.fillStyle = '#ffb040';
+      ctx.fillText(txt, bx + (left ? -20 : 20), by + 6);
+    }
     // name
     ctx.font = `900 19px ${FONT}`;
     ctx.textAlign = left ? 'left' : 'right';
