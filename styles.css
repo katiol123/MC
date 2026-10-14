@@ -150,3 +150,18 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 @keyframes fadeIn { from { opacity: 0; } }
 .side.waiting .portrait-frame { background: repeating-linear-gradient(115deg, #120a18 0 14px, #1a1022 14px 28px); }
 .side.waiting .portrait-frame::before { content: '?'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 220px; color: rgba(255,255,255,.08); z-index: 1; }
+
+/* ---------- transparent (cut-out) portraits ---------- */
+.card-img { background-color: #24122f; background-size: 135%; background-position: center 6%; background-repeat: no-repeat; }
+.card.c1 .card-img { background-color: #3a1240; }
+.card.c2 .card-img { background-color: #0f3434; }
+.portrait-frame { background: radial-gradient(ellipse at 50% 35%, rgba(255,255,255,.12), transparent 60%), repeating-linear-gradient(115deg, rgba(255,255,255,.04) 0 6px, transparent 6px 14px), #160b20; }
+.p1 .portrait-frame { background-color: #2a0d2e; }
+.p2 .portrait-frame { background-color: #0b2626; }
+.portrait { background-repeat: no-repeat; background-size: 108%; background-position: center 4%; }
+.p1 .portrait.base { filter: drop-shadow(4px 0 0 var(--p1)) drop-shadow(0 0 18px rgba(255,63,208,.45)); }
+.p2 .portrait.base { filter: drop-shadow(-4px 0 0 var(--p2)) drop-shadow(0 0 18px rgba(63,230,208,.45)); }
+.result .result-portrait { background-color: #24122f; background-repeat: no-repeat; filter: drop-shadow(0 0 16px rgba(255,210,63,.35)); }
+.vs-img { background-repeat: no-repeat; background-size: contain; background-position: center top; }
+.left .vs-img { filter: drop-shadow(8px 0 0 var(--p1)) drop-shadow(0 0 30px rgba(255,63,208,.5)); }
+.right .vs-img { filter: drop-shadow(8px 0 0 var(--p2)) drop-shadow(0 0 30px rgba(63,230,208,.5)); }
