@@ -44,7 +44,7 @@ export class TitleScene {
     ], { className: 'main-menu' });
   }
 
-  showOptions() {
+  showOptions(focus = 0) {
     const s = this.app.settings;
     const opts = [
       ['Rounds to win', 'roundsToWin', [1, 2, 3]],
@@ -54,13 +54,13 @@ export class TitleScene {
       ['Sound & music', 'sound', [true, false], (v) => (v ? 'on' : 'off')],
     ];
     const label = ([name, key, , fmt]) => `${name}:  ◀ ${fmt ? fmt(s[key]) : String(s[key]).toUpperCase()} ▶`;
-    const cycle = (o) => () => {
+    const cycle = (o, d) => () => {
       const [, key, vals] = o;
-      s[key] = vals[(vals.indexOf(s[key]) + 1) % vals.length];
+      s[key] = vals[(vals.indexOf(s[key]) + d + vals.length) % vals.length];
       this.app.saveSettings();
-      this.showOptions();
+      this.showOptions(opts.indexOf(o));
     };
-    this.menu = createMenu(this.app, 'OPTIONS', [...opts.map((o) => [label(o), cycle(o)]), ['Back', () => this.showMain()]], { onBack: () => this.showMain() });
+    this.menu = createMenu(this.app, 'OPTIONS', [...opts.map((o) => [label(o), cycle(o, 1), cycle(o, -1)]), ['Back', () => this.showMain()]], { onBack: () => this.showMain(), start: focus });
   }
 
   showControls() {

@@ -42,6 +42,65 @@ export class Arena {
     this.t++;
   }
 
+  /** Offscreen canvas helper (render-only module, so the DOM is available). */
+  static canvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w);
+    c.height = Math.ceil(h);
+    return c;
+  }
+
+  skyline(layer) {
+    this.skyCache = this.skyCache || [];
+    if (this.skyCache[layer]) return this.skyCache[layer];
+    const p = this.pal;
+    const sc = 0.7 + layer * 0.15;
+    const bs = this.buildings.filter((b) => b.layer === layer);
+    const x0 = Math.min(...bs.map((b) => b.x)), x1 = Math.max(...bs.map((b) => b.x + b.w));
+    const h = 330;
+    const c = Arena.canvas((x1 - x0) * sc + 10, h);
+    const g = c.getContext('2d');
+    for (const b of bs) {
+      const sx = (b.x - x0) * sc;
+      const hh = b.h * (0.6 + layer * 0.25);
+      g.fillStyle = layer === 0 ? p.city : p.city2;
+      g.fillRect(sx, h - hh, b.w * 0.85, hh);
+      if (b.antenna) g.fillRect(sx + b.w * 0.4, h - hh - 26, 2, 26);
+      for (const [wx, wy, ph] of b.wins) {
+        if (wy > hh - 6 || ph > 0.85) continue;
+        g.fillStyle = rgba(ph < 0.2 ? p.neon1 : ph < 0.35 ? p.neon2 : p.win, layer === 0 ? 0.45 : 0.7);
+        g.fillRect(sx + wx * 0.85, h - hh + wy, 4, 5);
+      }
+    }
+    this.skyCache[layer] = { canvas: c, x0: x0, h };
+    return this.skyCache[layer];
+  }
+
+  yard() {
+    if (this.yardCache) return this.yardCache;
+    const p = this.pal;
+    const zoom = 1.42;
+    const xs = this.containers.map((c) => c.x);
+    const x0 = Math.min(...xs), x1 = Math.max(...this.containers.map((c) => c.x + c.w));
+    const ch = 52 * 0.6 * zoom;
+    const h = ch * 3 + 4;
+    const c = Arena.canvas((x1 - x0) * 0.6 * zoom + 4, h);
+    const g = c.getContext('2d');
+    for (const ct of this.containers) {
+      const xx = (ct.x - x0) * 0.6 * zoom;
+      const cw = ct.w * 0.6 * zoom;
+      const yy = h - (ct.s + 1) * ch;
+      g.fillStyle = mix(ct.c, p.city, 0.45);
+      g.fillRect(xx, yy, cw, ch - 1);
+      g.fillStyle = rgba('#000000', 0.25);
+      for (let k = 4; k < cw - 2; k += 6) g.fillRect(xx + k, yy + 2, 2, ch - 5);
+      g.fillStyle = rgba(p.neon1, 0.12);
+      g.fillRect(xx, yy, cw, 2);
+    }
+    this.yardCache = { canvas: c, x0, h, zoom };
+    return this.yardCache;
+  }
+
   /** Draws everything behind the fighters. */
   drawBack(ctx, cam) {
     const W = VIEW.width, H = VIEW.height, p = this.pal, t = this.t;
@@ -76,26 +135,12 @@ export class Arena {
       ctx.fillRect(sunX - 100, yy, 200, 2 + i * 0.8);
     }
     ctx.restore();
-    // skyline (two parallax layers)
+    // skyline (two parallax layers, pre-rendered once into offscreen strips)
     for (const layer of [0, 1]) {
+      const strip = this.skyline(layer);
       const par = layer === 0 ? 0.12 : 0.22;
-      const base = horizon + 4;
-      ctx.fillStyle = layer === 0 ? p.city : p.city2;
-      for (const b of this.buildings) {
-        if (b.layer !== layer) continue;
-        const sx = (b.x - cam.x * par) * (0.7 + layer * 0.15) + W * 0.1;
-        if (sx > W + 50 || sx + b.w < -50) continue;
-        const hh = b.h * (0.6 + layer * 0.25);
-        ctx.fillRect(sx, base - hh, b.w * 0.85, hh);
-        if (b.antenna) ctx.fillRect(sx + b.w * 0.4, base - hh - 26, 2, 26);
-        for (const [wx, wy, ph] of b.wins) {
-          const on = Math.sin(t * 0.01 + ph * 40) > -0.85;
-          if (!on || wy > hh - 6) continue;
-          ctx.fillStyle = rgba(ph < 0.2 ? p.neon1 : ph < 0.35 ? p.neon2 : p.win, layer === 0 ? 0.45 : 0.7);
-          ctx.fillRect(sx + wx * 0.85, base - hh + wy, 4, 5);
-        }
-        ctx.fillStyle = layer === 0 ? p.city : p.city2;
-      }
+      const sc = 0.7 + layer * 0.15;
+      ctx.drawImage(strip.canvas, (strip.x0 - cam.x * par) * sc + W * 0.1, horizon + 4 - strip.h);
     }
     // cranes
     ctx.strokeStyle = mix(p.city2, '#000000', 0.2);
@@ -129,18 +174,9 @@ export class Arena {
     }
     // container yard
     const yardBase = gy - 95 * cam.zoom;
-    for (const c of this.containers) {
-      const xx = (c.x - cam.x) * 0.6 * cam.zoom + W / 2;
-      const cw = c.w * 0.6 * cam.zoom, ch = 52 * 0.6 * cam.zoom;
-      if (xx > W + 10 || xx + cw < -10) continue;
-      const yy = yardBase - (c.s + 1) * ch;
-      ctx.fillStyle = mix(c.c, p.city, 0.45);
-      ctx.fillRect(xx, yy, cw, ch - 1);
-      ctx.fillStyle = rgba('#000000', 0.25);
-      for (let k = 4; k < cw - 2; k += 6) ctx.fillRect(xx + k, yy + 2, 2, ch - 5);
-      ctx.fillStyle = rgba(p.neon1, 0.12);
-      ctx.fillRect(xx, yy, cw, 2);
-    }
+    const yard = this.yard();
+    const yk = cam.zoom / yard.zoom;
+    ctx.drawImage(yard.canvas, (yard.x0 - cam.x) * 0.6 * cam.zoom + W / 2, yardBase - yard.h * yk, yard.canvas.width * yk, yard.h * yk);
     // neon sign
     const signX = (520 - cam.x) * 0.6 * cam.zoom + W / 2, signY = yardBase - 175 * cam.zoom;
     const flick = Math.sin(t * 0.7) > -0.92 && !(t % 233 < 6);

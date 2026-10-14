@@ -112,3 +112,15 @@ test('knockdown -> getup -> idle, invulnerable while down', () => {
   for (const s of ['knockdown', 'getup']) assert.ok(seen.has(s), `saw ${s}`);
   assert.equal(b.state, 'idle');
 });
+
+test('stun meter: a full dizzy meter puts the defender into the dizzy state after hitstun', () => {
+  const m = fightingMatch();
+  place(m, 1000, 1100);
+  const b = m.fighters[1];
+  b.stun = b.stats.stunMax - 1;
+  const ev = run(m, 60, (i) => [raw({ hp: i === 0 }), raw()]);
+  assert.ok(ev.some((e) => e.type === 'dizzy'), 'dizzy event');
+  assert.equal(b.state, 'dizzy');
+  run(m, 200);
+  assert.notEqual(b.state, 'dizzy', 'recovers from dizzy');
+});

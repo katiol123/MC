@@ -49,13 +49,18 @@ export function createMenu(app, title, items, opts = {}) {
     close();
     items[i][1]();
   }
-  focus(0);
+  focus(opts.start || 0);
   const unsub = app.keyboard.onPress((code) => {
     const a = app.keyboard.constructor.actionOf(code);
     if (!a) return;
     if (a.action === 'up') { focus(idx - 1); app.audio.ui('move'); }
     else if (a.action === 'down') { focus(idx + 1); app.audio.ui('move'); }
     else if (a.action === 'lp' || a.action === 'lk') choose(idx);
+    else if ((a.action === 'left' || a.action === 'right') && items[idx][2]) {
+      app.audio.ui('move');
+      close();
+      items[idx][a.action === 'left' ? 2 : 1]();
+    }
     else if ((a.action === 'back' || a.action === 'hp') && opts.onBack) { app.audio.ui('back'); close(); opts.onBack(); }
   });
   function close() {

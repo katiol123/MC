@@ -110,7 +110,7 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 @keyframes flash { 0% { filter: brightness(3); } 100% { filter: none; } }
 
 .deck { position: absolute; left: 50%; bottom: 40px; width: 0; height: 0; }
-.card { --a: calc((var(--i) - (var(--n) - 1) / 2) * 5.6deg); position: absolute; left: -58px; bottom: 0; width: 116px; height: 176px; transform-origin: 50% 1150px;
+.card { --a: calc((var(--i) - (var(--n) - 1) / 2) * 4.1deg); position: absolute; left: -52px; bottom: 0; width: 104px; height: 158px; transform-origin: 50% 1250px;
   transform: rotate(var(--a)); transition: transform .22s cubic-bezier(.2,1.3,.4,1), filter .2s; cursor: pointer; filter: brightness(.62) saturate(.75); }
 .card-img { position: absolute; inset: 0; background-size: cover; background-position: center 10%; border: 3px solid #1a0f22; box-shadow: 0 6px 0 rgba(0,0,0,.5); clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
 .card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(8,3,12,.92)); clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
@@ -119,7 +119,7 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .card-tags { position: absolute; top: -26px; left: 0; right: 0; display: flex; justify-content: center; gap: 4px; z-index: 3; }
 .card-tags span { font-size: 13px; padding: 2px 7px; color: var(--ink); transform: skewX(-12deg); }
 .t1 { background: var(--p1); } .t2 { background: var(--p2); }
-.card.focus { transform: rotate(var(--a)) translateY(-44px) scale(1.16); filter: none; z-index: 10; }
+.card.focus { transform: rotate(var(--a)) translateY(-34px) scale(1.14); filter: none; z-index: 10; }
 .card.c1 .card-img { border-color: var(--p1); box-shadow: 0 0 22px var(--p1), 0 8px 0 rgba(0,0,0,.5); }
 .card.c2 .card-img { border-color: var(--p2); box-shadow: 0 0 22px var(--p2), 0 8px 0 rgba(0,0,0,.5); }
 .card.c1.c2 .card-img { border-color: var(--gold); box-shadow: -8px 0 22px var(--p1), 8px 0 22px var(--p2); }
@@ -148,3 +148,5 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 @keyframes bolt { from { opacity: 0; transform: translateX(-50%) rotate(14deg) scaleY(0); } }
 @keyframes slamIn { from { transform: scale(1.6); opacity: 0; } }
 @keyframes fadeIn { from { opacity: 0; } }
+.side.waiting .portrait-frame { background: repeating-linear-gradient(115deg, #120a18 0 14px, #1a1022 14px 28px); }
+.side.waiting .portrait-frame::before { content: '?'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 220px; color: rgba(255,255,255,.08); z-index: 1; }
