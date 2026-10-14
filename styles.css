@@ -119,9 +119,17 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .card-tags { position: absolute; top: -26px; left: 0; right: 0; display: flex; justify-content: center; gap: 4px; z-index: 3; }
 .card-tags span { font-size: 13px; padding: 2px 7px; color: var(--ink); transform: skewX(-12deg); }
 .t1 { background: var(--p1); } .t2 { background: var(--p2); }
-.card.focus { transform: rotate(var(--a)) translateY(-34px) scale(1.14); filter: none; z-index: 10; }
-.card.c1 .card-img { border-color: var(--p1); box-shadow: 0 0 22px var(--p1), 0 8px 0 rgba(0,0,0,.5); }
-.card.c2 .card-img { border-color: var(--p2); box-shadow: 0 0 22px var(--p2), 0 8px 0 rgba(0,0,0,.5); }
+.card.focus { transform: rotate(var(--a)) translateY(-8px); filter: none; z-index: 10; }
+/* The selected card barely moves (so it never slides out from under the mouse); instead its edges
+   light up: a thick player-coloured frame, an inner bright rim and a slow glow pulse. */
+/* note: the fan pivots 1250px below the cards, so scaling the card itself would fling it upwards;
+   only the picture inside grows slightly */
+.card.focus .card-img { border-width: 4px; transform: scale(1.04); transition: transform .18s; }
+.card.c1 .card-img, .card.c2 .card-img, .card.c1.c2 .card-img { animation: cardGlow 1.2s ease-in-out infinite alternate; }
+.card.focus::before { content: ''; position: absolute; inset: 5px; z-index: 3; pointer-events: none; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.85); }
+@keyframes cardGlow { from { filter: brightness(1); } to { filter: brightness(1.12); } }
+.card.c1 .card-img { border-color: var(--p1); box-shadow: 0 0 0 2px var(--p1), 0 0 26px var(--p1), 0 6px 0 rgba(0,0,0,.5); }
+.card.c2 .card-img { border-color: var(--p2); box-shadow: 0 0 0 2px var(--p2), 0 0 26px var(--p2), 0 6px 0 rgba(0,0,0,.5); }
 .card.c1.c2 .card-img { border-color: var(--gold); box-shadow: -8px 0 22px var(--p1), 8px 0 22px var(--p2); }
 
 /* ---------- versus ---------- */
@@ -165,3 +173,7 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .vs-img { background-repeat: no-repeat; background-size: contain; background-position: center top; }
 .left .vs-img { filter: drop-shadow(8px 0 0 var(--p1)) drop-shadow(0 0 30px rgba(255,63,208,.5)); }
 .right .vs-img { filter: drop-shadow(8px 0 0 var(--p2)) drop-shadow(0 0 30px rgba(63,230,208,.5)); }
+/* clip-path hides box-shadows, so the outer glow is a drop-shadow on the card itself */
+.card.c1 { filter: drop-shadow(0 0 2px var(--p1)) drop-shadow(0 0 10px var(--p1)); }
+.card.c2 { filter: drop-shadow(0 0 2px var(--p2)) drop-shadow(0 0 10px var(--p2)); }
+.card.c1.c2 { filter: drop-shadow(-3px 0 2px var(--p1)) drop-shadow(3px 0 2px var(--p2)) drop-shadow(0 0 10px var(--gold)); }
