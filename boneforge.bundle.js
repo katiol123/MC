@@ -3665,7 +3665,9 @@ class FighterPainter {
     for (const k in layers) {
       const g = groups.find((gr) => gr.z === zFor[k]);
       if (!g) continue;
-      if (layers[k] === 'front') g.z = k === 'bl' ? 6.6 : 8.5;
+      // A far-side limb brought forward by an attack may pass in front of the torso, but never in
+      // front of the near-side limb: otherwise the left leg/arm would read as the right one.
+      if (layers[k] === 'front') g.z = k === 'bl' ? 4.6 : 6.5;
       else if (layers[k] === 'back') g.z = k === 'fa' ? 1.5 : 2.5;
     }
     groups.sort((a, b) => a.z - b.z);
