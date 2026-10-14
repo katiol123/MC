@@ -18,6 +18,7 @@ export class Effects {
   }
 
   onEvent(e, fighters) {
+    if (fighters) this.fighters = fighters;
     switch (e.type) {
       case 'hit': {
         const heavy = e.strength !== 'light';
@@ -31,6 +32,11 @@ export class Effects {
             for (let i = 0; i < 8; i++) this.parts.push({ kind: 'mote', x: e.x + (this.rnd() - 0.5) * 30, y: e.y + (this.rnd() - 0.5) * 30, tx: a.body.x, ty: a.body.y + 130, life: 26 + i * 2, max: 26 + i * 2, w: this.rnd() });
             this.labels.push({ text: `+${e.heal}`, x: a.body.x, y: a.body.y + 250, life: 40, color: '#5ff0b8' });
           }
+        }
+        if (e.pull) {
+          // Talon Pull: a taut line from the hooking hand to the victim while they are reeled in
+          this.parts.push({ kind: 'tether', who: e.who, target: e.target, x: e.x, y: e.y, life: 36, max: 36 });
+          this.labels.push({ text: 'HOOKED!', x: e.x, y: e.y + 70, life: 45, color: '#3fe6d0' });
         }
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
@@ -203,6 +209,41 @@ export class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'tether' && this.fighters) {
+        const a = this.fighters[p.who], d = this.fighters[p.target];
+        const hand = a.skel.j[a.stance === 1 ? 'handB' : 'handF'];
+        const h = cam.toScreen(a.body.x + a.facing * hand.x, a.body.y + hand.y);
+        const t = cam.toScreen(d.body.x, d.body.y + 135 * d.props.posScale);
+        const sag = 14 * cam.zoom * (1 - k);
+        const mx = (h.x + t.x) / 2, my = (h.y + t.y) / 2 + sag;
+        for (const [w, c, al] of [[7, '#0c0610', 0.8], [3.5, '#3fe6d0', 1], [1.2, '#e8fffb', 1]]) {
+          ctx.strokeStyle = rgba(c, al * Math.min(1, k * 2));
+          ctx.lineWidth = w * cam.zoom;
+          ctx.beginPath();
+          ctx.moveTo(h.x, h.y);
+          ctx.quadraticCurveTo(mx, my, t.x, t.y);
+          ctx.stroke();
+        }
+        // the talon hooked into the victim
+        const ang = Math.atan2(t.y - my, t.x - mx);
+        ctx.fillStyle = rgba('#3fe6d0', Math.min(1, k * 2));
+        ctx.beginPath();
+        for (const s2 of [-1, 1]) {
+          ctx.moveTo(t.x, t.y);
+          ctx.lineTo(t.x - Math.cos(ang + s2 * 0.6) * 16 * cam.zoom, t.y - Math.sin(ang + s2 * 0.6) * 16 * cam.zoom);
+          ctx.lineTo(t.x - Math.cos(ang) * 8 * cam.zoom, t.y - Math.sin(ang) * 8 * cam.zoom);
+        }
+        ctx.fill();
+        // speed streaks behind the victim
+        ctx.strokeStyle = rgba('#ffffff', 0.5 * k);
+        ctx.lineWidth = 2;
+        const dir = Math.sign(t.x - h.x) || 1;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(t.x + dir * 30 * cam.zoom, t.y + i * 22 * cam.zoom);
+          ctx.lineTo(t.x + dir * (60 + 20 * (1 - k)) * cam.zoom, t.y + i * 22 * cam.zoom);
+          ctx.stroke();
+        }
       } else if (p.kind === 'mote') {
         const prev = ctx.globalCompositeOperation;
         ctx.globalCompositeOperation = 'lighter';

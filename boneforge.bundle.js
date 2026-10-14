@@ -1069,6 +1069,7 @@ const SPECIAL_ORDER = ['su', 's2', 's1', 's4', 's3'];
 });
 __define("src/data/signatures.js", function (__exports, __require) {
   Object.defineProperty(__exports, "PAN_COCK", { enumerable: true, get: () => PAN_COCK });
+  Object.defineProperty(__exports, "TALON_REACH", { enumerable: true, get: () => TALON_REACH });
   Object.defineProperty(__exports, "SIGNATURES", { enumerable: true, get: () => SIGNATURES });
 // Per-fighter signature special (s4, input ↓↙← + punch) and super (su, ↓↘→↓↘→ + punch).
 // Pure data: the generic systems (sequences, projectiles, throws, counter stance, air dives)
@@ -1109,6 +1110,8 @@ const FIRE = { fire: true, burn: 600 };
 const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
 const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
 
+/** How far Old Hawk's thrown talon reaches past his hand (hitbox and the drawn line share it). */
+const TALON_REACH = 120;
 /** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
 const HEAL = { lifesteal: 0.5 };
 
@@ -1271,10 +1274,10 @@ const SIGNATURES = {
     // long reaching hook that drags the opponent in (negative push) with time to follow up
     s4: {
       name: 'Talon Pull', anim: 'lunge', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, pull: true,
-      startup: 13, active: 4, recovery: 22, motion: [{ from: 6, to: 14, vx: 5 }],
+      startup: 13, active: 4, recovery: 18, motion: [{ from: 6, to: 14, vx: 2.5 }],
       damage: 55, stun: 50, hitstun: 34, blockstun: 14, hitstop: 10,
-      height: 'mid', reaction: 'light', push: { hit: -7, block: 3 },
-      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 26, r: 16 }],
+      height: 'mid', reaction: 'light', push: { hit: 0, block: 3 },
+      hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 15 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: TALON_REACH, r: 16 }],
       priority: 3,
     },
     su: {
@@ -2431,6 +2434,7 @@ class Fighter {
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
+    this.pulled = null; // being reeled in by a pull
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -2532,6 +2536,14 @@ class Fighter {
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
+    if (this.pulled) {
+      // hooked (Old Hawk's Talon Pull): reeled in to just in front of the puller
+      const p = this.pulled, target = opp.body.x + opp.facing * (opp.body.pushW + this.body.pushW + p.gap);
+      const k = Math.min(1, ++p.t / p.ticks);
+      this.body.x += (target - this.body.x) * (0.08 + 0.4 * k * k);
+      this.body.vx = 0;
+      if (p.t >= p.ticks || this.state !== 'hitstun') this.pulled = null;
+    }
     this.body.integrate({ friction: sliding });
     if (this.body.justLanded) this.onLand();
     return true;
@@ -4123,6 +4135,8 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
   ownHitstop(hitstop);
   if (!projectile) cornerPushback(att, def, spec.push.hit);
+  // hooked: the defender is reeled in over the next ticks (see Fighter.update)
+  if (spec.pull && def.state === 'hitstun') def.pulled = { t: 0, ticks: 22, gap: 6 };
   // second wind (Old Hawk's super): heal for a share of the damage dealt
   const heal = spec.lifesteal && !projectile ? Math.min(att.maxHealth - att.health, Math.round(damage * spec.lifesteal)) : 0;
   if (heal > 0 && att.health > 0) att.health += heal;
@@ -4135,7 +4149,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: spec.push.hit < 0,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: !!spec.pull,
   };
 }
 
@@ -4157,7 +4171,6 @@ function applyParry(att, def, point) {
 /** If the defender is pinned against a wall, the attacker is pushed back instead. */
 function cornerPushback(att, def, push) {
   const dirAway = Math.sign(def.body.x - att.body.x) || att.facing;
-  if (push <= 0) return; // pulls never push the attacker back
   if (def.body.wall === dirAway || Math.abs(def.body.x - (dirAway > 0 ? STAGE.right - def.body.pushW : STAGE.left + def.body.pushW)) < 4) {
     if (att.body.onGround) att.body.vx = -dirAway * push * 0.9;
   }
@@ -4348,6 +4361,7 @@ const { VIEW } = __require("src/config/constants.js");
 const { lerp } = __require("src/core/math.js");
 const { blendPoses, computeSkeleton, emptyPose, clonePose } = __require("src/anim/skeleton.js");
 const { drawFlame, drawGlow } = __require("src/render/fire.js");
+const { TALON_REACH } = __require("src/data/signatures.js");
 const { ATTACK_POSES } = __require("src/anim/attackPoses.js");
 const { FighterPainter } = __require("src/render/fighterPainter.js");
 const { SecondaryMotion } = __require("src/render/secondary.js");
@@ -4489,8 +4503,41 @@ class FightRenderer {
       blink,
     });
     if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
+    if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */
+  drawTalon(ctx, f, skel, alpha) {
+    const m = f.move.def, fr = f.move.frame + alpha;
+    const out = Math.min(1, Math.max(0, (fr - (m.startup - 3)) / 4));
+    const back = Math.min(1, Math.max(0, (fr - (m.startup + m.active)) / 6));
+    const k = out * (1 - back);
+    if (k <= 0 || f.move.contact === 'hit') return; // on a hit the reel-in tether takes over
+    const side = f.stance === 1 ? 'B' : 'F';
+    const H = skel.j['hand' + side], E = skel.j['elbow' + side];
+    const ang = Math.atan2(H.y - E.y, H.x - E.x);
+    const L = TALON_REACH * k;
+    const tx = H.x + Math.cos(ang) * L, ty = H.y + Math.sin(ang) * L;
+    ctx.lineCap = 'round';
+    for (const [w, c] of [[5, '#0c0610'], [2.4, '#3fe6d0'], [0.9, '#e8fffb']]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(H.x, H.y);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+    // the talon: three curved hooks
+    ctx.strokeStyle = '#3fe6d0';
+    ctx.lineWidth = 3;
+    for (const s of [-0.7, 0, 0.7]) {
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.quadraticCurveTo(tx + Math.cos(ang + s) * 14, ty + Math.sin(ang + s) * 14, tx + Math.cos(ang + s * 2.2) * 10 - Math.cos(ang) * 4, ty + Math.sin(ang + s * 2.2) * 10 - Math.sin(ang) * 4);
+      ctx.stroke();
+    }
   }
 
   /** Burn status: flames licking up from the body (fighter-local space, +y up). */
@@ -6790,6 +6837,7 @@ class Effects {
   }
 
   onEvent(e, fighters) {
+    if (fighters) this.fighters = fighters;
     switch (e.type) {
       case 'hit': {
         const heavy = e.strength !== 'light';
@@ -6803,6 +6851,11 @@ class Effects {
             for (let i = 0; i < 8; i++) this.parts.push({ kind: 'mote', x: e.x + (this.rnd() - 0.5) * 30, y: e.y + (this.rnd() - 0.5) * 30, tx: a.body.x, ty: a.body.y + 130, life: 26 + i * 2, max: 26 + i * 2, w: this.rnd() });
             this.labels.push({ text: `+${e.heal}`, x: a.body.x, y: a.body.y + 250, life: 40, color: '#5ff0b8' });
           }
+        }
+        if (e.pull) {
+          // Talon Pull: a taut line from the hooking hand to the victim while they are reeled in
+          this.parts.push({ kind: 'tether', who: e.who, target: e.target, x: e.x, y: e.y, life: 36, max: 36 });
+          this.labels.push({ text: 'HOOKED!', x: e.x, y: e.y + 70, life: 45, color: '#3fe6d0' });
         }
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
@@ -6975,6 +7028,41 @@ class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'tether' && this.fighters) {
+        const a = this.fighters[p.who], d = this.fighters[p.target];
+        const hand = a.skel.j[a.stance === 1 ? 'handB' : 'handF'];
+        const h = cam.toScreen(a.body.x + a.facing * hand.x, a.body.y + hand.y);
+        const t = cam.toScreen(d.body.x, d.body.y + 135 * d.props.posScale);
+        const sag = 14 * cam.zoom * (1 - k);
+        const mx = (h.x + t.x) / 2, my = (h.y + t.y) / 2 + sag;
+        for (const [w, c, al] of [[7, '#0c0610', 0.8], [3.5, '#3fe6d0', 1], [1.2, '#e8fffb', 1]]) {
+          ctx.strokeStyle = rgba(c, al * Math.min(1, k * 2));
+          ctx.lineWidth = w * cam.zoom;
+          ctx.beginPath();
+          ctx.moveTo(h.x, h.y);
+          ctx.quadraticCurveTo(mx, my, t.x, t.y);
+          ctx.stroke();
+        }
+        // the talon hooked into the victim
+        const ang = Math.atan2(t.y - my, t.x - mx);
+        ctx.fillStyle = rgba('#3fe6d0', Math.min(1, k * 2));
+        ctx.beginPath();
+        for (const s2 of [-1, 1]) {
+          ctx.moveTo(t.x, t.y);
+          ctx.lineTo(t.x - Math.cos(ang + s2 * 0.6) * 16 * cam.zoom, t.y - Math.sin(ang + s2 * 0.6) * 16 * cam.zoom);
+          ctx.lineTo(t.x - Math.cos(ang) * 8 * cam.zoom, t.y - Math.sin(ang) * 8 * cam.zoom);
+        }
+        ctx.fill();
+        // speed streaks behind the victim
+        ctx.strokeStyle = rgba('#ffffff', 0.5 * k);
+        ctx.lineWidth = 2;
+        const dir = Math.sign(t.x - h.x) || 1;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(t.x + dir * 30 * cam.zoom, t.y + i * 22 * cam.zoom);
+          ctx.lineTo(t.x + dir * (60 + 20 * (1 - k)) * cam.zoom, t.y + i * 22 * cam.zoom);
+          ctx.stroke();
+        }
       } else if (p.kind === 'mote') {
         const prev = ctx.globalCompositeOperation;
         ctx.globalCompositeOperation = 'lighter';
@@ -7822,10 +7910,10 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170], grizz: [100, 190], hawk: [90, 170],
+  cinder: [60, 170], grizz: [100, 190], hawk: [120, 280],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
-const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
+const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22, hawk: 0.1 };
 const SHOOTER = { rattigan: true, jax: true }; // projectile users: also back off from a downed opponent
 const BACK_DASH = [{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }];
 const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];

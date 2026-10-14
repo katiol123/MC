@@ -108,6 +108,7 @@ test('Talon Pull drags the opponent in and leaves time for a follow-up', () => {
   let ev = run(m, 40, p1seq(S4));
   assert.ok(ev.some((e) => e.type === 'hit' && e.who === 0 && e.move === 's4' && e.pull), 'pull connected');
   assert.ok(o.body.x - h.body.x < gap0 - 40, 'opponent pulled closer');
+  assert.ok(o.body.x - h.body.x - h.body.pushW - o.body.pushW < 20, 'reeled in to point blank');
   // a jab right after recovery still catches the pulled opponent (still in hitstun)
   for (let i = 0; i < 40 && h.state === 'attack'; i++) run(m, 1);
   assert.equal(o.state, 'hitstun', 'Old Hawk recovers while the opponent is still reeling (frame advantage)');

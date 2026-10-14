@@ -51,6 +51,7 @@ export class Fighter {
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
+    this.pulled = null; // being reeled in by a pull
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -152,6 +153,14 @@ export class Fighter {
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
+    if (this.pulled) {
+      // hooked (Old Hawk's Talon Pull): reeled in to just in front of the puller
+      const p = this.pulled, target = opp.body.x + opp.facing * (opp.body.pushW + this.body.pushW + p.gap);
+      const k = Math.min(1, ++p.t / p.ticks);
+      this.body.x += (target - this.body.x) * (0.08 + 0.4 * k * k);
+      this.body.vx = 0;
+      if (p.t >= p.ticks || this.state !== 'hitstun') this.pulled = null;
+    }
     this.body.integrate({ friction: sliding });
     if (this.body.justLanded) this.onLand();
     return true;

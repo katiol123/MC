@@ -206,6 +206,8 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
   def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
   ownHitstop(hitstop);
   if (!projectile) cornerPushback(att, def, spec.push.hit);
+  // hooked: the defender is reeled in over the next ticks (see Fighter.update)
+  if (spec.pull && def.state === 'hitstun') def.pulled = { t: 0, ticks: 22, gap: 6 };
   // second wind (Old Hawk's super): heal for a share of the damage dealt
   const heal = spec.lifesteal && !projectile ? Math.min(att.maxHealth - att.health, Math.round(damage * spec.lifesteal)) : 0;
   if (heal > 0 && att.health > 0) att.health += heal;
@@ -218,7 +220,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: spec.push.hit < 0,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: !!spec.pull,
   };
 }
 
@@ -240,7 +242,6 @@ function applyParry(att, def, point) {
 /** If the defender is pinned against a wall, the attacker is pushed back instead. */
 function cornerPushback(att, def, push) {
   const dirAway = Math.sign(def.body.x - att.body.x) || att.facing;
-  if (push <= 0) return; // pulls never push the attacker back
   if (def.body.wall === dirAway || Math.abs(def.body.x - (dirAway > 0 ? STAGE.right - def.body.pushW : STAGE.left + def.body.pushW)) < 4) {
     if (att.body.onGround) att.body.vx = -dirAway * push * 0.9;
   }

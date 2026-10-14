@@ -4,6 +4,7 @@ import { VIEW } from '../config/constants.js';
 import { lerp } from '../core/math.js';
 import { blendPoses, computeSkeleton, emptyPose, clonePose } from '../anim/skeleton.js';
 import { drawFlame, drawGlow } from './fire.js';
+import { TALON_REACH } from '../data/signatures.js';
 import { ATTACK_POSES } from '../anim/attackPoses.js';
 import { FighterPainter } from './fighterPainter.js';
 import { SecondaryMotion } from './secondary.js';
@@ -145,8 +146,41 @@ export class FightRenderer {
       blink,
     });
     if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
+    if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */
+  drawTalon(ctx, f, skel, alpha) {
+    const m = f.move.def, fr = f.move.frame + alpha;
+    const out = Math.min(1, Math.max(0, (fr - (m.startup - 3)) / 4));
+    const back = Math.min(1, Math.max(0, (fr - (m.startup + m.active)) / 6));
+    const k = out * (1 - back);
+    if (k <= 0 || f.move.contact === 'hit') return; // on a hit the reel-in tether takes over
+    const side = f.stance === 1 ? 'B' : 'F';
+    const H = skel.j['hand' + side], E = skel.j['elbow' + side];
+    const ang = Math.atan2(H.y - E.y, H.x - E.x);
+    const L = TALON_REACH * k;
+    const tx = H.x + Math.cos(ang) * L, ty = H.y + Math.sin(ang) * L;
+    ctx.lineCap = 'round';
+    for (const [w, c] of [[5, '#0c0610'], [2.4, '#3fe6d0'], [0.9, '#e8fffb']]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(H.x, H.y);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+    // the talon: three curved hooks
+    ctx.strokeStyle = '#3fe6d0';
+    ctx.lineWidth = 3;
+    for (const s of [-0.7, 0, 0.7]) {
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.quadraticCurveTo(tx + Math.cos(ang + s) * 14, ty + Math.sin(ang + s) * 14, tx + Math.cos(ang + s * 2.2) * 10 - Math.cos(ang) * 4, ty + Math.sin(ang + s * 2.2) * 10 - Math.sin(ang) * 4);
+      ctx.stroke();
+    }
   }
 
   /** Burn status: flames licking up from the body (fighter-local space, +y up). */

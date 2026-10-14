@@ -37,6 +37,8 @@ const FIRE = { fire: true, burn: 600 };
 const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
 const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
 
+/** How far Old Hawk's thrown talon reaches past his hand (hitbox and the drawn line share it). */
+export const TALON_REACH = 120;
 /** Second wind (Old Hawk's super): every hit heals him for half the damage it deals. */
 const HEAL = { lifesteal: 0.5 };
 
@@ -199,10 +201,10 @@ export const SIGNATURES = {
     // long reaching hook that drags the opponent in (negative push) with time to follow up
     s4: {
       name: 'Talon Pull', anim: 'lunge', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, pull: true,
-      startup: 13, active: 4, recovery: 22, motion: [{ from: 6, to: 14, vx: 5 }],
+      startup: 13, active: 4, recovery: 18, motion: [{ from: 6, to: 14, vx: 2.5 }],
       damage: 55, stun: 50, hitstun: 34, blockstun: 14, hitstop: 10,
-      height: 'mid', reaction: 'light', push: { hit: -7, block: 3 },
-      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 26, r: 16 }],
+      height: 'mid', reaction: 'light', push: { hit: 0, block: 3 },
+      hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 15 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: TALON_REACH, r: 16 }],
       priority: 3,
     },
     su: {
