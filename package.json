@@ -1,0 +1,13 @@
+{
+  "name": "boneforge",
+  "version": "1.0.0",
+  "description": "BONEFORGE - a 2D arcade fighting game with fully procedural skeletal characters (HTML5 Canvas, ES modules)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test tests/*.test.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "engines": { "node": ">=18" }
+}

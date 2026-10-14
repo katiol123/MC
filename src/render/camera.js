@@ -1,0 +1,41 @@
+// Camera: follows the midpoint of the fighters, zooms with their distance, adds impact shake.
+import { VIEW, STAGE } from '../config/constants.js';
+import { clamp, lerp } from '../core/math.js';
+
+export class Camera {
+  constructor() {
+    this.x = (STAGE.left + STAGE.right) / 2;
+    this.y = 0;
+    this.zoom = 1;
+    this.sx = 0;
+    this.sy = 0;
+    this.t = 0;
+  }
+  update(fighters, alpha, shake = 0) {
+    this.t++;
+    const xs = fighters.map((f) => lerp(f.prev.x, f.body.x, alpha));
+    const ys = fighters.map((f) => lerp(f.prev.y, f.body.y, alpha));
+    const mid = (xs[0] + xs[1]) / 2;
+    const dist = Math.abs(xs[0] - xs[1]);
+    const tz = clamp(1.16 - (dist - 180) / 1500, 0.9, 1.12);
+    this.zoom = lerp(this.zoom, tz, 0.08);
+    const half = VIEW.width / 2 / this.zoom;
+    const tx = clamp(mid, STAGE.left + half, STAGE.right - half);
+    this.x = lerp(this.x, tx, 0.18);
+    const ty = Math.max(0, Math.max(...ys) - 160) * 0.5;
+    this.y = lerp(this.y, ty, 0.1);
+    this.sx = shake ? (Math.sin(this.t * 2.3) + Math.sin(this.t * 3.7)) * shake * 0.5 : 0;
+    this.sy = shake ? (Math.cos(this.t * 2.9)) * shake * 0.5 : 0;
+  }
+  snap(fighters) {
+    this.update(fighters, 1, 0);
+    const xs = fighters.map((f) => f.body.x);
+    this.x = (xs[0] + xs[1]) / 2;
+  }
+  toScreen(x, y) {
+    return {
+      x: (x - this.x) * this.zoom + VIEW.width / 2 + this.sx,
+      y: VIEW.groundY - (y - this.y) * this.zoom + this.sy,
+    };
+  }
+}

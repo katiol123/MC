@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>BONEFORGE – pose gallery</title>
+<style>body{margin:0;background:#1a1020;color:#fff;font:12px monospace}canvas{display:block}</style></head>
+<body><canvas id="c" width="1600" height="900"></canvas>
+<script type="module">
+// Dev tool: renders every fighter (or one fighter in several clips) large, for visual QA.
+// Usage: tools/gallery.html#clip=idle&frame=10&scale=1  |  #fighter=brick&clips=idle,attack:hp:9,...
+import { ROSTER, buildFighterDef } from '../src/data/fighters.js';
+import { Fighter } from '../src/fighter/fighter.js';
+import { FighterPainter } from '../src/render/fighterPainter.js';
+import { SecondaryMotion } from '../src/render/secondary.js';
+const q = new URLSearchParams(location.hash.slice(1));
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+ctx.fillStyle = '#2a1838'; ctx.fillRect(0, 0, c.width, c.height);
+const scale = Number(q.get('scale') || 1.25);
+function render(id, clipSpec, cx, cy, s, label) {
+  const def = buildFighterDef(id);
+  const f = new Fighter(def, 0, 1000, 1);
+  const sec = new SecondaryMotion(def);
+  const [clip, a, b] = clipSpec.split(':');
+  let frames = Number(q.get('frame') || 30);
+  if (clip === 'attack') {
+    const m = def.moves[a];
+    f.move = { def: m, frame: 0, hitIds: new Set(), hits: 0 };
+    f.anim.play('attack', { blend: 0, params: { move: m } });
+    frames = Number(b || m.startup + 1);
+    for (let i = 0; i < frames; i++) { f.move.frame++; f.updatePose(); sec.tick(f); }
+  } else {
+    f.anim.play(clip, { blend: 0, params: { duration: 30, variant: Number(a || 0), launch: true } });
+    for (let i = 0; i < frames; i++) { if (clip === 'walk') f.walkDist += 3; f.updatePose(); sec.tick(f); }
+  }
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(s, -s);
+  new FighterPainter(def).draw(ctx, f.skel, { layers: f.anim.layers, chains: sec.localChains(1, f.body.x, f.body.y, 1) });
+  ctx.restore();
+  ctx.fillStyle = '#fff'; ctx.fillText(label, cx - 60, cy + 20);
+  ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(cx - 120, cy); ctx.lineTo(cx + 120, cy); ctx.stroke();
+}
+if (q.get('fighter')) {
+  const clips = (q.get('clips') || 'idle,walk,crouch,attack:lp,attack:hp,attack:lk,attack:hk,attack:chp').split(',');
+  const dx = Number(q.get('dx') || 260), cy = Number(q.get('cy') || 400), ox = Number(q.get('ox') || 120);
+  clips.forEach((cl, i) => render(q.get('fighter'), cl, ox + (i % 6) * dx, cy + Math.floor(i / 6) * 440, scale, cl));
+} else {
+  ROSTER.forEach((r, i) => render(r.id, q.get('clip') || 'idle', 110 + (i % 4) * 400, 420 + Math.floor(i / 4) * 440, scale, r.id));
+}
+window.done = true;
+</script></body></html>
