@@ -125,6 +125,30 @@ test('stun meter: a full dizzy meter puts the defender into the dizzy state afte
   assert.notEqual(b.state, 'dizzy', 'recovers from dizzy');
 });
 
+test('stun meter: filled by a launcher, the dizzy comes after the knockdown and getup', () => {
+  const m = fightingMatch();
+  place(m, 1000, 1080);
+  const b = m.fighters[1];
+  b.stun = b.stats.stunMax - 1;
+  const seen = new Set();
+  const ev = run(m, 240, (i) => { seen.add(b.state); return [raw({ down: i < 4, hp: i === 1 }), raw()]; }); // ↓+HP uppercut launches
+  for (const st of ['juggle', 'knockdown', 'getup']) assert.ok(seen.has(st), `saw ${st}`);
+  assert.ok(ev.some((e) => e.type === 'dizzy' && e.who === 1), 'dizzy after getting up');
+});
+
+test('stun meter: does not recover while the punishment continues, only after a pause', () => {
+  const m = fightingMatch();
+  place(m, 1000, 1100);
+  const b = m.fighters[1];
+  run(m, 40, (i) => [raw({ hp: i === 0 }), raw()]);
+  const after = b.stun;
+  assert.ok(after > 0);
+  run(m, 60);
+  assert.equal(b.stun, after, 'no recovery right after a hit');
+  run(m, 200);
+  assert.ok(b.stun < after, 'recovers after a pause');
+});
+
 test('a super motion (236236) never triggers a forward dash; 6-5-6 still does', () => {
   const m = fightingMatch();
   place(m, 600, 1400);

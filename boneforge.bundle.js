@@ -381,7 +381,8 @@ const TUNING = {
   blockHitstopScale: 0.75,
   chipDamage: 0.12, // fraction of special-move damage dealt through block
 
-  stunDecayPerTick: 0.35, // dizzy meter recovery
+  stunDecayPerTick: 0.35, // dizzy meter recovery per tick...
+  stunRecoverDelay: 120, // ...once this many ticks have passed without being hit
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },
   roundTimeSeconds: 99,
 
@@ -607,7 +608,7 @@ const ROSTER = [
     title: 'Grinning Wrecking Ball',
     blurb: 'Dock-yard brawler. Heavy hands, heavy grin, heavier follow-through.',
     body: { height: 1.02, bulk: 1.22, arms: 1.0, legs: 0.97, head: 1.05, torso: 1.02, shoulders: 1.2, armBulk: 1.15, waist: 1.05 },
-    stats: { health: 1080, walkF: 3.0, walkB: 2.4, run: 6.4, dash: 9, jumpVY: 15.8, jumpVX: 3.8, mass: 1.15, stunMax: 1100, pushW: 37 },
+    stats: { health: 1080, walkF: 3.0, walkB: 2.4, run: 6.4, dash: 9, jumpVY: 15.8, jumpVX: 3.8, mass: 1.15, stunMax: 680, pushW: 37 },
     look: {
       skin: '#c88a5e', outline: '#1b1012', rim: '#ff4fd8',
       eyes: '#3fd29a', brows: 'thick', mouth: 'grin',
@@ -632,7 +633,7 @@ const ROSTER = [
     title: 'The Top-Hat Weasel',
     blurb: 'A gentleman thief with goggles, a sharp tie and sharper teeth. Quick and slippery.',
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
-    stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 900, pushW: 32 },
+    stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -659,7 +660,7 @@ const ROSTER = [
     title: 'Laughing Long-Neck',
     blurb: 'Tall, bald and always laughing. Long legs make his kicks reach across the street.',
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
-    stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 1000, pushW: 34 },
+    stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -685,7 +686,7 @@ const ROSTER = [
     title: 'Punk Rush',
     blurb: 'Freckles, piercings and a jacket full of patches. Never stops coming forward.',
     body: { height: 0.98, bulk: 1.0, arms: 1.0, legs: 1.0, head: 1.08, torso: 0.98, shoulders: 1.04 },
-    stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 950, pushW: 34 },
+    stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 590, pushW: 34 },
     look: {
       skin: '#e3a27e', outline: '#1d1216', rim: '#2ee6d6',
       eyes: '#b04fd6', brows: 'angry', mouth: 'teeth', freckles: true,
@@ -710,7 +711,7 @@ const ROSTER = [
     title: 'The Velvet Collar',
     blurb: 'Pompadour, gold earrings and a coat that costs more than your street. Punishes everything.',
     body: { height: 1.06, bulk: 0.94, arms: 1.08, legs: 1.04, head: 1.0, torso: 1.04, shoulders: 1.0 },
-    stats: { health: 1020, walkF: 3.0, walkB: 2.6, run: 6.5, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.04, stunMax: 1050, pushW: 34 },
+    stats: { health: 1020, walkF: 3.0, walkB: 2.6, run: 6.5, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.04, stunMax: 650, pushW: 34 },
     look: {
       skin: '#b98256', outline: '#1a1012', rim: '#ff47d6',
       eyes: '#b34be0', brows: 'angry', mouth: 'snarl',
@@ -735,7 +736,7 @@ const ROSTER = [
     title: 'Spiked Riot',
     blurb: 'Street-punk kickboxer with a spiked pauldron and a bad attitude. Fastest legs in the district.',
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
-    stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 900, pushW: 31 },
+    stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 560, pushW: 31 },
     look: {
       female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
@@ -763,7 +764,7 @@ const ROSTER = [
     title: 'The Butcher of Pier 9',
     blurb: 'Runs the meanest kitchen on the docks. Slow, enormous, and every hit is a cleaver.',
     body: { height: 1.08, bulk: 1.36, arms: 1.02, legs: 0.94, head: 1.02, torso: 1.06, shoulders: 1.28, armBulk: 1.2, legBulk: 1.15, waist: 1.3, hands: 1.15 },
-    stats: { health: 1200, walkF: 2.5, walkB: 2.0, run: 5.6, dash: 8, jumpVY: 14.6, jumpVX: 3.4, mass: 1.4, stunMax: 1300, pushW: 42 },
+    stats: { health: 1200, walkF: 2.5, walkB: 2.0, run: 5.6, dash: 8, jumpVY: 14.6, jumpVX: 3.4, mass: 1.4, stunMax: 810, pushW: 42 },
     look: {
       skin: '#b07a52', outline: '#141012', rim: '#ff47d6',
       eyes: '#b04fd6', brows: 'thick', mouth: 'grin',
@@ -790,7 +791,7 @@ const ROSTER = [
     title: 'Masked Dread',
     blurb: 'A luchador-shaman in a golden jaguar mask. Patient, precise, and terrifyingly flexible.',
     body: { height: 1.0, bulk: 0.94, arms: 1.03, legs: 1.03, head: 1.0, torso: 1.0, shoulders: 1.0 },
-    stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 980, pushW: 33 },
+    stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 610, pushW: 33 },
     look: {
       skin: '#6a4430', outline: '#120c10', rim: '#ff3fd0',
       eyes: '#e6e23a', brows: 'none', mouth: 'none',
@@ -815,7 +816,7 @@ const ROSTER = [
     title: 'Pocket Wildfire',
     blurb: 'Moody street kid with fire in his fists. Keeps it caged until the bar is full, then lets it burn.',
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
-    stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 950, pushW: 32 },
+    stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -2330,6 +2331,7 @@ class Fighter {
     this.stance = 0;
     this.health = this.maxHealth;
     this.stun = 0;
+    this.sinceHit = 0;
     this.hitstop = 0;
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
@@ -2430,7 +2432,9 @@ class Fighter {
     }
     this.stateFrame++;
     if (this.throwProtect > 0) this.throwProtect--;
-    this.stun = Math.max(0, this.stun - (this.state === 'hitstun' || this.state === 'juggle' ? 0 : TUNING.stunDecayPerTick));
+    // the stun meter only recovers after a pause in the punishment
+    this.sinceHit++;
+    if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
     this.body.integrate({ friction: sliding });
@@ -2496,11 +2500,6 @@ class Fighter {
       case 'blockstun':
       case 'stagger':
         if (this.stateFrame >= this.sd.duration) {
-          if (this.dizzyPending && s !== 'blockstun') {
-            this.dizzyPending = false;
-            this.emit({ type: 'dizzy', who: this.index });
-            return this.setState('dizzy', { duration: TUNING.dizzyFrames }, 'dizzy', { blend: 8 });
-          }
           this.recoverToNeutral();
         }
         return;
@@ -2527,6 +2526,13 @@ class Fighter {
   }
 
   recoverToNeutral() {
+    // a full stun meter makes the fighter dizzy as soon as they are back on their feet
+    // (after hitstun, a stagger, or getting up from the knockdown the combo ended with)
+    if (this.dizzyPending && ['hitstun', 'stagger', 'getup', 'land'].includes(this.state) && this.health > 0) {
+      this.dizzyPending = false;
+      this.emit({ type: 'dizzy', who: this.index });
+      return this.setState('dizzy', { duration: TUNING.dizzyFrames }, 'dizzy', { blend: 8 });
+    }
     // a few frames of throw immunity after being hit, blocking or waking up (no unavoidable throws)
     if (['hitstun', 'blockstun', 'stagger', 'getup', 'dizzy', 'land'].includes(this.state)) this.throwProtect = 6;
     if (this.input.down) this.setState('crouch', {}, 'crouch', { blend: 6 });
@@ -2822,6 +2828,7 @@ class Fighter {
     this.flash = 6;
     this.health = Math.max(0, this.health - damage);
     this.stun += m.stun * (counter ? 1.25 : 1);
+    this.sinceHit = 0;
     if (this.state === 'dizzy') this.stun = 0;
     else if (this.stun >= this.stats.stunMax) this.dizzyPending = true;
 
@@ -2847,7 +2854,6 @@ class Fighter {
       // Launchers and sweeps always knock down; heavy hits knock down airborne opponents;
       // light air hits and grounded knockback let the defender land on their feet.
       const knockdown = m.reaction === 'launch' || m.reaction === 'knockdown' || (wasAir && m.strength !== 'light');
-      this.dizzyPending = false;
       this.setState('juggle', { knockdown }, 'airHit', { blend: 8, params: { launch: reaction === 'launch', rot0: this.anim.pose.rot } });
       return;
     }

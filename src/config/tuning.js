@@ -33,7 +33,8 @@ export const TUNING = {
   blockHitstopScale: 0.75,
   chipDamage: 0.12, // fraction of special-move damage dealt through block
 
-  stunDecayPerTick: 0.35, // dizzy meter recovery
+  stunDecayPerTick: 0.35, // dizzy meter recovery per tick...
+  stunRecoverDelay: 120, // ...once this many ticks have passed without being hit
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },
   roundTimeSeconds: 99,
 

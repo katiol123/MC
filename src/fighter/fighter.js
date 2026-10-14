@@ -46,6 +46,7 @@ export class Fighter {
     this.stance = 0;
     this.health = this.maxHealth;
     this.stun = 0;
+    this.sinceHit = 0;
     this.hitstop = 0;
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
@@ -146,7 +147,9 @@ export class Fighter {
     }
     this.stateFrame++;
     if (this.throwProtect > 0) this.throwProtect--;
-    this.stun = Math.max(0, this.stun - (this.state === 'hitstun' || this.state === 'juggle' ? 0 : TUNING.stunDecayPerTick));
+    // the stun meter only recovers after a pause in the punishment
+    this.sinceHit++;
+    if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
     this.body.integrate({ friction: sliding });
@@ -212,11 +215,6 @@ export class Fighter {
       case 'blockstun':
       case 'stagger':
         if (this.stateFrame >= this.sd.duration) {
-          if (this.dizzyPending && s !== 'blockstun') {
-            this.dizzyPending = false;
-            this.emit({ type: 'dizzy', who: this.index });
-            return this.setState('dizzy', { duration: TUNING.dizzyFrames }, 'dizzy', { blend: 8 });
-          }
           this.recoverToNeutral();
         }
         return;
@@ -243,6 +241,13 @@ export class Fighter {
   }
 
   recoverToNeutral() {
+    // a full stun meter makes the fighter dizzy as soon as they are back on their feet
+    // (after hitstun, a stagger, or getting up from the knockdown the combo ended with)
+    if (this.dizzyPending && ['hitstun', 'stagger', 'getup', 'land'].includes(this.state) && this.health > 0) {
+      this.dizzyPending = false;
+      this.emit({ type: 'dizzy', who: this.index });
+      return this.setState('dizzy', { duration: TUNING.dizzyFrames }, 'dizzy', { blend: 8 });
+    }
     // a few frames of throw immunity after being hit, blocking or waking up (no unavoidable throws)
     if (['hitstun', 'blockstun', 'stagger', 'getup', 'dizzy', 'land'].includes(this.state)) this.throwProtect = 6;
     if (this.input.down) this.setState('crouch', {}, 'crouch', { blend: 6 });
@@ -538,6 +543,7 @@ export class Fighter {
     this.flash = 6;
     this.health = Math.max(0, this.health - damage);
     this.stun += m.stun * (counter ? 1.25 : 1);
+    this.sinceHit = 0;
     if (this.state === 'dizzy') this.stun = 0;
     else if (this.stun >= this.stats.stunMax) this.dizzyPending = true;
 
@@ -563,7 +569,6 @@ export class Fighter {
       // Launchers and sweeps always knock down; heavy hits knock down airborne opponents;
       // light air hits and grounded knockback let the defender land on their feet.
       const knockdown = m.reaction === 'launch' || m.reaction === 'knockdown' || (wasAir && m.strength !== 'light');
-      this.dizzyPending = false;
       this.setState('juggle', { knockdown }, 'airHit', { blend: 8, params: { launch: reaction === 'launch', rot0: this.anim.pose.rot } });
       return;
     }
