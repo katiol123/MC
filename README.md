@@ -137,7 +137,8 @@ startup/active/recovery в `moves.js` автоматически перестр�
 ## Тесты
 
 ```bash
-npm test             # node --test: 62 теста физики, состояний, попаданий, анимации, матча
+npm test             # node --test: 65 тестов физики, состояний, попаданий, анимации, матча
+npm run audit        # аудит: все пары бойцов CPU vs CPU, проверка что каждая механика реально случается в боях
 npm run smoke        # браузерный смоук-тест (нужен Playwright: npm i -D playwright)
 ```
 

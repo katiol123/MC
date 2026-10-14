@@ -177,6 +177,17 @@ test('combo protection: mashing chains cannot loop forever', () => {
   assert.ok(recovered || b.combo.hits === 0, 'defender eventually recovered');
 });
 
+test('combo hit cap: a defender already at the cap cannot be hit again until the combo ends', () => {
+  const m = fightingMatch();
+  place(m, 1000, 1080);
+  const [a, b] = m.fighters;
+  b.setState('hitstun', { duration: 60 });
+  b.combo.hits = TUNING.comboHitCap;
+  const ev = run(m, 20, (i) => [raw({ lk: i === 0 }), raw()]);
+  assert.ok(!ev.some((e) => e.type === 'hit'), 'hit rejected');
+  assert.match(a.lastHit?.reason || '', /combo hit cap/);
+});
+
 test('juggle limit: launcher followed by repeated launchers stops connecting', () => {
   const m = fightingMatch({ p1: 'brick', p2: 'jax' });
   place(m, 1000, 1090);

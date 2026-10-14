@@ -191,7 +191,7 @@ export class AIController {
     }
     // Whiff punish.
     if (op.phase === 'recovery' && dist < 230 && r.chance(cfg.punish)) {
-      this.queue(dist < 140 ? press('hp') : M.s1);
+      this.queue(dist < 140 ? (r.chance(0.4) ? press('hp', 'd') : press('hp')) : M.s1);
       return;
     }
     // Opponent knocked down: approach for pressure.
@@ -200,6 +200,10 @@ export class AIController {
       return;
     }
     const aggr = cfg.aggression;
+    if (dist > 300 && r.chance(0.03)) {
+      this.queue([{ d: '', b: ['stance'], n: 2 }, { d: '', n: 2 }]);
+      return;
+    }
     if (dist > 330) {
       if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: r.int(24, 36) }]); // dash into a run
       else if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
@@ -211,14 +215,16 @@ export class AIController {
       const roll = r.next();
       if (roll < 0.22 * aggr + 0.1) this.queue(M.s1);
       else if (roll < 0.35) this.queue(press('hk'));
-      else if (roll < 0.45 && r.chance(aggr)) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: ['hk'], n: 2 }]);
+      else if (roll < 0.45 && r.chance(aggr)) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]);
       else if (roll < 0.75) this.hold = { d: 'f', n: r.int(6, 16) };
       else this.hold = { d: 'b', n: r.int(6, 14) };
       return;
     }
     // Close range.
     const roll = r.next();
-    if (roll < 0.25) this.queue(press('lp'));
+    if (roll < 0.19) this.queue(press('lp'));
+    else if (roll < 0.25) this.queue(press('lp', 'd'));
+    else if (roll < 0.29) this.queue(press('hp', 'd')); // uppercut
     else if (roll < 0.42) this.queue(press('lk', 'd'));
     else if (roll < 0.55) this.queue(press('lk'));
     else if (roll < 0.63) this.queue(press('hk', 'd'));
