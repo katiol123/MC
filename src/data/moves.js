@@ -18,6 +18,13 @@
 //   invuln                   [{from, to, parts}] frames where listed hurtbox parts are intangible
 //   motion                   {vx at frame ranges} forward motion of the attacker
 export const MOVES = {
+  // Throw: light punch + light kick together, close range, cannot be blocked, can be "teched"
+  // (escaped) by pressing light punch + light kick within TUNING.throwTechWindow frames.
+  throw: {
+    name: 'Throw', anim: 'grab', type: 'throw', stance: 'stand', strength: 'heavy',
+    startup: 5, active: 3, recovery: 22, hitboxes: [], range: 30, techable: true,
+    throwAnim: 'throwFwd', duration: 36, release: 24, damage: 110, stun: 60, priority: 0,
+  },
   lp: {
     name: 'Jab', anim: 'jab', button: 'lp', stance: 'stand', strength: 'light',
     startup: 4, active: 3, recovery: 7,
@@ -135,5 +142,5 @@ export const MOVES = {
   },
 };
 
-/** Order in which buffered inputs are checked: specials first, then normals. */
-export const SPECIAL_ORDER = ['s2', 's1', 's3'];
+/** Order in which buffered inputs are checked: super, specials, then normals. */
+export const SPECIAL_ORDER = ['su', 's2', 's1', 's4', 's3'];

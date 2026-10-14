@@ -5,15 +5,24 @@ import { Rng } from '../core/rng.js';
 import { emptyRaw } from '../input/inputBuffer.js';
 
 export const AI_LEVELS = {
-  easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22] },
-  normal: { reaction: 15, block: 0.55, antiAir: 0.45, aggression: 0.5, combo: 0.6, punish: 0.6, think: [6, 14] },
-  hard: { reaction: 9, block: 0.82, antiAir: 0.75, aggression: 0.6, combo: 0.9, punish: 0.9, think: [3, 9] },
+  easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22], tech: 0.1, throws: 0.08, signature: 0.12, super: 0.25 },
+  normal: { reaction: 15, block: 0.55, antiAir: 0.45, aggression: 0.5, combo: 0.6, punish: 0.6, think: [6, 14], tech: 0.35, throws: 0.15, signature: 0.2, super: 0.5 },
+  hard: { reaction: 9, block: 0.82, antiAir: 0.75, aggression: 0.6, combo: 0.9, punish: 0.9, think: [3, 9], tech: 0.6, throws: 0.22, signature: 0.28, super: 0.8 },
 };
 
 const M = {
   s1: [{ d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['lp'], n: 2 }],
   s2: [{ d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', b: ['hp'], n: 2 }],
   s3: [{ d: 'd', n: 2 }, { d: 'db', n: 2 }, { d: 'b', b: ['hk'], n: 2 }],
+  s4: [{ d: 'd', n: 2 }, { d: 'db', n: 2 }, { d: 'b', b: ['hp'], n: 2 }],
+  su: [{ d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['hp'], n: 2 }],
+  throw: [{ d: '', b: ['lp', 'lk'], n: 2 }, { d: '', n: 2 }],
+};
+
+/** How each fighter likes to use its signature move: [min distance, max distance]. */
+const SIGNATURE_RANGE = {
+  brick: [110, 230], rattigan: [280, 700], smiles: [170, 330], jax: [260, 700],
+  vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
 };
 const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 
@@ -64,6 +73,11 @@ export class AIController {
     const me = match.fighters[this.index];
     const seen = this.perceive(match);
     if (match.phase !== 'fight') return emptyRaw();
+    // Throw escape: mash LP+LK right after being grabbed (with a reaction chance).
+    if (me.state === 'thrown') {
+      if (me.stateFrame === 2) this.techTry = this.rng.chance(this.cfg.tech);
+      return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
+    }
     // Run the current macro.
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];
@@ -108,6 +122,35 @@ export class AIController {
     const dist = Math.abs(op.x - me.body.x);
     this.cooldown = r.int(cfg.think[0], cfg.think[1]);
     if (!me.actionable && me.state !== 'land') return;
+    const gap = dist - me.body.pushW - opF.body.pushW;
+    // Super: only with a full bar, up close or as a punish.
+    if (me.meter >= 100 && me.superLock === 0 && gap < 120 && (op.phase === 'recovery' || r.chance(cfg.super * 0.4))) {
+      this.queue(M.su);
+      return;
+    }
+    // Incoming projectile: block it (or jump over it on higher levels).
+    const proj = (match.projectiles || []).find((p) => p.owner !== this.index && Math.abs(p.x - me.body.x) < 260 && Math.sign(me.body.x - p.x) === Math.sign(p.vx));
+    if (proj) {
+      if (r.chance(cfg.antiAir * 0.5)) this.queue([{ d: 'uf', n: 3 }]);
+      else this.hold = { d: 'b', n: 24 };
+      return;
+    }
+    // Counter stance (Vellaro): read an incoming strike.
+    if (me.def.id === 'vellaro' && op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) {
+      this.queue(M.s4);
+      return;
+    }
+    // Signature special in its preferred range.
+    const range = SIGNATURE_RANGE[me.def.id];
+    if (range && gap >= range[0] - 60 && gap <= range[1] && !me.projectileOut && r.chance(cfg.signature * 0.6)) {
+      this.queue(M.s4);
+      return;
+    }
+    // Throw a turtling or idle opponent at close range.
+    if (gap < 24 && (opF.state === 'guardHigh' || opF.state === 'guardLow' || opF.actionable) && r.chance(cfg.throws)) {
+      this.queue(M.throw);
+      return;
+    }
 
     // Defence: block an attack we have "seen" coming.
     if (op.move && (op.phase === 'startup' || op.phase === 'active') && dist < 300) {
@@ -140,8 +183,9 @@ export class AIController {
     }
     const aggr = cfg.aggression;
     if (dist > 330) {
-      if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
-      else if (r.chance(0.08)) this.queue([{ d: 'uf', n: 3 }]);
+      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: r.int(24, 36) }]); // dash into a run
+      else if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
+      else if (r.chance(0.14)) this.queue([{ d: 'uf', n: 3 }]);
       else this.hold = { d: 'f', n: r.int(10, 24) };
       return;
     }

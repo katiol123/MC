@@ -4,6 +4,8 @@
 // All eight are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
+import { SIGNATURES } from './signatures.js';
+import { compileMove } from './compileMove.js';
 import { buildProportions } from '../anim/skeleton.js';
 
 export const ROSTER = [
@@ -232,8 +234,10 @@ export function buildFighterDef(id, overrides = {}) {
   const src = ROSTER.find((f) => f.id === id) || ROSTER[0];
   const def = deepMerge(src, overrides);
   const moves = {};
-  for (const mid in MOVES) {
-    moves[mid] = { id: mid, ...deepMerge(MOVES[mid], def.moves?.[mid] || {}) };
+  const sig = SIGNATURES[def.id] || {};
+  for (const mid of new Set([...Object.keys(MOVES), ...Object.keys(sig)])) {
+    const base = MOVES[mid] ? deepMerge(MOVES[mid], sig[mid] || {}) : sig[mid];
+    moves[mid] = compileMove(mid, deepMerge(base, def.moves?.[mid] || {}));
   }
   return { ...def, moves, props: buildProportions(def.body) };
 }

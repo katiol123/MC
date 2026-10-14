@@ -306,6 +306,7 @@ class InputBuffer {
    * appear in order within `window` frames; the last direction may be held on the press tick.
    */
   motion(seq, endTick = this.tick, window = TUNING.motionWindow) {
+    window = window ?? TUNING.motionWindow;
     const digits = seq.split('').map(Number);
     let idx = digits.length - 1;
     for (let i = this.hist.length - 1; i >= 0 && idx >= 0; i--) {
@@ -317,24 +318,26 @@ class InputBuffer {
     return idx < 0;
   }
 
-  /** Double tap of a direction (6 = forward dash, 4 = back dash) finishing on this tick. */
+  /**
+   * Double tap of a direction (6 = forward dash, 4 = back dash) finishing on this tick. The stick
+   * must return to neutral between the taps, so motions like 236236 (which pass 6 -> 2 -> 6) never
+   * trigger a dash.
+   */
   doubleTap(d, window = TUNING.dashWindow) {
     const n = this.hist.length;
     if (n < 3) return false;
-    const isD = (e) => e.dir === d;
     const cur = this.hist[n - 1], prev = this.hist[n - 2];
     if (!(cur.dir === d && prev.dir !== d)) return false;
-    let sawRelease = false;
+    let sawNeutral = false;
     for (let i = n - 2; i >= 0; i--) {
       const e = this.hist[i];
       if (cur.tick - e.tick > window) return false;
-      if (!isD(e)) sawRelease = true;
-      else if (sawRelease) {
-        // ensure the first tap wasn't already used for a dash
-        if (this.lastDashTick && e.tick <= this.lastDashTick) return false;
+      if (e.dir === 5) sawNeutral = true;
+      else if (e.dir === d && sawNeutral) {
+        if (this.lastDashTick && e.tick <= this.lastDashTick) return false; // first tap already used
         this.lastDashTick = cur.tick;
         return true;
-      }
+      } else return false;
     }
     return false;
   }
@@ -381,6 +384,20 @@ const TUNING = {
   stunDecayPerTick: 0.35, // dizzy meter recovery
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },
   roundTimeSeconds: 99,
+
+  // Throws
+  throwTechWindow: 9, // frames after being grabbed in which LP+LK escapes a normal throw
+
+  // Super meter (anti-spam: a super costs the whole bar, builds no meter itself, and locks
+  // meter gain for superCooldown ticks afterwards, so at most ~1 super per round is realistic)
+  superCost: 100,
+  superCooldown: 480, // 8 s without meter gain after using a super
+  superFreeze: 48, // cinematic freeze when a super starts
+  superMotionWindow: 26,
+  meterOnHit: 0.09, // fraction of damage dealt
+  meterOnBlock: 0.05,
+  meterOnDamaged: 0.06, // fraction of damage taken
+  meterOnSpecialWhiff: 2,
 };
 
 });
@@ -527,6 +544,26 @@ class AudioSystem {
         this.tone(1.2, { freq: 110, to: 30, gain: 0.8 });
         this.noise(0.9, { freq: 400, type: 'lowpass', gain: 0.6 });
         break;
+      case 'superStart':
+        this.tone(0.6, { freq: 140, to: 900, type: 'sawtooth', gain: 0.18 });
+        this.noise(0.7, { freq: 2500, q: 0.6, gain: 0.35, sweep: 0.2 });
+        break;
+      case 'parry':
+        this.tone(0.3, { freq: 1800, to: 2600, type: 'triangle', gain: 0.2 });
+        this.noise(0.12, { freq: 5000, q: 5, gain: 0.25 });
+        break;
+      case 'tech':
+        this.noise(0.1, { freq: 2200, q: 2, gain: 0.3 });
+        break;
+      case 'grab':
+        this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
+        break;
+      case 'projectile':
+        this.tone(0.25, { freq: e.kind === 'coin' ? 1400 : 300, to: e.kind === 'coin' ? 2200 : 160, type: e.kind === 'coin' ? 'triangle' : 'sawtooth', gain: 0.15 });
+        break;
+      case 'teleport':
+        this.tone(0.3, { freq: 200, to: 1600, type: 'sine', gain: 0.2 });
+        break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });
         break;
@@ -545,6 +582,8 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // All eight are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
+const { SIGNATURES } = __require("src/data/signatures.js");
+const { compileMove } = __require("src/data/compileMove.js");
 const { buildProportions } = __require("src/anim/skeleton.js");
 
 const ROSTER = [
@@ -773,8 +812,10 @@ function buildFighterDef(id, overrides = {}) {
   const src = ROSTER.find((f) => f.id === id) || ROSTER[0];
   const def = deepMerge(src, overrides);
   const moves = {};
-  for (const mid in MOVES) {
-    moves[mid] = { id: mid, ...deepMerge(MOVES[mid], def.moves?.[mid] || {}) };
+  const sig = SIGNATURES[def.id] || {};
+  for (const mid of new Set([...Object.keys(MOVES), ...Object.keys(sig)])) {
+    const base = MOVES[mid] ? deepMerge(MOVES[mid], sig[mid] || {}) : sig[mid];
+    moves[mid] = compileMove(mid, deepMerge(base, def.moves?.[mid] || {}));
   }
   return { ...def, moves, props: buildProportions(def.body) };
 }
@@ -803,6 +844,13 @@ __define("src/data/moves.js", function (__exports, __require) {
 //   invuln                   [{from, to, parts}] frames where listed hurtbox parts are intangible
 //   motion                   {vx at frame ranges} forward motion of the attacker
 const MOVES = {
+  // Throw: light punch + light kick together, close range, cannot be blocked, can be "teched"
+  // (escaped) by pressing light punch + light kick within TUNING.throwTechWindow frames.
+  throw: {
+    name: 'Throw', anim: 'grab', type: 'throw', stance: 'stand', strength: 'heavy',
+    startup: 5, active: 3, recovery: 22, hitboxes: [], range: 30, techable: true,
+    throwAnim: 'throwFwd', duration: 36, release: 24, damage: 110, stun: 60, priority: 0,
+  },
   lp: {
     name: 'Jab', anim: 'jab', button: 'lp', stance: 'stand', strength: 'light',
     startup: 4, active: 3, recovery: 7,
@@ -920,8 +968,225 @@ const MOVES = {
   },
 };
 
-/** Order in which buffered inputs are checked: specials first, then normals. */
-const SPECIAL_ORDER = ['s2', 's1', 's3'];
+/** Order in which buffered inputs are checked: super, specials, then normals. */
+const SPECIAL_ORDER = ['su', 's2', 's1', 's4', 's3'];
+
+});
+__define("src/data/signatures.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "SIGNATURES", { enumerable: true, get: () => SIGNATURES });
+// Per-fighter signature special (s4, input ↓↙← + punch) and super (su, ↓↘→↓↘→ + punch).
+// Pure data: the generic systems (sequences, projectiles, throws, counter stance, air dives)
+// interpret these fields, so each fighter gets distinct mechanics without fighter-specific code.
+//
+// Sequence steps: { anim, len, hitAt (frame inside the step, omit for no hit), hitLen, hit: {...},
+//   vx (forward speed during the step), teleport: 'behind' }
+
+const S4_INPUT = { motion: '214', buttons: ['lp', 'hp'] };
+const SUPER_INPUT = { motion: '236236', buttons: ['lp', 'hp'] };
+
+/** Defaults for every super: full meter, invulnerable start-up, cinematic freeze. */
+const SUPER = { super: true, isSpecial: true, strength: 'special', stance: 'stand', input: SUPER_INPUT, priority: 6 };
+
+// Small helpers to keep step lists readable.
+// the hit lands ~55% into the step, leaving time for the limb to come back before the next strike
+// big-arc strikes need more wind-up frames so the limb does not cross the screen in one frame
+const MIN_HIT_AT = { uppercut: 9, rising: 9, chop: 15, roundhouse: 9, whirl: 10, lunge: 9 };
+const step = (anim, len, hit, extra = {}) => {
+  const hitAt = Math.max(3, Math.round(len * 0.55), MIN_HIT_AT[anim] || 0);
+  const kick = anim === 'roundhouse' || anim === 'frontKick' || anim === 'whirl';
+  const finisher = hit && ['launch', 'knockdown', 'knockback'].includes(hit.reaction);
+  return { anim, len: Math.max(len, hitAt + (kick ? 9 : 6)), hitAt, hitLen: finisher ? 4 : 2, vx: 2.6, hit, ...extra };
+};
+const H = (damage, o = {}) => ({ damage, hitstun: 32, blockstun: 16, hitstop: 6, reaction: 'light', push: { hit: 1.4, block: 2.6 }, stun: 0, ...o });
+const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
+  hitstun: 36, hitstop: 14, reaction, push: { hit: 4, block: 5 }, launch: { vx: 5, vy: reaction === 'launch' ? 13 : 8 }, shake: 9, ...o,
+});
+
+const SIGNATURES = {
+  brick: {
+    s4: {
+      name: 'Anchor Drop', anim: 'hammer', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 17, active: 8, recovery: 14, air: { vy: 9, vx: 3.4, at: 6 }, landRecovery: 10,
+      damage: 120, stun: 90, hitstun: 26, blockstun: 18, hitstop: 13,
+      height: 'overhead', reaction: 'knockdown', push: { hit: 3, block: 5 }, launch: { vx: 3, vy: 7 },
+      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }],
+      juggle: 2, priority: 4, shake: 8,
+    },
+    su: {
+      ...SUPER, name: 'Dockyard Demolition', anim: 'sequence',
+      steps: [step('jab', 9, H(45)), step('cross', 10, H(50)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('lunge', 18, FINISH(95), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+  rattigan: {
+    s4: {
+      name: 'Coin Flick', anim: 'flick', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 11, active: 2, recovery: 20, hitboxes: [],
+      projectile: { at: 12, kind: 'coin', speed: 11.5, y: 150, r: 13, life: 80, hits: 1,
+        hit: { damage: 58, hitstun: 18, blockstun: 14, hitstop: 8, reaction: 'light', push: { hit: 3, block: 4 }, stun: 40, height: 'mid' } },
+      priority: 2,
+    },
+    su: {
+      ...SUPER, name: 'Grand Heist', anim: 'sequence',
+      steps: [
+        { anim: 'flick', len: 12 },
+        step('cross', 11, H(60), { teleport: 'behind', vx: 1 }),
+        step('jab', 8, H(45)),
+        step('roundhouse', 16, FINISH(110, 'knockdown')),
+      ],
+      recoveryAfter: 16,
+    },
+  },
+  smiles: {
+    s4: {
+      name: 'Long Leg Slide', anim: 'slide', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 10, active: 12, recovery: 18, motion: [{ from: 6, to: 22, vx: 9 }],
+      damage: 85, stun: 60, hitstun: 26, blockstun: 14, hitstop: 10,
+      height: 'low', reaction: 'knockdown', push: { hit: 3, block: 6 }, launch: { vx: 2, vy: 6 },
+      hitboxes: [{ a: 'kneeF', b: 'ankleF', r: 12 }, { a: 'ankleF', b: 'toeF', r: 13 }],
+      invuln: [{ from: 8, to: 20, parts: ['head'] }], juggle: 2, priority: 3, shake: 4,
+    },
+    su: {
+      ...SUPER, name: 'Laughing Storm', anim: 'sequence',
+      steps: [step('frontKick', 14, H(45)), step('roundhouse', 16, H(55)), step('frontKick', 14, H(40)), step('roundhouse', 16, H(55)), step('roundhouse', 18, FINISH(95), { vx: 4 })],
+      recoveryAfter: 18,
+    },
+  },
+  jax: {
+    s4: {
+      name: 'Feedback Wave', anim: 'pushWave', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 13, active: 2, recovery: 22, hitboxes: [],
+      projectile: { at: 14, kind: 'wave', speed: 6.5, y: 135, r: 26, life: 110, hits: 2, interval: 7,
+        hit: { damage: 38, hitstun: 17, blockstun: 12, hitstop: 6, reaction: 'light', push: { hit: 2.5, block: 3 }, stun: 35, height: 'mid' } },
+      priority: 2,
+    },
+    su: {
+      ...SUPER, name: 'Mosh Pit', anim: 'sequence',
+      steps: [step('jab', 8, H(40)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('frontKick', 14, H(50)), step('uppercut', 18, FINISH(100))],
+      recoveryAfter: 16,
+    },
+  },
+  vellaro: {
+    s4: {
+      name: 'Velvet Counter', anim: 'counterStance', type: 'counter', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 3, active: 20, recovery: 18, hitboxes: [], counterWindow: [3, 22], followup: 'vc', priority: 1,
+    },
+    // the automatic counter-attack after a successful parry (not directly selectable)
+    vc: {
+      name: 'Velvet Counter', anim: 'sequence', stance: 'stand', strength: 'special', isSpecial: true, hidden: true, priority: 6,
+      steps: [step('cross', 9, H(55, { hitstun: 30 }), { hitAt: 6 }), step('lunge', 16, FINISH(85, 'knockback'), { vx: 6 })],
+      recoveryAfter: 14, invuln: [{ from: 1, to: 14, parts: ['all'] }],
+    },
+    su: {
+      ...SUPER, name: 'Collar Execution', anim: 'sequence',
+      steps: [step('jab', 8, H(40)), step('cross', 10, H(50)), step('jab', 8, H(40)), step('cross', 10, H(55)), step('lunge', 18, FINISH(105, 'knockback'), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+  roxy: {
+    s4: {
+      name: 'Spike Rush', anim: 'sequence', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true, priority: 4,
+      steps: [
+        step('frontKick', 14, H(32, { hitstun: 22, blockstun: 12 }), { vx: 3.5 }),
+        step('roundhouse', 16, H(36, { hitstun: 22, blockstun: 12 }), { vx: 3.5 }),
+        step('frontKick', 14, FINISH(48, 'knockdown', { hitstun: 26, hitstop: 11, launch: { vx: 5, vy: 7 } }), { vx: 3 }),
+      ],
+      recoveryAfter: 16, chip: true,
+    },
+    su: {
+      ...SUPER, name: 'Riot Barrage', anim: 'sequence',
+      steps: [step('frontKick', 14, H(40)), step('roundhouse', 16, H(50)), step('frontKick', 14, H(40)), step('roundhouse', 16, H(50)), step('whirl', 18, FINISH(105, 'knockdown'))],
+      recoveryAfter: 18,
+    },
+  },
+  bruno: {
+    s4: {
+      name: 'Into the Pot', anim: 'grab', type: 'throw', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 9, active: 3, recovery: 28, hitboxes: [], range: 62, techable: false,
+      throwAnim: 'slam', duration: 44, release: 28, damage: 150, stun: 80, priority: 1,
+    },
+    su: {
+      ...SUPER, name: "Chef's Special", anim: 'sequence',
+      steps: [step('chop', 19, H(60)), step('cross', 10, H(55)), step('chop', 19, H(60)), step('chop', 19, FINISH(120, 'knockdown'))],
+      recoveryAfter: 18,
+    },
+  },
+  jaguar: {
+    s4: {
+      name: 'Sun Pounce', anim: 'pounce', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 14, active: 14, recovery: 10, air: { vy: 8.5, vx: 8, at: 8 }, landRecovery: 12,
+      damage: 105, stun: 80, hitstun: 24, blockstun: 16, hitstop: 12,
+      height: 'overhead', reaction: 'knockdown', push: { hit: 3, block: 4 }, launch: { vx: 4, vy: 6 },
+      hitboxes: [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 14 }, { a: 'neck', b: 'pelvis', r: 16 }],
+      juggle: 2, priority: 4, shake: 6,
+    },
+    su: {
+      ...SUPER, name: 'Sun Eclipse', anim: 'sequence',
+      steps: [step('jab', 8, H(40)), step('cross', 10, H(50)), step('jab', 8, H(40)), step('cross', 10, H(50)), step('lunge', 18, FINISH(100), { vx: 6 })],
+      recoveryAfter: 16,
+    },
+  },
+};
+
+});
+__define("src/data/compileMove.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "compileMove", { enumerable: true, get: () => compileMove });
+// Turns authored move data into runtime form. Sequence moves (multi-hit specials and supers) are
+// lists of steps; each step reuses an existing attack animation and gets its own hit window and
+// hit spec. Frame data (startup/active/recovery) is derived so all generic code keeps working.
+const { MOVES } = __require("src/data/moves.js");
+
+/** Default hitboxes per animation, taken from the base move that uses that animation. */
+const ANIM_HITBOXES = {};
+for (const m of Object.values(MOVES)) if (m.hitboxes?.length && !ANIM_HITBOXES[m.anim]) ANIM_HITBOXES[m.anim] = m.hitboxes;
+ANIM_HITBOXES.chop = [{ a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }];
+
+const SPEC_DEFAULTS = {
+  damage: 40, stun: 0, hitstun: 30, blockstun: 16, hitstop: 6, height: 'mid', reaction: 'light',
+  push: { hit: 1.4, block: 2.6 }, launch: { vx: 3, vy: 6 }, juggle: 0, strength: 'heavy',
+};
+
+function compileMove(id, m) {
+  const move = { id, ...m };
+  if (move.super) {
+    move.cost = move.cost ?? 100;
+  }
+  if (!move.steps) return move;
+  let t = 0;
+  let firstHit = Infinity, lastHit = 0;
+  move.steps = move.steps.map((s, i) => {
+    const len = s.len + (i === m.steps.length - 1 ? m.recoveryAfter || 12 : 0);
+    const st = { ...s, len, start: t + 1, end: t + len };
+    if (s.hit && s.hitAt) {
+      st.hitFrom = t + s.hitAt;
+      st.hitTo = st.hitFrom + (s.hitLen || 2) - 1;
+      firstHit = Math.min(firstHit, st.hitFrom);
+      lastHit = Math.max(lastHit, st.hitTo);
+      st.spec = {
+        ...SPEC_DEFAULTS,
+        priority: move.priority ?? 4,
+        isSpecial: true,
+        ...s.hit,
+        id: `${id}#${i}`,
+        anim: s.anim,
+        hitboxes: s.hit.hitboxes || ANIM_HITBOXES[s.anim] || [],
+        // sequences have their own fixed hit count: exempt from repeat/juggle limits
+        comboExempt: true,
+        juggleIgnore: true,
+        super: !!move.super,
+        chip: move.super || move.chip,
+      };
+    }
+    t += len;
+    return st;
+  });
+  move.startup = firstHit === Infinity ? t : firstHit - 1;
+  move.active = firstHit === Infinity ? 0 : lastHit - move.startup;
+  move.recovery = t - (move.startup + move.active);
+  move.hitboxes = [];
+  if (move.super && !move.invuln) move.invuln = [{ from: 1, to: move.startup, parts: ['all'] }];
+  return move;
+}
 
 });
 __define("src/anim/skeleton.js", function (__exports, __require) {
@@ -1715,7 +1980,7 @@ const { STAGE_CENTER } = __require("src/config/constants.js");
 const { Fighter } = __require("src/fighter/fighter.js");
 const { buildFighterDef } = __require("src/data/fighters.js");
 const { resolvePushboxes, enforceSeparation } = __require("src/physics/world.js");
-const { resolveExchange } = __require("src/combat/hitResolver.js");
+const { resolveExchange, resolveThrows, updateProjectiles } = __require("src/combat/hitResolver.js");
 const { emptyRaw } = __require("src/input/inputBuffer.js");
 
 const START_GAP = 170;
@@ -1735,11 +2000,26 @@ class Match {
       new Fighter(d2, 1, STAGE_CENTER + START_GAP, -1),
     ];
     this.events = [];
-    for (const f of this.fighters) f.emit = (e) => this.events.push(e);
+    for (const f of this.fighters) {
+      f.emit = (e) => this.events.push(e);
+      f.spawnProjectile = (owner, p) => this.spawnProjectile(owner, p);
+    }
     this.restart();
   }
 
+  spawnProjectile(f, p) {
+    const s = f.props.posScale;
+    this.projectiles.push({
+      owner: f.index, kind: p.kind, x: f.body.x + f.facing * 46 * s, y: f.body.y + p.y * s, vx: f.facing * p.speed,
+      r: p.r, life: p.life, age: 0, hitsLeft: p.hits || 1, interval: p.interval || 6, cooldown: 0,
+      hitIds: new Set(), hits: 0, contact: null,
+      spec: { strength: 'special', priority: 1, juggle: 1, launch: { vx: 3, vy: 6 }, ...p.hit, id: `proj:${p.kind}`, isSpecial: true, projectile: true },
+    });
+    this.events.push({ type: 'projectile', who: f.index, kind: p.kind });
+  }
+
   restart() {
+    for (const f of this.fighters) f.meter = 0;
     this.wins = [0, 0];
     this.round = 0;
     this.winner = null;
@@ -1755,6 +2035,8 @@ class Match {
     this.timer = this.opts.roundTime > 0 ? this.opts.roundTime * 60 : Infinity;
     this.roundResult = null;
     this.posed = false;
+    this.projectiles = [];
+    this.freeze = null;
     const [a, b] = this.fighters;
     a.reset(STAGE_CENTER - START_GAP, 1);
     b.reset(STAGE_CENTER + START_GAP, -1);
@@ -1800,11 +2082,19 @@ class Match {
     const [a, b] = this.fighters;
     a.snapshot();
     b.snapshot();
+    if (this.freeze) {
+      // Super flash: the world stops while the super is announced (inputs keep buffering).
+      a.input.push(raws[0], a.facing, true);
+      b.input.push(raws[1], b.facing, true);
+      if (--this.freeze.ticks <= 0) this.freeze = null;
+      return;
+    }
     a.pushInput(raws[0]);
     b.pushInput(raws[1]);
     const movedA = a.update(b);
     const movedB = b.update(a);
-    resolvePushboxes(a.body, b.body, a.facing);
+    const throwing = [a, b].some((f) => f.state === 'thrown' || f.state === 'throwing');
+    if (!throwing) resolvePushboxes(a.body, b.body, a.facing);
     enforceSeparation(a.body, b.body);
     for (const [f, o] of [[a, b], [b, a]]) {
       if (f.canTurn && f.body.onGround) {
@@ -1818,8 +2108,19 @@ class Match {
     // Frozen (hitstop) fighters keep their pose but their volumes follow any position change.
     a.updatePose(movedA);
     b.updatePose(movedB);
+    const throwEvents = resolveThrows(this.fighters);
+    for (const e of throwEvents) this.events.push(e);
+    if (throwEvents.length || [a, b].some((f) => f.state === 'thrown')) {
+      // throws move bodies directly (carry, tech push-apart): rebuild volumes and floor clamp
+      for (const f of [a, b]) f.updatePose(false);
+    }
     const ev = resolveExchange(a, b);
     for (const e of ev) this.events.push(e);
+    for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
+    a.projectileOut = this.projectiles.some((p) => p.owner === 0);
+    b.projectileOut = this.projectiles.some((p) => p.owner === 1);
+    const sup = this.events.find((e) => e.type === 'superStart');
+    if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
   }
 
   updateFight() {
@@ -1829,6 +2130,8 @@ class Match {
       for (const f of this.fighters) {
         if (f.health <= 0) f.health = 1;
         if (f.actionable && f.stateFrame > 50 && f.health < f.maxHealth) f.health = f.maxHealth;
+        // training: the super bar refills once its cooldown is over
+        if (f.actionable && f.superLock === 0) f.meter = 100;
       }
       if (a.state === 'ko') a.setState('juggle', { knockdown: true }, 'airHit');
       if (b.state === 'ko') b.setState('juggle', { knockdown: true }, 'airHit');
@@ -1909,6 +2212,8 @@ const { Animator } = __require("src/anim/animator.js");
 const { computeSkeleton, centerOfGravity, clonePose, lowestPoint } = __require("src/anim/skeleton.js");
 const { buildHurtboxes, buildHitboxes } = __require("src/combat/boxes.js");
 const { SPECIAL_ORDER } = __require("src/data/moves.js");
+const { sequenceStep } = __require("src/anim/clips.js");
+const { STAGE } = __require("src/config/constants.js");
 
 const ACTIONABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'run']);
 const BLOCKABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'blockstun', 'land']);
@@ -1927,7 +2232,10 @@ class Fighter {
     this.input = new InputBuffer();
     this.anim = new Animator(this.props);
     this.maxHealth = def.stats.health;
+    this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
+    this.spawnProjectile = null; // set by the match
+    this.projectileOut = false;
     this.reset(x, facing);
   }
 
@@ -1942,6 +2250,8 @@ class Fighter {
     this.health = this.maxHealth;
     this.stun = 0;
     this.hitstop = 0;
+    this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
+    this.throwProtect = 0;
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -2018,13 +2328,26 @@ class Fighter {
   }
 
   // --- main update ---------------------------------------------------------------------------
+  /** Adds super meter unless the post-super cooldown is running. */
+  gainMeter(n) {
+    if (this.superLock > 0 || !(n > 0)) return;
+    this.meter = Math.min(TUNING.superCost, this.meter + n);
+  }
+
   update(opp) {
     if (this.flash > 0) this.flash--;
+    if (this.superLock > 0) this.superLock--;
+    if (this.state === 'thrown') {
+      // position is driven by the thrower (see resolveThrows); no own physics
+      this.stateFrame++;
+      return true;
+    }
     if (this.hitstop > 0) {
       this.hitstop--;
       return false;
     }
     this.stateFrame++;
+    if (this.throwProtect > 0) this.throwProtect--;
     this.stun = Math.max(0, this.stun - (this.state === 'hitstun' || this.state === 'juggle' ? 0 : TUNING.stunDecayPerTick));
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
@@ -2083,6 +2406,10 @@ class Fighter {
       }
       case 'attack':
         return this.updateAttack(opp);
+      case 'throwing':
+        b.steer(0, 1.2);
+        if (this.stateFrame >= this.sd.def.duration) this.recoverToNeutral();
+        return;
       case 'hitstun':
       case 'blockstun':
       case 'stagger':
@@ -2118,6 +2445,8 @@ class Fighter {
   }
 
   recoverToNeutral() {
+    // a few frames of throw immunity after being hit, blocking or waking up (no unavoidable throws)
+    if (['hitstun', 'blockstun', 'stagger', 'getup', 'dizzy', 'land'].includes(this.state)) this.throwProtect = 6;
     if (this.input.down) this.setState('crouch', {}, 'crouch', { blend: 6 });
     else this.setState('idle', {}, 'idle', { blend: 7 });
   }
@@ -2200,15 +2529,25 @@ class Fighter {
     if (!air && (!cur || cur.special)) {
       for (const id of SPECIAL_ORDER) {
         const m = moves[id];
+        if (!m?.input) continue;
+        if (m.super && this.meter < (m.cost ?? TUNING.superCost)) continue;
+        if (m.projectile && this.projectileOut) continue; // one projectile on screen at a time
         for (const btn of m.input.buttons) {
           const t = inp.pressedTick(btn);
-          if (t >= 0 && inp.motion(m.input.motion, t)) {
+          if (t >= 0 && inp.motion(m.input.motion, t, m.input.motion.length > 3 ? TUNING.superMotionWindow : undefined)) {
             inp.consume(btn);
             this.startMove(m, false, !!cur);
             return true;
           }
         }
       }
+    }
+    // Throw: light punch + light kick together, standing on the ground.
+    if (!air && !cur && !inp.down && moves.throw && inp.pressed('lp', 3) && inp.pressed('lk', 3)) {
+      inp.consume('lp');
+      inp.consume('lk');
+      this.startMove(moves.throw);
+      return true;
     }
     if (cur && this.chainLen >= TUNING.maxChainLength) return false;
     const stance = air ? 'air' : inp.down ? 'crouch' : 'stand';
@@ -2227,8 +2566,13 @@ class Fighter {
   startMove(m, isChain = false, isCancel = isChain) {
     this.chainLen = isChain ? this.chainLen + 1 : 0;
     // frame 1 is the tick the button was pressed on (frame data counts from the press)
-    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null };
+    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null };
     if (m.stance === 'air') this.airAttackUsed = true;
+    if (m.super) {
+      this.meter -= m.cost ?? TUNING.superCost;
+      this.superLock = TUNING.superCooldown;
+      this.emit({ type: 'superStart', who: this.index, name: m.name });
+    }
     // Cross-fade into the move: short for fast normals, longer when the body must change posture
     // (cancels, stand -> crouch) so no limb snaps across the screen in a single frame.
     const fromStance = this.crouching ? 'crouch' : this.body.onGround ? 'stand' : 'air';
@@ -2244,6 +2588,23 @@ class Fighter {
     const b = this.body;
     mv.frame++;
     const total = m.startup + m.active + m.recovery;
+    // Kara-throw: light punch/kick followed 1-2 frames later by the other button becomes a throw.
+    if (mv.frame <= 3 && ['lp', 'lk'].includes(m.id) && this.def.moves.throw && this.input.pressed('lp', 3) && this.input.pressed('lk', 3)) {
+      this.input.consume('lp');
+      this.input.consume('lk');
+      this.startMove(this.def.moves.throw);
+      return;
+    }
+    if (m.steps) {
+      const st = sequenceStep(m, mv.frame);
+      if (st !== mv.step) {
+        mv.step = st;
+        mv.hitIds.clear(); // each step of a sequence may hit once
+        mv.hits = 0;
+        if (st.teleport && opp) this.teleportBehind(opp);
+      }
+    }
+    if (m.projectile && mv.frame === m.projectile.at && this.spawnProjectile) this.spawnProjectile(this, m.projectile);
     // Scripted forward motion (lunges) – otherwise decelerate on the ground.
     let moving = false;
     if (m.motion) {
@@ -2258,11 +2619,16 @@ class Fighter {
       b.launch(m.air.vy);
       b.vx = m.air.vx * this.facing;
     }
+    if (!moving && mv.step?.vx && b.onGround) {
+      b.vx = mv.step.vx * this.facing;
+      moving = true;
+    }
     if (!moving && b.onGround && !(m.air && mv.frame >= m.air.at)) b.steer(0, 0.8);
     if (mv.frame === m.startup + 1) this.emit({ type: 'swing', who: this.index, move: m.id, strength: m.strength });
     if (mv.frame === m.startup + m.active + 1 && !mv.contact) {
       const hb = this.hitboxes[0];
-      this.emit({ type: 'whiff', who: this.index, move: m.id, strength: m.strength, x: hb ? hb.b.x : this.body.x, y: hb ? hb.b.y : 150, dir: this.facing });
+      if (m.hitboxes?.length) this.emit({ type: 'whiff', who: this.index, move: m.id, strength: m.strength, x: hb ? hb.b.x : this.body.x, y: hb ? hb.b.y : 150, dir: this.facing });
+      if (m.isSpecial && !m.super) this.gainMeter(TUNING.meterOnSpecialWhiff);
     }
 
     // Cancels: only after the move made contact, inside the cancel window.
@@ -2285,6 +2651,18 @@ class Fighter {
       this.move = null;
       this.recoverToNeutral();
     }
+  }
+
+  /** Vanish and reappear behind the opponent (used by sequence steps with `teleport`). */
+  teleportBehind(opp) {
+    const from = this.body.x;
+    const side = Math.sign(opp.body.x - this.body.x) || this.facing;
+    const lo = STAGE.left + this.body.pushW, hi = STAGE.right - this.body.pushW;
+    let x = opp.body.x + side * (opp.body.pushW + this.body.pushW + 6);
+    if (x < lo || x > hi) x = opp.body.x - side * (opp.body.pushW + this.body.pushW + 6); // cornered: stay in front
+    this.body.x = this.body.prevX = Math.min(hi, Math.max(lo, x));
+    this.facing = Math.sign(opp.body.x - this.body.x) || this.facing;
+    this.emit({ type: 'teleport', who: this.index, from, to: this.body.x });
   }
 
   onLand() {
@@ -2315,7 +2693,7 @@ class Fighter {
   /** Parts of the hurtbox that are intangible this tick. Returns 'all', a Set of parts, or null. */
   invulnerability() {
     if (this.state === 'knockdown' || this.state === 'getup' || this.state === 'intro' || this.state === 'victory') return 'all';
-    if (this.state === 'ko') return 'all';
+    if (this.state === 'ko' || this.state === 'thrown' || this.state === 'throwing') return 'all';
     if (this.state === 'dashB' && this.stateFrame <= 5) return 'all';
     if (this.state === 'attack' && this.move?.def.invuln) {
       const parts = new Set();
@@ -2350,7 +2728,7 @@ class Fighter {
     this.body.vx = dir * m.push.block;
     const dur = m.blockstun;
     this.setState('blockstun', { duration: dur, low }, low ? 'blockLow' : 'blockHigh', { blend: 3, params: { duration: dur } });
-    if (m.isSpecial) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
+    if (m.isSpecial || m.chip) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
   }
 
   receiveHit(att, m, { damage, hitstun, part, hitstop, counter, reaction = m.reaction }) {
@@ -2411,6 +2789,7 @@ class Fighter {
       airDir: this.airDir,
       moveFrame: this.move ? this.move.frame : 0,
       stance: this.stance,
+      throwRot: this.state === 'thrown' ? this.sd.rot : 0,
     };
   }
 
@@ -2535,7 +2914,7 @@ const { STANCE } = __require("src/anim/poses.js");
 const { ease, clamp } = __require("src/core/math.js");
 
 /** Maximum change per tick (speed control): keeps the body from snapping between key poses. */
-const MAX_SPEED = { limb: 46, spine: 9, head: 10, rot: 45, pos: 22 };
+const MAX_SPEED = { limb: 46, leg: 34, spine: 9, head: 10, rot: 45, pos: 22 };
 
 const SWAP_LAYER = { fa: 'ba', ba: 'fa', fl: 'bl', bl: 'fl' };
 
@@ -2571,7 +2950,7 @@ class Animator {
     this.frame++;
     const clip = CLIPS[this.clipId];
     let pose = clip.sample(this.frame, ctx, this.params, this.props);
-    let layers = clip.layers ? clip.layers(this.params) : null;
+    let layers = clip.layers ? clip.layers(this.params, ctx) : null;
     if (ctx.stance === 1) {
       swapStance(pose);
       if (layers) {
@@ -2606,7 +2985,8 @@ class Animator {
     // Arms are limited directly; IK legs keep their foot targets (planted feet win over speed).
     for (const k of LIMBS) {
       if ((k === 'fl' && pose.ff) || (k === 'bl' && pose.bf)) continue;
-      for (let i = 0; i < 3; i++) pose[k][i] = lim(prev[k][i], pose[k][i], MAX_SPEED.limb);
+      const max = k === 'fl' || k === 'bl' ? MAX_SPEED.leg : MAX_SPEED.limb;
+      for (let i = 0; i < 3; i++) pose[k][i] = lim(prev[k][i], pose[k][i], max);
     }
     finalizePose(pose, this.props);
   }
@@ -2614,6 +2994,7 @@ class Animator {
 
 });
 __define("src/anim/clips.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "sequenceStep", { enumerable: true, get: () => sequenceStep });
   Object.defineProperty(__exports, "attackPhase", { enumerable: true, get: () => attackPhase });
   Object.defineProperty(__exports, "CLIPS", { enumerable: true, get: () => CLIPS });
 // Animation clips. A clip samples a *resolved* pose (fighter proportions applied, IK solved) from a
@@ -2697,21 +3078,60 @@ const BASES = { stand: K.STANCE, crouch: K.CROUCH, air: K.AIR_FALL };
 
 function attackPose(f, move, props) {
   const ap = ATTACK_POSES[move.anim];
-  const base = BASES[ap.base] || K.STANCE;
+  const base = BASES[move.base || ap.base] || K.STANCE;
   const end = BASES[move.endStance || ap.base] || base;
   const S = move.startup, A = move.active, Rc = move.recovery;
   const wu = Math.max(1, Math.round(S * 0.45));
   const contact = ap.contact;
-  const extend = ap.extend || contact;
+  // short sequence hits have no time for a separate follow-through pose
+  const extend = move.noHold ? contact : ap.extend || contact;
   const follow = ap.follow || extend;
   if (f <= wu) return mix(base, ap.windup, ease.inOutSine(f / wu), props);
   if (f <= S + 1) return mix(ap.windup, contact, ease.strike((f - wu) / Math.max(1, S + 1 - wu)), props);
   if (f <= S + A) return mix(contact, extend, (f - S - 1) / Math.max(1, A - 1), props);
   const r = f - S - A;
-  const rf = Math.max(1, Math.round(Rc * 0.35));
-  if (r <= rf) return mix(extend, follow, ease.outQuad(r / rf), props);
-  return mix(follow, end, ease.inOutSine((r - rf) / Math.max(1, Rc - rf)), props);
+  const rf = move.noHold ? 0 : Math.max(1, Math.round(Rc * 0.35));
+  if (r <= rf && rf > 0) return mix(extend, follow, ease.outQuad(r / rf), props);
+  return mix(rf > 0 ? follow : extend, end, ease.inOutSine((r - rf) / Math.max(1, Rc - rf)), props);
 }
+
+/** Step of a sequence move containing frame f (sequences: multi-hit specials and supers). */
+function sequenceStep(move, f) {
+  const steps = move.steps;
+  for (const st of steps) if (f <= st.end) return st;
+  return steps[steps.length - 1];
+}
+
+/** Each step plays its own attack animation, timed so the contact pose lands on the step's hit. */
+function sequencePose(f, move, props) {
+  const st = sequenceStep(move, f);
+  const local = Math.min(f - st.start + 1, st.len);
+  const hitAt = st.hitAt || Math.max(2, Math.round(st.len * 0.6));
+  const hitLen = st.hitLen || 2;
+  const virtual = { anim: st.anim, startup: hitAt - 1, active: hitLen, recovery: Math.max(1, st.len - hitAt - hitLen + 1), endStance: 'stand', base: 'stand', noHold: true };
+  return attackPose(local, virtual, props);
+}
+
+const THROW_KEYS = {
+  throwFwd: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.35, K.P(K.STANCE, { y: 118, lean: -14, chest: -10, fa: [148, 60, 0], ba: [150, 68, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.66, K.P(K.STANCE, { x: 18, y: 106, lean: 30, chest: 12, fa: [84, 10, 0], ba: [88, 12, 0], ff: [40, 8, 0], bf: [-26, 8, 0] })],
+    [1, K.STANCE],
+  ],
+  throwBack: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.35, K.P(K.STANCE, { y: 118, lean: -16, chest: -12, fa: [160, 56, 0], ba: [162, 62, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.66, K.P(K.STANCE, { x: -6, y: 114, lean: -30, chest: -14, neck: 10, fa: [205, 26, 0], ba: [208, 22, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
+    [1, K.STANCE],
+  ],
+  slam: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.3, K.P(K.STANCE, { y: 120, lean: -10, chest: -12, fa: [172, 40, 0], ba: [170, 46, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.62, K.P(K.STANCE, { x: 16, y: 96, lean: 44, chest: 16, neck: -10, fa: [66, 10, 0], ba: [62, 14, 0], ff: [42, 8, 0], bf: [-30, 8, 0] })],
+    [1, K.STANCE],
+  ],
+};
 
 /** Phases of an attack frame for UI / debugging (kept here because animation and data agree on it). */
 function attackPhase(move, f) {
@@ -2756,8 +3176,21 @@ const CLIPS = {
   jump: { sample: (f, ctx, p, props) => jumpPose(f, ctx, props) },
   land: { sample: (f, c, p, props) => keyed([[0, K.LAND], [2, K.LAND], [p.duration || 4, K.STANCE]], f, props) },
   attack: {
-    sample: (f, ctx, p, props) => attackPose(ctx.moveFrame ?? f, p.move, props),
-    layers: (p) => ATTACK_POSES[p.move.anim].layers,
+    sample: (f, ctx, p, props) => (p.move.steps ? sequencePose(ctx.moveFrame ?? f, p.move, props) : attackPose(ctx.moveFrame ?? f, p.move, props)),
+    layers: (p, ctx) => ATTACK_POSES[p.move.steps ? sequenceStep(p.move, ctx?.moveFrame ?? 1).anim : p.move.anim]?.layers,
+  },
+  throwing: {
+    sample: (f, c, p, props) => {
+      const d = p.duration || 36;
+      return keyed(THROW_KEYS[p.kind || 'throwFwd'].map(([t, pose]) => [t * d, pose]), f, props);
+    },
+  },
+  thrown: {
+    sample: (f, ctx, p, props) => {
+      const pose = mix(K.HIT_HIGH, K.AIR_TUMBLE, clamp(f / 8, 0, 1), props);
+      pose.rot = ctx.throwRot || 0;
+      return pose;
+    },
   },
   guardHigh: { sample: (f, c, p, props) => mix(K.STANCE, K.BLOCK_HIGH, ease.outQuad(f / 4), props) },
   guardLow: { sample: (f, c, p, props) => mix(K.CROUCH, K.BLOCK_LOW, ease.outQuad(f / 4), props) },
@@ -2819,27 +3252,27 @@ const ATTACK_POSES = {
     extend: P(STANCE, { x: 8, lean: 16, chest: 10, neck: -6, head: -8, fa: [104, 6, 0], ba: [38, 150, 10], ff: [34, 8, 0], bf: [-30, 8, 0] }),
   },
   cross: {
-    base: 'stand', layers: { ba: 'front' },
+    base: 'stand',
     windup: P(STANCE, { x: -7, lean: 4, chest: -12, fa: [62, 112, 0], ba: [20, 142, 0], ff: [28, 8, 0], bf: [-34, 8, 0] }),
     contact: P(STANCE, { x: 18, y: 106, lean: 24, chest: 12, neck: -8, head: -10, fa: [26, 132, 10], ba: [104, 2, 0], ff: [38, 8, 0], bf: [-22, 8, 0] }),
     extend: P(STANCE, { x: 19, y: 105, lean: 25, chest: 13, neck: -8, head: -10, fa: [26, 132, 10], ba: [101, 6, 0], ff: [38, 8, 0], bf: [-22, 8, 0] }),
     follow: P(STANCE, { x: 14, y: 106, lean: 20, chest: 9, fa: [40, 120, 0], ba: [80, 50, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
   },
   frontKick: {
-    base: 'stand', layers: { fl: 'front' },
+    base: 'stand',
     windup: P(STANCE, { x: -2, y: 110, lean: -4, chest: -2, fa: guardF, ba: guardB, fl: [96, 112, 20], ff: null, bf: [-32, 8, 0] }),
     contact: P(STANCE, { x: -6, y: 112, lean: -14, chest: -4, neck: 4, head: 6, fa: [44, 112, 0], ba: [26, 146, 10], fl: [93, 4, 32], ff: null, bf: [-34, 8, 0] }),
     extend: P(STANCE, { x: -6, y: 112, lean: -15, chest: -4, neck: 4, head: 6, fa: [44, 112, 0], ba: [26, 146, 10], fl: [90, 10, 30], ff: null, bf: [-34, 8, 0] }),
   },
   roundhouse: {
-    base: 'stand', layers: { bl: 'front' },
+    base: 'stand',
     windup: P(STANCE, { x: 2, y: 110, lean: -12, chest: -16, fa: [60, 100, 0], ba: [30, 120, 0], bl: [84, 120, 10], bf: null, ff: [16, 8, 0] }),
     contact: P(STANCE, { x: 14, y: 112, lean: -34, chest: -8, neck: 10, head: 10, fa: [44, 86, 0], ba: [-24, 62, 0], bl: [122, 4, 26], bf: null, ff: [12, 8, 0] }),
     extend: P(STANCE, { x: 14, y: 112, lean: -34, chest: -8, neck: 10, head: 10, fa: [44, 86, 0], ba: [-24, 62, 0], bl: [118, 14, 20], bf: null, ff: [12, 8, 0] }),
     follow: P(STANCE, { x: 10, y: 110, lean: -18, chest: -4, fa: [50, 96, 0], ba: [10, 90, 0], bl: [80, 80, 10], bf: null, ff: [12, 8, 0] }),
   },
   uppercut: {
-    base: 'crouch', layers: { ba: 'front' },
+    base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 60, lean: 28, chest: 8, fa: [54, 112, 0], ba: [44, 112, 0] }),
     contact: P(STANCE, { x: 18, y: 106, lean: 10, chest: -8, neck: -12, head: -14, fa: [20, 124, 0], ba: [126, 12, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 110, lean: 4, chest: -12, neck: -12, head: -14, fa: [20, 124, 0], ba: [150, 8, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
@@ -2850,23 +3283,23 @@ const ATTACK_POSES = {
     contact: P(CROUCH, { x: 10, lean: 18, chest: 10, neck: -12, fa: [100, 3, 0] }),
   },
   lowKick: {
-    base: 'crouch', layers: { fl: 'front' },
+    base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 62, lean: 18, fl: [62, 92, 10], ff: null }),
     contact: P(CROUCH, { x: 6, y: 60, lean: 10, chest: 6, fl: [82, 0, 20], ff: null, bf: [-42, 8, 0] }),
   },
   sweep: {
-    base: 'crouch', layers: { bl: 'front' },
+    base: 'crouch',
     windup: P(CROUCH, { x: 2, y: 54, lean: 34, chest: 10, fa: [20, 40, 0], ba: [60, 90, 0], bl: [30, 110, 0], bf: null, ff: [24, 8, 0] }),
     contact: P(CROUCH, { x: 8, y: 48, lean: 38, chest: 12, neck: -18, head: -10, fa: [6, 24, 0], ba: [70, 70, 0], bl: [94, 0, 18], bf: null, ff: [20, 8, 0] }),
     extend: P(CROUCH, { x: 8, y: 48, lean: 38, chest: 12, neck: -18, head: -10, fa: [6, 24, 0], ba: [70, 70, 0], bl: [90, 2, 18], bf: null, ff: [20, 8, 0] }),
   },
   airKick: {
-    base: 'air', layers: { fl: 'front' },
+    base: 'air',
     windup: P(AIR_FALL, { lean: 0, fl: [84, 122, 10], bl: [62, 130, 0], fa: [72, 104, 0], ba: [44, 128, 0] }),
     contact: P(AIR_FALL, { lean: -12, chest: -4, fl: [52, 3, 24], bl: [78, 136, 0], fa: [64, 104, 0], ba: [40, 126, 0] }),
   },
   airPunch: {
-    base: 'air', layers: { ba: 'front' },
+    base: 'air',
     windup: P(AIR_FALL, { lean: -4, chest: -8, ba: [112, 68, 0], fa: [70, 100, 0], fl: [70, 108, 0], bl: [40, 96, 0] }),
     contact: P(AIR_FALL, { lean: 18, chest: 10, neck: -8, ba: [66, 14, 0], fa: [30, 120, 0], fl: [68, 112, 0], bl: [36, 92, 0] }),
   },
@@ -2877,17 +3310,62 @@ const ATTACK_POSES = {
     extend: P(STANCE, { x: 30, y: 90, lean: 31, chest: 13, neck: -12, head: -12, fa: [100, 4, 0], ba: [18, 140, 10], ff: [72, 8, 0], bf: [-48, 8, 0] }),
   },
   rising: {
-    base: 'crouch', layers: { ba: 'front' },
+    base: 'crouch',
     windup: P(CROUCH, { x: 0, y: 58, lean: 30, chest: 10, ba: [44, 114, 0], fa: [50, 112, 0] }),
     contact: P(AIR_FALL, { y: 96, lean: 2, chest: -10, neck: -12, head: -14, fa: [24, 124, 0], ba: [126, 22, 0], fl: [70, 96, 10], bl: [10, 40, 10] }),
     extend: P(AIR_FALL, { y: 100, lean: -8, chest: -14, neck: -14, head: -16, fa: [24, 124, 0], ba: [168, 8, 0], fl: [64, 90, 10], bl: [6, 34, 10] }),
   },
   whirl: {
-    base: 'stand', layers: { bl: 'front' }, spin: true,
+    base: 'stand', spin: true,
     windup: P(STANCE, { x: 4, y: 108, lean: 26, chest: 10, neck: 10, fa: [20, 60, 0], ba: [60, 80, 0], bl: [60, 120, 0], bf: null, ff: [10, 8, 0] }),
     contact: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [104, 2, 30], bf: null, ff: [4, 8, 0] }),
     extend: P(STANCE, { x: 18, y: 112, lean: -40, chest: -10, neck: 14, head: 12, fa: [130, 20, 0], ba: [-30, 40, 0], bl: [100, 6, 30], bf: null, ff: [4, 8, 0] }),
   },
+  // --- throws -------------------------------------------------------------------------------------
+  grab: {
+    base: 'stand',
+    windup: P(STANCE, { x: 2, lean: 10, fa: [40, 112, 0], ba: [30, 128, 0] }),
+    contact: P(STANCE, { x: 16, y: 112, lean: 20, chest: 8, fa: [90, 32, 0], ba: [96, 40, 0], ff: [38, 8, 0], bf: [-26, 8, 0] }),
+  },
+  // --- signature specials ------------------------------------------------------------------------
+  hammer: {
+    base: 'stand',
+    windup: P(STANCE, { y: 112, lean: -10, chest: -10, fa: [172, 62, 0], ba: [168, 72, 0] }),
+    contact: P(AIR_FALL, { lean: 26, chest: 12, neck: -10, fa: [102, 12, 0], ba: [96, 16, 0], fl: [60, 96, 10], bl: [30, 90, 10] }),
+    extend: P(AIR_FALL, { lean: 30, chest: 14, neck: -10, fa: [92, 10, 0], ba: [88, 14, 0], fl: [50, 80, 10], bl: [20, 70, 10] }),
+  },
+  chop: {
+    base: 'stand',
+    windup: P(STANCE, { y: 116, lean: -10, chest: -10, fa: [150, 70, 0], ba: [146, 78, 0] }),
+    contact: P(STANCE, { x: 14, y: 102, lean: 26, chest: 12, neck: -10, fa: [82, 18, 0], ba: [78, 22, 0], ff: [38, 8, 0], bf: [-30, 8, 0] }),
+  },
+  flick: {
+    base: 'stand',
+    windup: P(STANCE, { x: -4, lean: 2, chest: -8, fa: [14, 118, 0] }),
+    contact: P(STANCE, { x: 8, lean: 12, chest: 8, fa: [112, 16, 30], ff: [34, 8, 0], bf: [-30, 8, 0] }),
+  },
+  slide: {
+    base: 'crouch', endStance: 'crouch',
+    windup: P(CROUCH, { x: 0, y: 60, lean: 16 }),
+    contact: P(CROUCH, { x: 8, y: 34, lean: -30, chest: -6, neck: 12, head: 8, fa: [-20, 50, 0], ba: [-40, 40, 0],
+      fl: [88, 0, 20], bl: [44, 120, 0], ff: null, bf: null }),
+  },
+  pushWave: {
+    base: 'stand',
+    windup: P(STANCE, { x: -6, lean: -4, chest: -6, fa: [30, 124, 0], ba: [24, 132, 0] }),
+    contact: P(STANCE, { x: 10, lean: 14, chest: 8, fa: [92, 10, -30], ba: [88, 14, -30], ff: [36, 8, 0], bf: [-30, 8, 0] }),
+  },
+  counterStance: {
+    base: 'stand',
+    windup: P(STANCE, { x: -6, y: 114, lean: -6, chest: -4, fa: [76, 76, -20], ba: [58, 96, -10], ff: [24, 8, 0], bf: [-36, 8, 0] }),
+    contact: P(STANCE, { x: -8, y: 113, lean: -8, chest: -6, neck: 4, head: 6, fa: [80, 68, -24], ba: [60, 92, -12], ff: [24, 8, 0], bf: [-36, 8, 0] }),
+  },
+  pounce: {
+    base: 'stand',
+    windup: P(STANCE, { y: 86, lean: 30, chest: 8, fa: [-16, 50, 0], ba: [-26, 44, 0], ff: [30, 8, 0], bf: [-34, 8, 0] }),
+    contact: P(AIR_FALL, { lean: 55, chest: 10, neck: -28, head: -18, fa: [118, 18, 0], ba: [108, 26, 0], fl: [-10, 40, 10], bl: [-26, 30, 10] }),
+  },
+
 };
 
 });
@@ -3075,6 +3553,7 @@ const TURN = P(STANCE, { lean: 4, fa: [40, 115, 0], ba: [40, 120, 0] });
 });
 __define("src/combat/boxes.js", function (__exports, __require) {
   Object.defineProperty(__exports, "buildHurtboxes", { enumerable: true, get: () => buildHurtboxes });
+  Object.defineProperty(__exports, "activeSpec", { enumerable: true, get: () => activeSpec });
   Object.defineProperty(__exports, "buildHitboxes", { enumerable: true, get: () => buildHitboxes });
 // Builds collision volumes from the skeleton every tick.
 //   Hurtboxes: capsules on head / torso / limbs (where the fighter can be hit)
@@ -3110,21 +3589,39 @@ function buildHurtboxes(fighter) {
   return boxes;
 }
 
+/**
+ * Hit spec active on the current frame: the move itself for ordinary strikes, the current step's
+ * spec for sequences (multi-hit specials / supers), or null (not active, throws, counters, projectiles).
+ */
+function activeSpec(fighter) {
+  const mv = fighter.move;
+  if (!mv) return null;
+  const m = mv.def;
+  if (m.type === 'throw' || m.type === 'counter') return null;
+  if (m.steps) {
+    for (const st of m.steps) if (st.spec && mv.frame >= st.hitFrom && mv.frame <= st.hitTo) return st.spec;
+    return null;
+  }
+  if (!m.hitboxes?.length) return null;
+  if (mv.frame <= m.startup || mv.frame > m.startup + m.active) return null;
+  return m;
+}
+
 /** Hitboxes of the current move on its current frame (empty outside the active window). */
 function buildHitboxes(fighter) {
-  const mv = fighter.move;
-  if (!mv) return [];
-  const m = mv.def;
-  const f = mv.frame;
-  if (f <= m.startup || f > m.startup + m.active) return [];
+  const spec = activeSpec(fighter);
+  fighter.hitSpec = spec;
+  if (!spec) return [];
   const { j } = fighter.skel;
   const { x, y } = fighter.body;
   const W = (p) => w(x, y, fighter.facing, p);
-  const local = f - m.startup; // 1..active
+  const local = fighter.move.frame - fighter.move.def.startup; // 1..active for plain strikes
   const out = [];
-  for (const hb of m.hitboxes) {
-    if (hb.from && local < hb.from) continue;
-    if (hb.to && local > hb.to) continue;
+  for (const hb of spec.hitboxes) {
+    if (!fighter.move.def.steps) {
+      if (hb.from && local < hb.from) continue;
+      if (hb.to && local > hb.to) continue;
+    }
     const an = fighter.stance === 1 ? swapSide(hb.a) : hb.a;
     const bn = fighter.stance === 1 ? swapSide(hb.b || hb.a) : hb.b || hb.a;
     out.push({ a: W(j[an]), b: W(j[bn]), r: hb.r * (fighter.props.posScale ** 0.5) });
@@ -3203,14 +3700,20 @@ function enforceSeparation(a, b, max = MAX_SEPARATION) {
 
 });
 __define("src/combat/hitResolver.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "note", { enumerable: true, get: () => note });
   Object.defineProperty(__exports, "detectHit", { enumerable: true, get: () => detectHit });
   Object.defineProperty(__exports, "resolveExchange", { enumerable: true, get: () => resolveExchange });
   Object.defineProperty(__exports, "damageScale", { enumerable: true, get: () => damageScale });
+  Object.defineProperty(__exports, "applyStrike", { enumerable: true, get: () => applyStrike });
+  Object.defineProperty(__exports, "updateProjectiles", { enumerable: true, get: () => updateProjectiles });
+  Object.defineProperty(__exports, "throwImmunity", { enumerable: true, get: () => throwImmunity });
+  Object.defineProperty(__exports, "resolveThrows", { enumerable: true, get: () => resolveThrows });
 // Hit detection and resolution. Runs once per tick after both fighters moved and rebuilt their
 // collision volumes. Both directions are detected first and then applied, so simultaneous hits
 // trade (or the higher-priority move wins) independent of update order.
+// Also resolves throws (grab / tech / release), projectiles and counter-stance parries.
 const { TUNING } = __require("src/config/tuning.js");
-const { capsulesOverlap, capsulePenetration } = __require("src/core/math.js");
+const { capsulesOverlap, capsulePenetration, lerp, clamp } = __require("src/core/math.js");
 const { STAGE } = __require("src/config/constants.js");
 
 const PART_ORDER = { head: 0, torso: 1, limb: 2 };
@@ -3218,7 +3721,7 @@ const PART_ORDER = { head: 0, torso: 1, limb: 2 };
 /** Records why a hit attempt was accepted or rejected (shown by the debug overlay). */
 function note(f, reason) {
   if (!reason) return;
-  const mid = f.move ? f.move.def.id : '-';
+  const mid = f.move ? f.move.def.id : f.state;
   const last = f.hitLog[f.hitLog.length - 1];
   if (last && last.reason === reason && last.move === mid) return;
   f.lastHit = { tick: f.input.tick, move: mid, reason };
@@ -3226,18 +3729,11 @@ function note(f, reason) {
   if (f.hitLog.length > 6) f.hitLog.shift();
 }
 
-/**
- * Checks whether `att`'s active hitboxes connect with `def`. Returns
- *   { ok: true, part, point } or { ok: false, reason } (reason null when there is nothing to report).
- */
-function detectHit(att, def) {
-  const mv = att.move;
-  if (!mv || att.hitboxes.length === 0) return { ok: false, reason: null };
-  const m = mv.def;
-  if (mv.hitIds.has(def.index) && mv.hits >= (m.maxHits || 1)) return { ok: false, reason: 'rejected: move already hit' };
+/** Finds the best hurtbox touched by a set of hit volumes. */
+function touch(volumes, def) {
   const inv = def.invulnerability();
   let best = null, sawInvuln = false;
-  for (const hb of att.hitboxes) {
+  for (const hb of volumes) {
     for (const hu of def.hurtboxes) {
       if (!capsulesOverlap(hb, hu)) continue;
       if (inv === 'all' || (inv && inv.has(hu.part))) {
@@ -3246,18 +3742,43 @@ function detectHit(att, def) {
       }
       const depth = capsulePenetration(hb, hu);
       if (!best || PART_ORDER[hu.part] < PART_ORDER[best.part] || (hu.part === best.part && depth > best.depth)) {
-        best = { part: hu.part, depth, point: { x: hb.b.x, y: hb.b.y }, hb, hu };
+        best = { part: hu.part, depth, point: { x: hb.b.x, y: hb.b.y } };
       }
     }
   }
+  return { best, sawInvuln };
+}
+
+/** Combo-protection checks shared by strikes and projectiles. */
+function comboRejection(spec, def) {
+  if (def.state === 'juggle' && !spec.juggleIgnore && def.combo.juggle + (spec.juggle ?? 1) > TUNING.juggleLimit) return 'rejected: juggle limit';
+  if (def.combo.hits >= TUNING.comboHitCap) return 'rejected: combo hit cap';
+  if (!spec.comboExempt && def.combo.hits > 0 && (def.combo.moves[spec.id] || 0) >= TUNING.maxSameMoveInCombo) return 'rejected: repeated move limit';
+  return null;
+}
+
+/** True when `def` is in the parry window of a counter stance and the strike can be parried. */
+function parries(def, spec) {
+  const mv = def.move;
+  if (!mv || mv.def.type !== 'counter' || def.state !== 'attack') return false;
+  const [from, to] = mv.def.counterWindow;
+  return mv.frame >= from && mv.frame <= to && spec.height !== 'low' && !spec.projectile;
+}
+
+/**
+ * Checks whether `att`'s active hitboxes connect with `def`. Returns
+ *   { ok: true, part, point } or { ok: false, reason } (reason null when there is nothing to report).
+ */
+function detectHit(att, def) {
+  const mv = att.move;
+  const spec = att.hitSpec;
+  if (!mv || !spec || att.hitboxes.length === 0) return { ok: false, reason: null };
+  if (mv.hitIds.has(def.index) && mv.hits >= (spec.maxHits || 1)) return { ok: false, reason: 'rejected: move already hit' };
+  const { best, sawInvuln } = touch(att.hitboxes, def);
   if (!best) return { ok: false, reason: sawInvuln ? 'rejected: invulnerable' : 'whiff: no overlap' };
-  if (def.state === 'juggle' && !m.juggleIgnore && def.combo.juggle + (m.juggle ?? 1) > TUNING.juggleLimit) {
-    return { ok: false, reason: 'rejected: juggle limit' };
-  }
-  if (def.combo.hits >= TUNING.comboHitCap) return { ok: false, reason: 'rejected: combo hit cap' };
-  if (def.combo.hits > 0 && (def.combo.moves[m.id] || 0) >= TUNING.maxSameMoveInCombo) {
-    return { ok: false, reason: 'rejected: repeated move limit' };
-  }
+  if (parries(def, spec)) return { ok: false, parry: true, point: best.point, reason: 'PARRIED by counter stance' };
+  const rej = comboRejection(spec, def);
+  if (rej) return { ok: false, reason: rej };
   return { ok: true, part: best.part, point: best.point, reason: `hit ${best.part}` };
 }
 
@@ -3274,10 +3795,18 @@ function resolveExchange(f1, f2) {
   note(f1, r1.reason);
   note(f2, r2.reason);
 
+  // Counter stance: the strike is caught, the attacker is left open and the parry follow-up runs.
+  for (const [att, def, r] of [[f1, f2, r1], [f2, f1, r2]]) {
+    if (r.parry) {
+      events.push(applyParry(att, def, r.point));
+      return events;
+    }
+  }
+
   // Clash: two active attacks meet fist-to-fist and neither reaches a body yet.
   if (!r1.ok && !r2.ok && f1.hitboxes.length && f2.hitboxes.length && f1.move.hits === 0 && f2.move.hits === 0 &&
       !f1.move.clashed && hitboxesClash(f1, f2)) {
-    const p1 = f1.move.def.priority, p2 = f2.move.def.priority;
+    const p1 = f1.hitSpec.priority ?? 1, p2 = f2.hitSpec.priority ?? 1;
     if (p1 === p2) {
       for (const [f, o] of [[f1, f2], [f2, f1]]) {
         f.move.clashed = true;
@@ -3300,19 +3829,20 @@ function resolveExchange(f1, f2) {
   }
 
   if (r1.ok && r2.ok) {
-    const p1 = f1.move.def.priority, p2 = f2.move.def.priority;
+    const p1 = f1.hitSpec.priority ?? 1, p2 = f2.hitSpec.priority ?? 1;
     if (p1 - p2 >= 2) r2 = { ok: false, reason: 'rejected: lost trade on priority' };
     else if (p2 - p1 >= 2) r1 = { ok: false, reason: 'rejected: lost trade on priority' };
     if (!r1.ok) note(f1, r1.reason);
     if (!r2.ok) note(f2, r2.reason);
   }
-  // Capture defender states before applying anything (simultaneous resolution).
+  // Capture defender states and specs before applying anything (simultaneous resolution).
   const pending = [];
-  // (moves are captured too: applying the first hit of a trade cancels the other fighter's move)
-  if (r1.ok) pending.push([f1, f2, r1, snapshotDefender(f2), f1.move]);
-  if (r2.ok) pending.push([f2, f1, r2, snapshotDefender(f1), f2.move]);
+  if (r1.ok) pending.push([f1, f2, r1, snapshotDefender(f2), f1.move, f1.hitSpec]);
+  if (r2.ok) pending.push([f2, f1, r2, snapshotDefender(f1), f2.move, f2.hitSpec]);
   const trade = pending.length === 2;
-  for (const [att, def, res, snap, mv] of pending) events.push(applyHit(att, def, res, snap, trade, mv));
+  for (const [att, def, res, snap, holder, spec] of pending) {
+    events.push(applyStrike(att, def, spec, res, snap, { trade, holder }));
+  }
   return events;
 }
 
@@ -3329,48 +3859,73 @@ function damageScale(hitNumber) {
   return Math.max(TUNING.minDamageScale, t[Math.min(hitNumber - 1, t.length - 1)]);
 }
 
-function applyHit(att, def, res, snap, trade, mv) {
-  const m = mv.def;
-  mv.hitIds.add(def.index);
-  mv.hits++;
-  const block = trade ? { ok: false, why: 'trade' } : def.canBlock(att, m.height);
+/**
+ * Applies a strike (melee or projectile) from `att` to `def` using hit spec `spec`.
+ * holder: object carrying hitIds/hits/contact (the move instance or the projectile).
+ */
+function applyStrike(att, def, spec, res, snap, { trade = false, holder, projectile = null } = {}) {
+  holder.hitIds.add(def.index);
+  holder.hits++;
+  const from = projectile ? { body: { x: projectile.x - Math.sign(projectile.vx) * 20 }, facing: Math.sign(projectile.vx) || 1 } : att;
+  const block = trade ? { ok: false, why: 'trade' } : def.canBlock(from, spec.height);
+  const ownHitstop = (n) => { if (!projectile) att.hitstop = n; };
   if (block.ok) {
-    mv.contact = 'block';
-    const hs = Math.round(m.hitstop * TUNING.blockHitstopScale);
-    def.receiveBlock(att, m, hs);
-    att.hitstop = hs;
-    cornerPushback(att, def, m.push.block);
+    holder.contact = 'block';
+    const hs = Math.round(spec.hitstop * TUNING.blockHitstopScale);
+    def.receiveBlock(from, spec, hs);
+    ownHitstop(hs);
+    if (!projectile) cornerPushback(att, def, spec.push.block);
+    if (!spec.super) att.gainMeter(spec.damage * TUNING.meterOnBlock);
+    def.gainMeter(spec.damage * TUNING.meterOnDamaged * 0.5);
     note(att, `BLOCKED (${block.low ? 'low' : 'high'} guard)`);
-    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: m.strength, move: m.id, low: block.low };
+    return { type: 'block', who: att.index, target: def.index, x: res.point.x, y: res.point.y, strength: spec.strength, move: spec.id, low: block.low };
   }
 
-  mv.contact = 'hit';
+  holder.contact = 'hit';
   const inStartupOrActive = snap.state === 'attack' && snap.move && snap.moveFrame <= snap.move.startup + snap.move.active;
-  const counter = inStartupOrActive && !trade;
+  const counter = inStartupOrActive && !trade && !projectile;
   const punish = snap.state === 'attack' && !inStartupOrActive;
   const hitN = def.combo.hits + 1;
-  const scale = damageScale(hitN);
+  const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
   const partMul = TUNING.partDamage[res.part] ?? 1;
   const dmgMul = att.stats.damage ?? 1;
-  const damage = Math.max(1, Math.round(m.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
-  const decay = Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
-  const hitstun = Math.max(TUNING.minHitstun, m.hitstun + (counter ? TUNING.counterHitStun : 0) - decay);
-  const hitstop = m.hitstop + (counter ? TUNING.counterHitHitstop : 0);
+  const damage = Math.max(1, Math.round(spec.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
+  const decay = spec.comboExempt ? 0 : Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
+  const hitstun = Math.max(TUNING.minHitstun, spec.hitstun + (counter ? TUNING.counterHitStun : 0) - decay);
+  const hitstop = spec.hitstop + (counter ? TUNING.counterHitHitstop : 0);
   // Counter-hit heavy strikes on a grounded opponent stagger instead of a simple flinch.
-  const reaction = counter && m.reaction === 'heavy' && def.body.onGround ? 'stagger' : m.reaction;
+  const reaction = counter && spec.reaction === 'heavy' && def.body.onGround ? 'stagger' : spec.reaction;
 
   def.combo.hits = hitN;
   def.combo.damage += damage;
-  def.combo.moves[m.id] = (def.combo.moves[m.id] || 0) + 1;
-  def.receiveHit(att, m, { damage, hitstun, part: res.part, hitstop, counter, reaction });
-  att.hitstop = hitstop;
-  cornerPushback(att, def, m.push.hit);
+  def.combo.moves[spec.id] = (def.combo.moves[spec.id] || 0) + 1;
+  def.receiveHit(projectile ? from : att, spec, { damage, hitstun, part: res.part, hitstop, counter, reaction });
+  ownHitstop(hitstop);
+  if (!projectile) cornerPushback(att, def, spec.push.hit);
+  if (!spec.super) att.gainMeter(damage * TUNING.meterOnHit);
+  def.gainMeter(damage * TUNING.meterOnDamaged);
   note(att, `HIT ${res.part}${counter ? ' COUNTER' : ''}${punish ? ' PUNISH' : ''}${trade ? ' TRADE' : ''} dmg ${damage} stun ${hitstun}`);
   return {
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
-    strength: m.strength, move: m.id, part: res.part, damage, counter, punish, trade,
-    combo: hitN, ko: def.health <= 0, shake: m.shake || 0, dir: att.facing,
+    strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
+    combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
+    super: !!spec.super,
   };
+}
+
+/** Counter stance caught a strike: freeze the attacker open and run the parry follow-up. */
+function applyParry(att, def, point) {
+  att.move.hitIds.add(def.index);
+  att.move.hits = 99;
+  att.move = null;
+  att.hitstop = 14;
+  att.flash = 4;
+  att.setState('stagger', { duration: 34 }, 'stagger', { blend: 5, params: { duration: 34 } });
+  const follow = def.def.moves[def.move.def.followup];
+  def.hitstop = 8;
+  if (follow) def.startMove(follow, false, true);
+  note(def, 'PARRY: counter stance caught a strike');
+  return { type: 'parry', who: def.index, target: att.index, x: point.x, y: point.y };
 }
 
 /** If the defender is pinned against a wall, the attacker is pushed back instead. */
@@ -3379,6 +3934,182 @@ function cornerPushback(att, def, push) {
   if (def.body.wall === dirAway || Math.abs(def.body.x - (dirAway > 0 ? STAGE.right - def.body.pushW : STAGE.left + def.body.pushW)) < 4) {
     if (att.body.onGround) att.body.vx = -dirAway * push * 0.9;
   }
+}
+
+// --- projectiles --------------------------------------------------------------------------------
+
+/** Advances projectiles, resolves projectile clashes and hits. Mutates `list`; returns events. */
+function updateProjectiles(list, fighters) {
+  const events = [];
+  for (const p of list) {
+    p.x += p.vx;
+    p.life--;
+    p.age++;
+    if (p.cooldown > 0) p.cooldown--;
+    if (p.x < STAGE.left - 50 || p.x > STAGE.right + 50) p.life = 0;
+  }
+  // projectile vs projectile: they cancel each other out
+  for (let i = 0; i < list.length; i++) {
+    for (let k = i + 1; k < list.length; k++) {
+      const a = list[i], b = list[k];
+      if (a.owner === b.owner || a.life <= 0 || b.life <= 0) continue;
+      if (Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r) {
+        a.life = b.life = 0;
+        events.push({ type: 'clash', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      }
+    }
+  }
+  for (const p of list) {
+    if (p.life <= 0 || p.cooldown > 0) continue;
+    const owner = fighters[p.owner], def = fighters[1 - p.owner];
+    const vol = { a: { x: p.x, y: p.y }, b: { x: p.x, y: p.y }, r: p.r };
+    if (def.state === 'thrown') continue;
+    const { best } = touch([vol], def);
+    if (!best) continue;
+    const rej = comboRejection(p.spec, def);
+    if (rej) { p.life = 0; continue; }
+    p.hitIds.clear(); // multi-hit projectiles may hit again after their interval
+    const ev = applyStrike(owner, def, p.spec, { part: best.part, point: { x: p.x, y: p.y } }, snapshotDefender(def), { holder: p, projectile: p });
+    events.push(ev);
+    p.hitsLeft--;
+    p.cooldown = p.interval || 6;
+    if (p.hitsLeft <= 0) p.life = 0;
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].life <= 0) {
+      events.push({ type: 'projectileEnd', who: list[i].owner, x: list[i].x, y: list[i].y, kind: list[i].kind });
+      list.splice(i, 1);
+    }
+  }
+  return events;
+}
+
+// --- throws ---------------------------------------------------------------------------------------
+
+const THROWABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'run', 'attack', 'land', 'dashF', 'prejump']);
+
+/** Can `f` be grabbed right now? Returns a rejection reason or null. */
+function throwImmunity(f) {
+  if (!f.body.onGround) return 'airborne';
+  if (!THROWABLE.has(f.state)) return `state ${f.state}`;
+  if (f.throwProtect > 0) return 'just recovered (throw protection)';
+  if (f.invulnerability() === 'all') return 'invulnerable';
+  return null;
+}
+
+function grabbing(f) {
+  const mv = f.move;
+  if (f.state !== 'attack' || !mv || mv.def.type !== 'throw' || mv.grabbed) return false;
+  return mv.frame > mv.def.startup && mv.frame <= mv.def.startup + mv.def.active;
+}
+
+/** Throw paths: [t (0..1 of release time), x along the thrower's facing, height]. */
+const PATHS = {
+  throwFwd: [[0, 62, 0], [0.45, 66, 70], [1, 86, 46]],
+  throwBack: [[0, 62, 0], [0.5, 8, 140], [1, -76, 50]],
+  slam: [[0, 62, 0], [0.45, 34, 150], [1, 78, 6]],
+};
+const ROT = { throwFwd: 70, throwBack: -170, slam: 100 };
+
+function samplePath(kind, t) {
+  const keys = PATHS[kind];
+  for (let i = 1; i < keys.length; i++) {
+    if (t <= keys[i][0]) {
+      const [t0, x0, y0] = keys[i - 1], [t1, x1, y1] = keys[i];
+      const k = (t - t0) / (t1 - t0);
+      return [lerp(x0, x1, k), lerp(y0, y1, k)];
+    }
+  }
+  return keys[keys.length - 1].slice(1);
+}
+
+function tech(a, b, events) {
+  for (const [f, o] of [[a, b], [b, a]]) {
+    const dir = Math.sign(f.body.x - o.body.x) || -f.facing;
+    f.move = null;
+    f.body.y = 0;
+    f.body.onGround = true;
+    f.body.vx = dir * 7;
+    f.setState('blockstun', { duration: 18 }, 'blockHigh', { blend: 4, params: { duration: 18 } });
+    note(f, 'THROW TECH');
+  }
+  events.push({ type: 'tech', x: (a.body.x + b.body.x) / 2, y: 160 });
+}
+
+/** Grabs, techs, carries and releases throws. Call once per tick after movement. */
+function resolveThrows(fighters) {
+  const events = [];
+  const [a, b] = fighters;
+  // 1) new grabs
+  const tries = [];
+  for (const [g, o] of [[a, b], [b, a]]) {
+    if (!grabbing(g)) continue;
+    const m = g.move.def;
+    const gap = Math.abs(g.body.x - o.body.x) - g.body.pushW - o.body.pushW;
+    const imm = throwImmunity(o);
+    if (gap > m.range) { note(g, 'throw whiff: out of range'); continue; }
+    if (imm) { note(g, `throw rejected: ${imm}`); continue; }
+    tries.push([g, o]);
+  }
+  if (tries.length === 2) {
+    tech(a, b, events); // simultaneous throws break each other
+  } else if (tries.length === 1) {
+    const [g, o] = tries[0];
+    const m = g.move.def;
+    g.move.grabbed = true;
+    const kind = m.throwAnim === 'throwFwd' && g.holdingAwayFrom(o.body.x) ? 'throwBack' : m.throwAnim;
+    g.move = null;
+    g.setState('throwing', { target: o.index, def: m, kind }, 'throwing', { blend: 3, params: { kind, duration: m.duration } });
+    o.move = null;
+    o.setState('thrown', { by: g.index, techable: m.techable, rot: 0 }, 'thrown', { blend: 4 });
+    note(g, `THROW grabbed (${kind})`);
+    events.push({ type: 'grab', who: g.index, target: o.index, x: o.body.x, y: 150 });
+  }
+  // 2) carry / tech / release
+  for (const [g, o] of [[a, b], [b, a]]) {
+    if (g.state !== 'throwing' || o.state !== 'thrown' || o.sd.by !== g.index) continue;
+    const m = g.sd.def;
+    const f = g.stateFrame;
+    if (o.sd.techable && f <= TUNING.throwTechWindow && o.input.pressed('lp', TUNING.throwTechWindow) && o.input.pressed('lk', TUNING.throwTechWindow)) {
+      o.input.consume('lp');
+      o.input.consume('lk');
+      tech(g, o, events);
+      continue;
+    }
+    const t = clamp(f / m.release, 0, 1);
+    const [px, py] = samplePath(g.sd.kind, t);
+    o.body.x = clamp(g.body.x + g.facing * px * g.props.posScale, STAGE.left + o.body.pushW, STAGE.right - o.body.pushW);
+    o.body.y = py;
+    o.body.vx = o.body.vy = 0;
+    o.body.onGround = py <= 0;
+    o.sd.rot = ROT[g.sd.kind] * t;
+    if (f === m.release) events.push(...releaseThrow(g, o, m));
+  }
+  return events;
+}
+
+function releaseThrow(g, o, m) {
+  const kind = g.sd.kind;
+  const dir = kind === 'throwBack' ? -g.facing : g.facing;
+  const hitN = o.combo.hits + 1;
+  const damage = Math.max(1, Math.round(m.damage * damageScale(hitN) * (g.stats.damage ?? 1)));
+  o.combo.hits = hitN;
+  o.combo.damage += damage;
+  o.health = Math.max(0, o.health - damage);
+  o.stun += m.stun || 0;
+  o.flash = 6;
+  g.hitstop = o.hitstop = 10;
+  g.gainMeter(damage * TUNING.meterOnHit);
+  o.gainMeter(damage * TUNING.meterOnDamaged);
+  const b = o.body;
+  b.onGround = false;
+  b.vy = kind === 'slam' ? 4 : 7.5;
+  b.vx = (dir * (kind === 'slam' ? 2 : 7)) / b.mass;
+  if (o.health <= 0) o.setState('ko', {}, 'airHit', { blend: 6, params: { launch: true, rot0: o.anim.pose.rot } });
+  else o.setState('juggle', { knockdown: true }, 'airHit', { blend: 6, params: { launch: false, rot0: o.anim.pose.rot } });
+  note(g, `THROW released dmg ${damage}`);
+  return [{ type: 'hit', who: g.index, target: o.index, x: o.body.x, y: o.body.y + 80, strength: 'heavy', move: m.id, part: 'torso',
+    damage, combo: hitN, ko: o.health <= 0, shake: 8, dir, throw: true }];
 }
 
 });
@@ -3447,9 +4178,16 @@ class FightRenderer {
     this.cam.update(fs, alpha, this.effects.shake);
     ctx.save();
     this.arena.drawBack(ctx, this.cam);
+    if (this.match.freeze) {
+      // super flash: darken the stage behind the fighters
+      const k = Math.min(1, (this.match.freeze.total - this.match.freeze.ticks) / 6);
+      ctx.fillStyle = `rgba(10,2,20,${0.62 * k})`;
+      ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+    }
     for (const f of fs) this.drawShadow(ctx, f, alpha);
     for (const i of this.drawOrder) this.drawFighter(ctx, fs[i], i, alpha, now);
     this.trails.draw(ctx, this.cam, fs.map((f) => f.def.look.rim));
+    this.drawProjectiles(ctx, now);
     this.effects.draw(ctx, this.cam);
     this.arena.drawFront(ctx, this.cam);
     if (this.effects.flash > 0.02) {
@@ -3458,6 +4196,7 @@ class FightRenderer {
     }
     ctx.restore();
     if (this.showHud) drawHud(ctx, this.match, this.hud, this.portraits);
+    if (this.match.freeze) this.drawSuperCutIn(ctx, this.match.freeze);
     if (debug?.enabled) drawDebug(ctx, this.match, this.cam, debug);
   }
 
@@ -3512,6 +4251,106 @@ class FightRenderer {
     });
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  drawProjectiles(ctx, now) {
+    for (const p of this.match.projectiles || []) {
+      const s = this.cam.toScreen(p.x, p.y);
+      const z = this.cam.zoom;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      if (p.kind === 'coin') {
+        // spinning gold coin with a glint trail
+        for (let i = 1; i <= 4; i++) {
+          ctx.fillStyle = `rgba(255,210,63,${0.18 / i})`;
+          ctx.beginPath();
+          ctx.arc(-Math.sign(p.vx) * i * 10 * z, 0, p.r * z * (1 - i * 0.12), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const w = Math.abs(Math.cos(p.age * 0.45)) * p.r * z + 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w, p.r * z, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#e2b440';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#5a3a10';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w * 0.55, p.r * z * 0.55, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = '#fff2a8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        // sonic wave: pulsing concentric arcs
+        const dir = Math.sign(p.vx);
+        for (let i = 0; i < 4; i++) {
+          const r = (p.r * 0.5 + i * 9 + (p.age % 8)) * z;
+          ctx.strokeStyle = `rgba(63,230,208,${0.9 - i * 0.2})`;
+          ctx.lineWidth = 5 - i;
+          ctx.beginPath();
+          ctx.arc(-dir * 18 * z, 0, r, dir > 0 ? -0.9 : Math.PI - 0.9, dir > 0 ? 0.9 : Math.PI + 0.9);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,63,208,0.35)';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.r * 0.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Super flash cut-in: the attacker's portrait slides in on a diagonal band with the move name. */
+  drawSuperCutIn(ctx, fr) {
+    const f = this.match.fighters[fr.who];
+    const t = 1 - fr.ticks / fr.total; // 0..1
+    const W = VIEW.width, H = VIEW.height;
+    const left = fr.who === 0;
+    const slide = t < 0.2 ? 1 - t / 0.2 : t > 0.85 ? -(t - 0.85) / 0.15 : 0;
+    const off = slide * W * (left ? -1 : 1);
+    ctx.save();
+    ctx.translate(off, 0);
+    const y0 = H * 0.3, y1 = H * 0.66;
+    ctx.beginPath();
+    ctx.moveTo(0, y0 + 40); ctx.lineTo(W, y0 - 40); ctx.lineTo(W, y1 - 40); ctx.lineTo(0, y1 + 40);
+    ctx.closePath();
+    const col = left ? '#ff3fd0' : '#3fe6d0';
+    const g = ctx.createLinearGradient(0, y0, W, y1);
+    g.addColorStop(0, rgba(col, 0.92));
+    g.addColorStop(1, 'rgba(20,6,30,0.95)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    // speed lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) {
+      const yy = y0 + ((i * 37 + this.cam.t * 9) % (y1 - y0 + 80)) - 40;
+      ctx.beginPath();
+      ctx.moveTo(0, yy); ctx.lineTo(W, yy - 80);
+      ctx.stroke();
+    }
+    const img = this.portraits[f.def.id];
+    if (img && img.complete && img.naturalWidth) {
+      const ph = (y1 - y0) * 1.9, pw = ph * (img.naturalWidth / img.naturalHeight);
+      const px = left ? 60 : W - 60 - pw;
+      ctx.drawImage(img, 0, img.naturalHeight * 0.02, img.naturalWidth, img.naturalHeight * 0.55, px, y0 - 40, pw, ph * 0.55);
+    }
+    ctx.restore();
+    ctx.font = '900 64px "Arial Black", Impact, sans-serif';
+    ctx.textAlign = left ? 'right' : 'left';
+    const tx = left ? W - 60 : 60;
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#120816';
+    ctx.strokeText(fr.name.toUpperCase(), tx, H * 0.53);
+    ctx.fillStyle = '#fff6c8';
+    ctx.fillText(fr.name.toUpperCase(), tx, H * 0.53);
+    ctx.font = '900 22px "Arial Black", Impact, sans-serif';
+    ctx.fillStyle = col;
+    ctx.strokeText('SUPER', tx, H * 0.53 - 62);
+    ctx.fillText('SUPER', tx, H * 0.53 - 62);
+    ctx.restore();
   }
 
   drawDizzyStars(ctx, f, skel, x, y, now) {
@@ -3660,17 +4499,10 @@ class FighterPainter {
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
     push(8, (p) => this.drawArm(ctx, p, J, A, 'F'));
-    // Layer overrides from the current animation. Depth order is always:
-    //   far arm < far leg < torso < near leg < near arm.
-    // An attack may bring a far limb in front of the torso, and a near leg in front of the torso,
-    // but a far limb never covers the matching near limb (that would swap left and right).
-    const Z_FRONT = { ba: 6.5, bl: 4.6, fl: 6.55 };
-    const zFor = { ba: 1, bl: 2, fl: 5, fa: 8 };
-    for (const k in layers) {
-      if (layers[k] !== 'front' || !(k in Z_FRONT)) continue;
-      const g = groups.find((gr) => gr.z === zFor[k]);
-      if (g) g.z = Z_FRONT[k];
-    }
+    // Fixed depth order: far arm < far leg < torso < near leg < near arm. Attack animations do not
+    // re-layer limbs: switching layers mid-move makes a limb "pop" over the body for a frame and
+    // makes the far (left) limb read as the near (right) one.
+    void layers;
     groups.sort((a, b) => a.z - b.z);
     for (const g of groups) {
       g.fn('outline');
@@ -5378,6 +6210,33 @@ class Effects {
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
         break;
       }
+      case 'parry':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 9, life: 16, max: 16, color: '#7fe8ff' });
+        this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 16, max: 16, dir: 1 });
+        this.labels.push({ text: 'PARRY!', x: e.x, y: e.y + 70, life: 55, color: '#7fe8ff' });
+        this.shake = Math.max(this.shake, 4);
+        break;
+      case 'tech':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffffff' });
+        this.labels.push({ text: 'TECH', x: e.x, y: e.y + 60, life: 45, color: '#ffffff' });
+        break;
+      case 'grab':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 6, vr: 5, life: 10, max: 10, color: '#ffd23f' });
+        break;
+      case 'teleport':
+        for (const x of [e.from, e.to]) {
+          for (let i = 0; i < 14; i++) {
+            const a = this.rnd() * Math.PI * 2;
+            this.parts.push({ kind: 'spark', x, y: 40 + this.rnd() * 180, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 18, max: 18, color: '#c27bff', w: 2 });
+          }
+        }
+        break;
+      case 'projectileEnd':
+        for (let i = 0; i < 6; i++) {
+          const a = this.rnd() * Math.PI * 2;
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : '#3fe6d0', w: 2 });
+        }
+        break;
       case 'whiff':
         // a faint air-cut arc: readable as a miss, clearly different from hit sparks / block shields
         this.parts.push({ kind: 'whiff', x: e.x, y: e.y, dir: e.dir, life: 10, max: 10, r: e.strength === 'light' ? 16 : 26 });
@@ -5504,14 +6363,11 @@ class Trails {
   tick(fighters) {
     fighters.forEach((f, i) => {
       const h = this.hist[i];
-      const mv = f.move;
       if (f.hitstop > 0) return;
-      if (mv && mv.frame >= Math.max(1, mv.def.startup - 4) && mv.frame <= mv.def.startup + mv.def.active + 1) {
-        const hb = mv.def.hitboxes[mv.def.hitboxes.length - 1];
-        let name = hb.b || hb.a;
-        if (f.stance === 1) name = name.endsWith('F') ? name.slice(0, -1) + 'B' : name.slice(0, -1) + 'F';
-        const p = f.skel.j[name];
-        if (p) h.push({ x: f.body.x + p.x * f.facing, y: f.body.y + p.y, life: 8, strength: mv.def.strength });
+      // follow the tip of the strike that is actually active this tick (works for any move type)
+      if (f.hitboxes?.length && f.hitSpec) {
+        const hb = f.hitboxes[f.hitboxes.length - 1];
+        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength });
       }
       for (const p of h) p.life--;
       while (h.length && h[0].life <= 0) h.shift();
@@ -5961,6 +6817,39 @@ function portraitIcon(ctx, img, cx, cy, r, color, flip) {
   ctx.restore();
 }
 
+/** Super meter: bottom corners. Full = SUPER READY; after a super it is locked for a while. */
+function drawMeter(ctx, f, left, col) {
+  const W = VIEW.width, H = VIEW.height;
+  const w = 300, h = 16, y = H - 44;
+  const x = left ? 40 : W - 40 - w;
+  const k = Math.max(0, Math.min(1, f.meter / 100));
+  slanted(ctx, x - 4, y - 4, w + 8, h + 8, left ? 8 : -8);
+  ctx.fillStyle = 'rgba(12,6,18,0.85)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = rgba(col, 0.8);
+  ctx.stroke();
+  const fw = w * k;
+  slanted(ctx, left ? x : x + w - fw, y, fw, h, left ? 6 : -6);
+  const ready = k >= 1;
+  const pulse = 0.75 + 0.25 * Math.sin(performance.now() / 120);
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, ready ? '#ffffff' : '#7fe8ff');
+  g.addColorStop(1, ready ? col : '#2a6aff');
+  ctx.globalAlpha = ready ? pulse : 1;
+  ctx.fillStyle = f.superLock > 0 ? '#4a4458' : g;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.font = `900 13px ${FONT}`;
+  ctx.textAlign = left ? 'left' : 'right';
+  const label = f.superLock > 0 ? `SUPER COOLDOWN ${Math.ceil(f.superLock / 60)}s` : ready ? 'SUPER READY  ↓↘→↓↘→ + P' : 'SUPER';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#120816';
+  ctx.strokeText(label, left ? x : x + w, y - 8);
+  ctx.fillStyle = ready ? '#fff6c8' : '#cdbfe0';
+  ctx.fillText(label, left ? x : x + w, y - 8);
+}
+
 function drawHud(ctx, match, hud, portraits) {
   const W = VIEW.width;
   const fs = match.fighters;
@@ -6022,6 +6911,7 @@ function drawHud(ctx, match, hud, portraits) {
       ctx.stroke();
     }
     portraitIcon(ctx, portraits[f.def.id], left ? 58 : W - 58, top + 22, 38, col, !left);
+    drawMeter(ctx, f, left, col);
     // combo counter
     const c = hud.combo[i];
     if (c && c.hits >= 2) {
@@ -6224,15 +7114,24 @@ const { Rng } = __require("src/core/rng.js");
 const { emptyRaw } = __require("src/input/inputBuffer.js");
 
 const AI_LEVELS = {
-  easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22] },
-  normal: { reaction: 15, block: 0.55, antiAir: 0.45, aggression: 0.5, combo: 0.6, punish: 0.6, think: [6, 14] },
-  hard: { reaction: 9, block: 0.82, antiAir: 0.75, aggression: 0.6, combo: 0.9, punish: 0.9, think: [3, 9] },
+  easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22], tech: 0.1, throws: 0.08, signature: 0.12, super: 0.25 },
+  normal: { reaction: 15, block: 0.55, antiAir: 0.45, aggression: 0.5, combo: 0.6, punish: 0.6, think: [6, 14], tech: 0.35, throws: 0.15, signature: 0.2, super: 0.5 },
+  hard: { reaction: 9, block: 0.82, antiAir: 0.75, aggression: 0.6, combo: 0.9, punish: 0.9, think: [3, 9], tech: 0.6, throws: 0.22, signature: 0.28, super: 0.8 },
 };
 
 const M = {
   s1: [{ d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['lp'], n: 2 }],
   s2: [{ d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', b: ['hp'], n: 2 }],
   s3: [{ d: 'd', n: 2 }, { d: 'db', n: 2 }, { d: 'b', b: ['hk'], n: 2 }],
+  s4: [{ d: 'd', n: 2 }, { d: 'db', n: 2 }, { d: 'b', b: ['hp'], n: 2 }],
+  su: [{ d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['hp'], n: 2 }],
+  throw: [{ d: '', b: ['lp', 'lk'], n: 2 }, { d: '', n: 2 }],
+};
+
+/** How each fighter likes to use its signature move: [min distance, max distance]. */
+const SIGNATURE_RANGE = {
+  brick: [110, 230], rattigan: [280, 700], smiles: [170, 330], jax: [260, 700],
+  vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
 };
 const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 
@@ -6283,6 +7182,11 @@ class AIController {
     const me = match.fighters[this.index];
     const seen = this.perceive(match);
     if (match.phase !== 'fight') return emptyRaw();
+    // Throw escape: mash LP+LK right after being grabbed (with a reaction chance).
+    if (me.state === 'thrown') {
+      if (me.stateFrame === 2) this.techTry = this.rng.chance(this.cfg.tech);
+      return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
+    }
     // Run the current macro.
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];
@@ -6327,6 +7231,35 @@ class AIController {
     const dist = Math.abs(op.x - me.body.x);
     this.cooldown = r.int(cfg.think[0], cfg.think[1]);
     if (!me.actionable && me.state !== 'land') return;
+    const gap = dist - me.body.pushW - opF.body.pushW;
+    // Super: only with a full bar, up close or as a punish.
+    if (me.meter >= 100 && me.superLock === 0 && gap < 120 && (op.phase === 'recovery' || r.chance(cfg.super * 0.4))) {
+      this.queue(M.su);
+      return;
+    }
+    // Incoming projectile: block it (or jump over it on higher levels).
+    const proj = (match.projectiles || []).find((p) => p.owner !== this.index && Math.abs(p.x - me.body.x) < 260 && Math.sign(me.body.x - p.x) === Math.sign(p.vx));
+    if (proj) {
+      if (r.chance(cfg.antiAir * 0.5)) this.queue([{ d: 'uf', n: 3 }]);
+      else this.hold = { d: 'b', n: 24 };
+      return;
+    }
+    // Counter stance (Vellaro): read an incoming strike.
+    if (me.def.id === 'vellaro' && op.move && op.phase === 'startup' && op.move.height !== 'low' && dist < 240 && r.chance(cfg.signature)) {
+      this.queue(M.s4);
+      return;
+    }
+    // Signature special in its preferred range.
+    const range = SIGNATURE_RANGE[me.def.id];
+    if (range && gap >= range[0] - 60 && gap <= range[1] && !me.projectileOut && r.chance(cfg.signature * 0.6)) {
+      this.queue(M.s4);
+      return;
+    }
+    // Throw a turtling or idle opponent at close range.
+    if (gap < 24 && (opF.state === 'guardHigh' || opF.state === 'guardLow' || opF.actionable) && r.chance(cfg.throws)) {
+      this.queue(M.throw);
+      return;
+    }
 
     // Defence: block an attack we have "seen" coming.
     if (op.move && (op.phase === 'startup' || op.phase === 'active') && dist < 300) {
@@ -6359,8 +7292,9 @@ class AIController {
     }
     const aggr = cfg.aggression;
     if (dist > 330) {
-      if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
-      else if (r.chance(0.08)) this.queue([{ d: 'uf', n: 3 }]);
+      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: r.int(24, 36) }]); // dash into a run
+      else if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
+      else if (r.chance(0.14)) this.queue([{ d: 'uf', n: 3 }]);
       else this.hold = { d: 'f', n: r.int(10, 24) };
       return;
     }
@@ -6470,6 +7404,9 @@ class TitleScene {
           ['Surge Fist', '↓ ↘ → + punch', ''],
           ['Skybreaker', '→ ↓ ↘ + punch', ''],
           ['Whirl Kick', '↓ ↙ ← + kick', ''],
+          ['Signature special (unique per fighter)', '↓ ↙ ← + punch', ''],
+          ['SUPER (needs a full bar)', '↓ ↘ → ↓ ↘ → + punch', ''],
+          ['Throw / escape a throw (tech)', 'LP + LK together (F + V)', 'I + K'],
           ['Uppercut / Sweep', '↓ + HP  /  ↓ + HK', ''],
           ['Debug', 'F1 overlay · F2 slow-mo · F3 pause · F4 frame step', ''],
         ].map((r) => el('tr', {}, r.map((c) => el('td', {}, [c])))),

@@ -32,21 +32,39 @@ export function buildHurtboxes(fighter) {
   return boxes;
 }
 
+/**
+ * Hit spec active on the current frame: the move itself for ordinary strikes, the current step's
+ * spec for sequences (multi-hit specials / supers), or null (not active, throws, counters, projectiles).
+ */
+export function activeSpec(fighter) {
+  const mv = fighter.move;
+  if (!mv) return null;
+  const m = mv.def;
+  if (m.type === 'throw' || m.type === 'counter') return null;
+  if (m.steps) {
+    for (const st of m.steps) if (st.spec && mv.frame >= st.hitFrom && mv.frame <= st.hitTo) return st.spec;
+    return null;
+  }
+  if (!m.hitboxes?.length) return null;
+  if (mv.frame <= m.startup || mv.frame > m.startup + m.active) return null;
+  return m;
+}
+
 /** Hitboxes of the current move on its current frame (empty outside the active window). */
 export function buildHitboxes(fighter) {
-  const mv = fighter.move;
-  if (!mv) return [];
-  const m = mv.def;
-  const f = mv.frame;
-  if (f <= m.startup || f > m.startup + m.active) return [];
+  const spec = activeSpec(fighter);
+  fighter.hitSpec = spec;
+  if (!spec) return [];
   const { j } = fighter.skel;
   const { x, y } = fighter.body;
   const W = (p) => w(x, y, fighter.facing, p);
-  const local = f - m.startup; // 1..active
+  const local = fighter.move.frame - fighter.move.def.startup; // 1..active for plain strikes
   const out = [];
-  for (const hb of m.hitboxes) {
-    if (hb.from && local < hb.from) continue;
-    if (hb.to && local > hb.to) continue;
+  for (const hb of spec.hitboxes) {
+    if (!fighter.move.def.steps) {
+      if (hb.from && local < hb.from) continue;
+      if (hb.to && local > hb.to) continue;
+    }
     const an = fighter.stance === 1 ? swapSide(hb.a) : hb.a;
     const bn = fighter.stance === 1 ? swapSide(hb.b || hb.a) : hb.b || hb.a;
     out.push({ a: W(j[an]), b: W(j[bn]), r: hb.r * (fighter.props.posScale ** 0.5) });

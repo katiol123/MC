@@ -43,6 +43,33 @@ export class Effects {
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
         break;
       }
+      case 'parry':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 9, life: 16, max: 16, color: '#7fe8ff' });
+        this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 16, max: 16, dir: 1 });
+        this.labels.push({ text: 'PARRY!', x: e.x, y: e.y + 70, life: 55, color: '#7fe8ff' });
+        this.shake = Math.max(this.shake, 4);
+        break;
+      case 'tech':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffffff' });
+        this.labels.push({ text: 'TECH', x: e.x, y: e.y + 60, life: 45, color: '#ffffff' });
+        break;
+      case 'grab':
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 6, vr: 5, life: 10, max: 10, color: '#ffd23f' });
+        break;
+      case 'teleport':
+        for (const x of [e.from, e.to]) {
+          for (let i = 0; i < 14; i++) {
+            const a = this.rnd() * Math.PI * 2;
+            this.parts.push({ kind: 'spark', x, y: 40 + this.rnd() * 180, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 18, max: 18, color: '#c27bff', w: 2 });
+          }
+        }
+        break;
+      case 'projectileEnd':
+        for (let i = 0; i < 6; i++) {
+          const a = this.rnd() * Math.PI * 2;
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : '#3fe6d0', w: 2 });
+        }
+        break;
       case 'whiff':
         // a faint air-cut arc: readable as a miss, clearly different from hit sparks / block shields
         this.parts.push({ kind: 'whiff', x: e.x, y: e.y, dir: e.dir, life: 10, max: 10, r: e.strength === 'light' ? 16 : 26 });
@@ -169,14 +196,11 @@ export class Trails {
   tick(fighters) {
     fighters.forEach((f, i) => {
       const h = this.hist[i];
-      const mv = f.move;
       if (f.hitstop > 0) return;
-      if (mv && mv.frame >= Math.max(1, mv.def.startup - 4) && mv.frame <= mv.def.startup + mv.def.active + 1) {
-        const hb = mv.def.hitboxes[mv.def.hitboxes.length - 1];
-        let name = hb.b || hb.a;
-        if (f.stance === 1) name = name.endsWith('F') ? name.slice(0, -1) + 'B' : name.slice(0, -1) + 'F';
-        const p = f.skel.j[name];
-        if (p) h.push({ x: f.body.x + p.x * f.facing, y: f.body.y + p.y, life: 8, strength: mv.def.strength });
+      // follow the tip of the strike that is actually active this tick (works for any move type)
+      if (f.hitboxes?.length && f.hitSpec) {
+        const hb = f.hitboxes[f.hitboxes.length - 1];
+        h.push({ x: hb.b.x, y: hb.b.y, life: 8, strength: f.hitSpec.strength });
       }
       for (const p of h) p.life--;
       while (h.length && h[0].life <= 0) h.shift();

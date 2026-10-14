@@ -123,17 +123,10 @@ export class FighterPainter {
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
     push(8, (p) => this.drawArm(ctx, p, J, A, 'F'));
-    // Layer overrides from the current animation. Depth order is always:
-    //   far arm < far leg < torso < near leg < near arm.
-    // An attack may bring a far limb in front of the torso, and a near leg in front of the torso,
-    // but a far limb never covers the matching near limb (that would swap left and right).
-    const Z_FRONT = { ba: 6.5, bl: 4.6, fl: 6.55 };
-    const zFor = { ba: 1, bl: 2, fl: 5, fa: 8 };
-    for (const k in layers) {
-      if (layers[k] !== 'front' || !(k in Z_FRONT)) continue;
-      const g = groups.find((gr) => gr.z === zFor[k]);
-      if (g) g.z = Z_FRONT[k];
-    }
+    // Fixed depth order: far arm < far leg < torso < near leg < near arm. Attack animations do not
+    // re-layer limbs: switching layers mid-move makes a limb "pop" over the body for a frame and
+    // makes the far (left) limb read as the near (right) one.
+    void layers;
     groups.sort((a, b) => a.z - b.z);
     for (const g of groups) {
       g.fn('outline');

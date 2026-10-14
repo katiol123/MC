@@ -36,4 +36,18 @@ export const TUNING = {
   stunDecayPerTick: 0.35, // dizzy meter recovery
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },
   roundTimeSeconds: 99,
+
+  // Throws
+  throwTechWindow: 9, // frames after being grabbed in which LP+LK escapes a normal throw
+
+  // Super meter (anti-spam: a super costs the whole bar, builds no meter itself, and locks
+  // meter gain for superCooldown ticks afterwards, so at most ~1 super per round is realistic)
+  superCost: 100,
+  superCooldown: 480, // 8 s without meter gain after using a super
+  superFreeze: 48, // cinematic freeze when a super starts
+  superMotionWindow: 26,
+  meterOnHit: 0.09, // fraction of damage dealt
+  meterOnBlock: 0.05,
+  meterOnDamaged: 0.06, // fraction of damage taken
+  meterOnSpecialWhiff: 2,
 };

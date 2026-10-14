@@ -5,7 +5,7 @@ import { STANCE } from './poses.js';
 import { ease, clamp } from '../core/math.js';
 
 /** Maximum change per tick (speed control): keeps the body from snapping between key poses. */
-const MAX_SPEED = { limb: 46, spine: 9, head: 10, rot: 45, pos: 22 };
+const MAX_SPEED = { limb: 46, leg: 34, spine: 9, head: 10, rot: 45, pos: 22 };
 
 const SWAP_LAYER = { fa: 'ba', ba: 'fa', fl: 'bl', bl: 'fl' };
 
@@ -41,7 +41,7 @@ export class Animator {
     this.frame++;
     const clip = CLIPS[this.clipId];
     let pose = clip.sample(this.frame, ctx, this.params, this.props);
-    let layers = clip.layers ? clip.layers(this.params) : null;
+    let layers = clip.layers ? clip.layers(this.params, ctx) : null;
     if (ctx.stance === 1) {
       swapStance(pose);
       if (layers) {
@@ -76,7 +76,8 @@ export class Animator {
     // Arms are limited directly; IK legs keep their foot targets (planted feet win over speed).
     for (const k of LIMBS) {
       if ((k === 'fl' && pose.ff) || (k === 'bl' && pose.bf)) continue;
-      for (let i = 0; i < 3; i++) pose[k][i] = lim(prev[k][i], pose[k][i], MAX_SPEED.limb);
+      const max = k === 'fl' || k === 'bl' ? MAX_SPEED.leg : MAX_SPEED.limb;
+      for (let i = 0; i < 3; i++) pose[k][i] = lim(prev[k][i], pose[k][i], max);
     }
     finalizePose(pose, this.props);
   }

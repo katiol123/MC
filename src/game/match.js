@@ -5,7 +5,7 @@ import { STAGE_CENTER } from '../config/constants.js';
 import { Fighter } from '../fighter/fighter.js';
 import { buildFighterDef } from '../data/fighters.js';
 import { resolvePushboxes, enforceSeparation } from '../physics/world.js';
-import { resolveExchange } from '../combat/hitResolver.js';
+import { resolveExchange, resolveThrows, updateProjectiles } from '../combat/hitResolver.js';
 import { emptyRaw } from '../input/inputBuffer.js';
 
 const START_GAP = 170;
@@ -25,11 +25,26 @@ export class Match {
       new Fighter(d2, 1, STAGE_CENTER + START_GAP, -1),
     ];
     this.events = [];
-    for (const f of this.fighters) f.emit = (e) => this.events.push(e);
+    for (const f of this.fighters) {
+      f.emit = (e) => this.events.push(e);
+      f.spawnProjectile = (owner, p) => this.spawnProjectile(owner, p);
+    }
     this.restart();
   }
 
+  spawnProjectile(f, p) {
+    const s = f.props.posScale;
+    this.projectiles.push({
+      owner: f.index, kind: p.kind, x: f.body.x + f.facing * 46 * s, y: f.body.y + p.y * s, vx: f.facing * p.speed,
+      r: p.r, life: p.life, age: 0, hitsLeft: p.hits || 1, interval: p.interval || 6, cooldown: 0,
+      hitIds: new Set(), hits: 0, contact: null,
+      spec: { strength: 'special', priority: 1, juggle: 1, launch: { vx: 3, vy: 6 }, ...p.hit, id: `proj:${p.kind}`, isSpecial: true, projectile: true },
+    });
+    this.events.push({ type: 'projectile', who: f.index, kind: p.kind });
+  }
+
   restart() {
+    for (const f of this.fighters) f.meter = 0;
     this.wins = [0, 0];
     this.round = 0;
     this.winner = null;
@@ -45,6 +60,8 @@ export class Match {
     this.timer = this.opts.roundTime > 0 ? this.opts.roundTime * 60 : Infinity;
     this.roundResult = null;
     this.posed = false;
+    this.projectiles = [];
+    this.freeze = null;
     const [a, b] = this.fighters;
     a.reset(STAGE_CENTER - START_GAP, 1);
     b.reset(STAGE_CENTER + START_GAP, -1);
@@ -90,11 +107,19 @@ export class Match {
     const [a, b] = this.fighters;
     a.snapshot();
     b.snapshot();
+    if (this.freeze) {
+      // Super flash: the world stops while the super is announced (inputs keep buffering).
+      a.input.push(raws[0], a.facing, true);
+      b.input.push(raws[1], b.facing, true);
+      if (--this.freeze.ticks <= 0) this.freeze = null;
+      return;
+    }
     a.pushInput(raws[0]);
     b.pushInput(raws[1]);
     const movedA = a.update(b);
     const movedB = b.update(a);
-    resolvePushboxes(a.body, b.body, a.facing);
+    const throwing = [a, b].some((f) => f.state === 'thrown' || f.state === 'throwing');
+    if (!throwing) resolvePushboxes(a.body, b.body, a.facing);
     enforceSeparation(a.body, b.body);
     for (const [f, o] of [[a, b], [b, a]]) {
       if (f.canTurn && f.body.onGround) {
@@ -108,8 +133,19 @@ export class Match {
     // Frozen (hitstop) fighters keep their pose but their volumes follow any position change.
     a.updatePose(movedA);
     b.updatePose(movedB);
+    const throwEvents = resolveThrows(this.fighters);
+    for (const e of throwEvents) this.events.push(e);
+    if (throwEvents.length || [a, b].some((f) => f.state === 'thrown')) {
+      // throws move bodies directly (carry, tech push-apart): rebuild volumes and floor clamp
+      for (const f of [a, b]) f.updatePose(false);
+    }
     const ev = resolveExchange(a, b);
     for (const e of ev) this.events.push(e);
+    for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
+    a.projectileOut = this.projectiles.some((p) => p.owner === 0);
+    b.projectileOut = this.projectiles.some((p) => p.owner === 1);
+    const sup = this.events.find((e) => e.type === 'superStart');
+    if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
   }
 
   updateFight() {
@@ -119,6 +155,8 @@ export class Match {
       for (const f of this.fighters) {
         if (f.health <= 0) f.health = 1;
         if (f.actionable && f.stateFrame > 50 && f.health < f.maxHealth) f.health = f.maxHealth;
+        // training: the super bar refills once its cooldown is over
+        if (f.actionable && f.superLock === 0) f.meter = 100;
       }
       if (a.state === 'ko') a.setState('juggle', { knockdown: true }, 'airHit');
       if (b.state === 'ko') b.setState('juggle', { knockdown: true }, 'airHit');

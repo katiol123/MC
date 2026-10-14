@@ -97,6 +97,7 @@ export class InputBuffer {
    * appear in order within `window` frames; the last direction may be held on the press tick.
    */
   motion(seq, endTick = this.tick, window = TUNING.motionWindow) {
+    window = window ?? TUNING.motionWindow;
     const digits = seq.split('').map(Number);
     let idx = digits.length - 1;
     for (let i = this.hist.length - 1; i >= 0 && idx >= 0; i--) {
@@ -108,24 +109,26 @@ export class InputBuffer {
     return idx < 0;
   }
 
-  /** Double tap of a direction (6 = forward dash, 4 = back dash) finishing on this tick. */
+  /**
+   * Double tap of a direction (6 = forward dash, 4 = back dash) finishing on this tick. The stick
+   * must return to neutral between the taps, so motions like 236236 (which pass 6 -> 2 -> 6) never
+   * trigger a dash.
+   */
   doubleTap(d, window = TUNING.dashWindow) {
     const n = this.hist.length;
     if (n < 3) return false;
-    const isD = (e) => e.dir === d;
     const cur = this.hist[n - 1], prev = this.hist[n - 2];
     if (!(cur.dir === d && prev.dir !== d)) return false;
-    let sawRelease = false;
+    let sawNeutral = false;
     for (let i = n - 2; i >= 0; i--) {
       const e = this.hist[i];
       if (cur.tick - e.tick > window) return false;
-      if (!isD(e)) sawRelease = true;
-      else if (sawRelease) {
-        // ensure the first tap wasn't already used for a dash
-        if (this.lastDashTick && e.tick <= this.lastDashTick) return false;
+      if (e.dir === 5) sawNeutral = true;
+      else if (e.dir === d && sawNeutral) {
+        if (this.lastDashTick && e.tick <= this.lastDashTick) return false; // first tap already used
         this.lastDashTick = cur.tick;
         return true;
-      }
+      } else return false;
     }
     return false;
   }

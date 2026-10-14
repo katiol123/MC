@@ -124,3 +124,13 @@ test('stun meter: a full dizzy meter puts the defender into the dizzy state afte
   run(m, 200);
   assert.notEqual(b.state, 'dizzy', 'recovers from dizzy');
 });
+
+test('a super motion (236236) never triggers a forward dash; 6-5-6 still does', () => {
+  const m = fightingMatch();
+  place(m, 600, 1400);
+  const f = m.fighters[0];
+  const seq = [{ down: true }, { down: true, right: true }, { right: true }, { down: true }, { down: true, right: true }, { right: true }];
+  const ev = run(m, 14, (i) => [raw(seq[Math.floor(i / 2)] || {}), raw()]);
+  assert.ok(!ev.some((e) => e.type === 'dash'));
+  assert.notEqual(f.state, 'dashF');
+});

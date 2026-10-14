@@ -139,6 +139,26 @@ export class AudioSystem {
         this.tone(1.2, { freq: 110, to: 30, gain: 0.8 });
         this.noise(0.9, { freq: 400, type: 'lowpass', gain: 0.6 });
         break;
+      case 'superStart':
+        this.tone(0.6, { freq: 140, to: 900, type: 'sawtooth', gain: 0.18 });
+        this.noise(0.7, { freq: 2500, q: 0.6, gain: 0.35, sweep: 0.2 });
+        break;
+      case 'parry':
+        this.tone(0.3, { freq: 1800, to: 2600, type: 'triangle', gain: 0.2 });
+        this.noise(0.12, { freq: 5000, q: 5, gain: 0.25 });
+        break;
+      case 'tech':
+        this.noise(0.1, { freq: 2200, q: 2, gain: 0.3 });
+        break;
+      case 'grab':
+        this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
+        break;
+      case 'projectile':
+        this.tone(0.25, { freq: e.kind === 'coin' ? 1400 : 300, to: e.kind === 'coin' ? 2200 : 160, type: e.kind === 'coin' ? 'triangle' : 'sawtooth', gain: 0.15 });
+        break;
+      case 'teleport':
+        this.tone(0.3, { freq: 200, to: 1600, type: 'sine', gain: 0.2 });
+        break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });
         break;

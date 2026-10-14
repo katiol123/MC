@@ -61,9 +61,16 @@ export class FightRenderer {
     this.cam.update(fs, alpha, this.effects.shake);
     ctx.save();
     this.arena.drawBack(ctx, this.cam);
+    if (this.match.freeze) {
+      // super flash: darken the stage behind the fighters
+      const k = Math.min(1, (this.match.freeze.total - this.match.freeze.ticks) / 6);
+      ctx.fillStyle = `rgba(10,2,20,${0.62 * k})`;
+      ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+    }
     for (const f of fs) this.drawShadow(ctx, f, alpha);
     for (const i of this.drawOrder) this.drawFighter(ctx, fs[i], i, alpha, now);
     this.trails.draw(ctx, this.cam, fs.map((f) => f.def.look.rim));
+    this.drawProjectiles(ctx, now);
     this.effects.draw(ctx, this.cam);
     this.arena.drawFront(ctx, this.cam);
     if (this.effects.flash > 0.02) {
@@ -72,6 +79,7 @@ export class FightRenderer {
     }
     ctx.restore();
     if (this.showHud) drawHud(ctx, this.match, this.hud, this.portraits);
+    if (this.match.freeze) this.drawSuperCutIn(ctx, this.match.freeze);
     if (debug?.enabled) drawDebug(ctx, this.match, this.cam, debug);
   }
 
@@ -126,6 +134,106 @@ export class FightRenderer {
     });
     ctx.restore();
     if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+  }
+
+  drawProjectiles(ctx, now) {
+    for (const p of this.match.projectiles || []) {
+      const s = this.cam.toScreen(p.x, p.y);
+      const z = this.cam.zoom;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      if (p.kind === 'coin') {
+        // spinning gold coin with a glint trail
+        for (let i = 1; i <= 4; i++) {
+          ctx.fillStyle = `rgba(255,210,63,${0.18 / i})`;
+          ctx.beginPath();
+          ctx.arc(-Math.sign(p.vx) * i * 10 * z, 0, p.r * z * (1 - i * 0.12), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const w = Math.abs(Math.cos(p.age * 0.45)) * p.r * z + 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w, p.r * z, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#e2b440';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#5a3a10';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w * 0.55, p.r * z * 0.55, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = '#fff2a8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        // sonic wave: pulsing concentric arcs
+        const dir = Math.sign(p.vx);
+        for (let i = 0; i < 4; i++) {
+          const r = (p.r * 0.5 + i * 9 + (p.age % 8)) * z;
+          ctx.strokeStyle = `rgba(63,230,208,${0.9 - i * 0.2})`;
+          ctx.lineWidth = 5 - i;
+          ctx.beginPath();
+          ctx.arc(-dir * 18 * z, 0, r, dir > 0 ? -0.9 : Math.PI - 0.9, dir > 0 ? 0.9 : Math.PI + 0.9);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,63,208,0.35)';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.r * 0.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Super flash cut-in: the attacker's portrait slides in on a diagonal band with the move name. */
+  drawSuperCutIn(ctx, fr) {
+    const f = this.match.fighters[fr.who];
+    const t = 1 - fr.ticks / fr.total; // 0..1
+    const W = VIEW.width, H = VIEW.height;
+    const left = fr.who === 0;
+    const slide = t < 0.2 ? 1 - t / 0.2 : t > 0.85 ? -(t - 0.85) / 0.15 : 0;
+    const off = slide * W * (left ? -1 : 1);
+    ctx.save();
+    ctx.translate(off, 0);
+    const y0 = H * 0.3, y1 = H * 0.66;
+    ctx.beginPath();
+    ctx.moveTo(0, y0 + 40); ctx.lineTo(W, y0 - 40); ctx.lineTo(W, y1 - 40); ctx.lineTo(0, y1 + 40);
+    ctx.closePath();
+    const col = left ? '#ff3fd0' : '#3fe6d0';
+    const g = ctx.createLinearGradient(0, y0, W, y1);
+    g.addColorStop(0, rgba(col, 0.92));
+    g.addColorStop(1, 'rgba(20,6,30,0.95)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    // speed lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) {
+      const yy = y0 + ((i * 37 + this.cam.t * 9) % (y1 - y0 + 80)) - 40;
+      ctx.beginPath();
+      ctx.moveTo(0, yy); ctx.lineTo(W, yy - 80);
+      ctx.stroke();
+    }
+    const img = this.portraits[f.def.id];
+    if (img && img.complete && img.naturalWidth) {
+      const ph = (y1 - y0) * 1.9, pw = ph * (img.naturalWidth / img.naturalHeight);
+      const px = left ? 60 : W - 60 - pw;
+      ctx.drawImage(img, 0, img.naturalHeight * 0.02, img.naturalWidth, img.naturalHeight * 0.55, px, y0 - 40, pw, ph * 0.55);
+    }
+    ctx.restore();
+    ctx.font = '900 64px "Arial Black", Impact, sans-serif';
+    ctx.textAlign = left ? 'right' : 'left';
+    const tx = left ? W - 60 : 60;
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#120816';
+    ctx.strokeText(fr.name.toUpperCase(), tx, H * 0.53);
+    ctx.fillStyle = '#fff6c8';
+    ctx.fillText(fr.name.toUpperCase(), tx, H * 0.53);
+    ctx.font = '900 22px "Arial Black", Impact, sans-serif';
+    ctx.fillStyle = col;
+    ctx.strokeText('SUPER', tx, H * 0.53 - 62);
+    ctx.fillText('SUPER', tx, H * 0.53 - 62);
+    ctx.restore();
   }
 
   drawDizzyStars(ctx, f, skel, x, y, now) {

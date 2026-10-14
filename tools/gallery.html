@@ -17,7 +17,8 @@ function render(id, clipSpec, cx, cy, s, label) {
   const def = buildFighterDef(id);
   const f = new Fighter(def, 0, 1000, 1);
   const sec = new SecondaryMotion(def);
-  const [clip, a, b] = clipSpec.split(':');
+  let [clip, a, b] = clipSpec.split(':');
+  if (clip === 'attack' && a === 's4!') a = 's4';
   let frames = Number(q.get('frame') || 30);
   if (clip === 'attack') {
     const m = def.moves[a];
@@ -35,7 +36,13 @@ function render(id, clipSpec, cx, cy, s, label) {
   ctx.fillStyle = '#fff'; ctx.fillText(label, cx - 60, cy + 20);
   ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(cx - 120, cy); ctx.lineTo(cx + 120, cy); ctx.stroke();
 }
-if (q.get('fighter')) {
+if (q.get('sig')) {
+  // contact pose of each fighter's signature special (or super steps)
+  ROSTER.forEach((r, i) => {
+    const m = buildFighterDef(r.id).moves[q.get('sig')];
+    render(r.id, `attack:${q.get('sig')}:${Number(q.get('frame')) || m.startup + 1}`, 110 + (i % 4) * 400, 420 + Math.floor(i / 4) * 440, scale, `${r.id} ${m.name}`);
+  });
+} else if (q.get('fighter')) {
   const clips = (q.get('clips') || 'idle,walk,crouch,attack:lp,attack:hp,attack:lk,attack:hk,attack:chp').split(',');
   const dx = Number(q.get('dx') || 260), cy = Number(q.get('cy') || 400), ox = Number(q.get('ox') || 120);
   clips.forEach((cl, i) => render(q.get('fighter'), cl, ox + (i % 6) * dx, cy + Math.floor(i / 6) * 440, scale, cl));

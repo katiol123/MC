@@ -47,7 +47,7 @@ test('every hit/block event happens while the attacker is in its active window (
     for (let t = 0; t < 2400 && m.phase === 'fight'; t++) {
       const ev = m.tick([ai[0].input(m), ai[1].input(m)]);
       for (const e of ev) {
-        if ((e.type !== 'hit' && e.type !== 'block') || e.trade) continue;
+        if ((e.type !== 'hit' && e.type !== 'block') || e.trade || String(e.move).startsWith('proj:') || e.throw) continue;
         const f = m.fighters[e.who];
         const mv = f.move;
         assert.ok(mv, 'attacker has a move');

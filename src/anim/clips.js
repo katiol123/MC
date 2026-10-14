@@ -79,21 +79,60 @@ const BASES = { stand: K.STANCE, crouch: K.CROUCH, air: K.AIR_FALL };
 
 function attackPose(f, move, props) {
   const ap = ATTACK_POSES[move.anim];
-  const base = BASES[ap.base] || K.STANCE;
+  const base = BASES[move.base || ap.base] || K.STANCE;
   const end = BASES[move.endStance || ap.base] || base;
   const S = move.startup, A = move.active, Rc = move.recovery;
   const wu = Math.max(1, Math.round(S * 0.45));
   const contact = ap.contact;
-  const extend = ap.extend || contact;
+  // short sequence hits have no time for a separate follow-through pose
+  const extend = move.noHold ? contact : ap.extend || contact;
   const follow = ap.follow || extend;
   if (f <= wu) return mix(base, ap.windup, ease.inOutSine(f / wu), props);
   if (f <= S + 1) return mix(ap.windup, contact, ease.strike((f - wu) / Math.max(1, S + 1 - wu)), props);
   if (f <= S + A) return mix(contact, extend, (f - S - 1) / Math.max(1, A - 1), props);
   const r = f - S - A;
-  const rf = Math.max(1, Math.round(Rc * 0.35));
-  if (r <= rf) return mix(extend, follow, ease.outQuad(r / rf), props);
-  return mix(follow, end, ease.inOutSine((r - rf) / Math.max(1, Rc - rf)), props);
+  const rf = move.noHold ? 0 : Math.max(1, Math.round(Rc * 0.35));
+  if (r <= rf && rf > 0) return mix(extend, follow, ease.outQuad(r / rf), props);
+  return mix(rf > 0 ? follow : extend, end, ease.inOutSine((r - rf) / Math.max(1, Rc - rf)), props);
 }
+
+/** Step of a sequence move containing frame f (sequences: multi-hit specials and supers). */
+export function sequenceStep(move, f) {
+  const steps = move.steps;
+  for (const st of steps) if (f <= st.end) return st;
+  return steps[steps.length - 1];
+}
+
+/** Each step plays its own attack animation, timed so the contact pose lands on the step's hit. */
+function sequencePose(f, move, props) {
+  const st = sequenceStep(move, f);
+  const local = Math.min(f - st.start + 1, st.len);
+  const hitAt = st.hitAt || Math.max(2, Math.round(st.len * 0.6));
+  const hitLen = st.hitLen || 2;
+  const virtual = { anim: st.anim, startup: hitAt - 1, active: hitLen, recovery: Math.max(1, st.len - hitAt - hitLen + 1), endStance: 'stand', base: 'stand', noHold: true };
+  return attackPose(local, virtual, props);
+}
+
+const THROW_KEYS = {
+  throwFwd: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.35, K.P(K.STANCE, { y: 118, lean: -14, chest: -10, fa: [148, 60, 0], ba: [150, 68, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.66, K.P(K.STANCE, { x: 18, y: 106, lean: 30, chest: 12, fa: [84, 10, 0], ba: [88, 12, 0], ff: [40, 8, 0], bf: [-26, 8, 0] })],
+    [1, K.STANCE],
+  ],
+  throwBack: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.35, K.P(K.STANCE, { y: 118, lean: -16, chest: -12, fa: [160, 56, 0], ba: [162, 62, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.66, K.P(K.STANCE, { x: -6, y: 114, lean: -30, chest: -14, neck: 10, fa: [205, 26, 0], ba: [208, 22, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
+    [1, K.STANCE],
+  ],
+  slam: [
+    [0, ATTACK_POSES.grab.contact],
+    [0.3, K.P(K.STANCE, { y: 120, lean: -10, chest: -12, fa: [172, 40, 0], ba: [170, 46, 0], ff: [30, 8, 0], bf: [-34, 8, 0] })],
+    [0.62, K.P(K.STANCE, { x: 16, y: 96, lean: 44, chest: 16, neck: -10, fa: [66, 10, 0], ba: [62, 14, 0], ff: [42, 8, 0], bf: [-30, 8, 0] })],
+    [1, K.STANCE],
+  ],
+};
 
 /** Phases of an attack frame for UI / debugging (kept here because animation and data agree on it). */
 export function attackPhase(move, f) {
@@ -138,8 +177,21 @@ export const CLIPS = {
   jump: { sample: (f, ctx, p, props) => jumpPose(f, ctx, props) },
   land: { sample: (f, c, p, props) => keyed([[0, K.LAND], [2, K.LAND], [p.duration || 4, K.STANCE]], f, props) },
   attack: {
-    sample: (f, ctx, p, props) => attackPose(ctx.moveFrame ?? f, p.move, props),
-    layers: (p) => ATTACK_POSES[p.move.anim].layers,
+    sample: (f, ctx, p, props) => (p.move.steps ? sequencePose(ctx.moveFrame ?? f, p.move, props) : attackPose(ctx.moveFrame ?? f, p.move, props)),
+    layers: (p, ctx) => ATTACK_POSES[p.move.steps ? sequenceStep(p.move, ctx?.moveFrame ?? 1).anim : p.move.anim]?.layers,
+  },
+  throwing: {
+    sample: (f, c, p, props) => {
+      const d = p.duration || 36;
+      return keyed(THROW_KEYS[p.kind || 'throwFwd'].map(([t, pose]) => [t * d, pose]), f, props);
+    },
+  },
+  thrown: {
+    sample: (f, ctx, p, props) => {
+      const pose = mix(K.HIT_HIGH, K.AIR_TUMBLE, clamp(f / 8, 0, 1), props);
+      pose.rot = ctx.throwRot || 0;
+      return pose;
+    },
   },
   guardHigh: { sample: (f, c, p, props) => mix(K.STANCE, K.BLOCK_HIGH, ease.outQuad(f / 4), props) },
   guardLow: { sample: (f, c, p, props) => mix(K.CROUCH, K.BLOCK_LOW, ease.outQuad(f / 4), props) },

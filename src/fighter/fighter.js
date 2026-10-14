@@ -9,6 +9,8 @@ import { Animator } from '../anim/animator.js';
 import { computeSkeleton, centerOfGravity, clonePose, lowestPoint } from '../anim/skeleton.js';
 import { buildHurtboxes, buildHitboxes } from '../combat/boxes.js';
 import { SPECIAL_ORDER } from '../data/moves.js';
+import { sequenceStep } from '../anim/clips.js';
+import { STAGE } from '../config/constants.js';
 
 export const ACTIONABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'run']);
 const BLOCKABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'blockstun', 'land']);
@@ -27,7 +29,10 @@ export class Fighter {
     this.input = new InputBuffer();
     this.anim = new Animator(this.props);
     this.maxHealth = def.stats.health;
+    this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
+    this.spawnProjectile = null; // set by the match
+    this.projectileOut = false;
     this.reset(x, facing);
   }
 
@@ -42,6 +47,8 @@ export class Fighter {
     this.health = this.maxHealth;
     this.stun = 0;
     this.hitstop = 0;
+    this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
+    this.throwProtect = 0;
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
     this.chainLen = 0;
@@ -118,13 +125,26 @@ export class Fighter {
   }
 
   // --- main update ---------------------------------------------------------------------------
+  /** Adds super meter unless the post-super cooldown is running. */
+  gainMeter(n) {
+    if (this.superLock > 0 || !(n > 0)) return;
+    this.meter = Math.min(TUNING.superCost, this.meter + n);
+  }
+
   update(opp) {
     if (this.flash > 0) this.flash--;
+    if (this.superLock > 0) this.superLock--;
+    if (this.state === 'thrown') {
+      // position is driven by the thrower (see resolveThrows); no own physics
+      this.stateFrame++;
+      return true;
+    }
     if (this.hitstop > 0) {
       this.hitstop--;
       return false;
     }
     this.stateFrame++;
+    if (this.throwProtect > 0) this.throwProtect--;
     this.stun = Math.max(0, this.stun - (this.state === 'hitstun' || this.state === 'juggle' ? 0 : TUNING.stunDecayPerTick));
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
@@ -183,6 +203,10 @@ export class Fighter {
       }
       case 'attack':
         return this.updateAttack(opp);
+      case 'throwing':
+        b.steer(0, 1.2);
+        if (this.stateFrame >= this.sd.def.duration) this.recoverToNeutral();
+        return;
       case 'hitstun':
       case 'blockstun':
       case 'stagger':
@@ -218,6 +242,8 @@ export class Fighter {
   }
 
   recoverToNeutral() {
+    // a few frames of throw immunity after being hit, blocking or waking up (no unavoidable throws)
+    if (['hitstun', 'blockstun', 'stagger', 'getup', 'dizzy', 'land'].includes(this.state)) this.throwProtect = 6;
     if (this.input.down) this.setState('crouch', {}, 'crouch', { blend: 6 });
     else this.setState('idle', {}, 'idle', { blend: 7 });
   }
@@ -300,15 +326,25 @@ export class Fighter {
     if (!air && (!cur || cur.special)) {
       for (const id of SPECIAL_ORDER) {
         const m = moves[id];
+        if (!m?.input) continue;
+        if (m.super && this.meter < (m.cost ?? TUNING.superCost)) continue;
+        if (m.projectile && this.projectileOut) continue; // one projectile on screen at a time
         for (const btn of m.input.buttons) {
           const t = inp.pressedTick(btn);
-          if (t >= 0 && inp.motion(m.input.motion, t)) {
+          if (t >= 0 && inp.motion(m.input.motion, t, m.input.motion.length > 3 ? TUNING.superMotionWindow : undefined)) {
             inp.consume(btn);
             this.startMove(m, false, !!cur);
             return true;
           }
         }
       }
+    }
+    // Throw: light punch + light kick together, standing on the ground.
+    if (!air && !cur && !inp.down && moves.throw && inp.pressed('lp', 3) && inp.pressed('lk', 3)) {
+      inp.consume('lp');
+      inp.consume('lk');
+      this.startMove(moves.throw);
+      return true;
     }
     if (cur && this.chainLen >= TUNING.maxChainLength) return false;
     const stance = air ? 'air' : inp.down ? 'crouch' : 'stand';
@@ -327,8 +363,13 @@ export class Fighter {
   startMove(m, isChain = false, isCancel = isChain) {
     this.chainLen = isChain ? this.chainLen + 1 : 0;
     // frame 1 is the tick the button was pressed on (frame data counts from the press)
-    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null };
+    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null };
     if (m.stance === 'air') this.airAttackUsed = true;
+    if (m.super) {
+      this.meter -= m.cost ?? TUNING.superCost;
+      this.superLock = TUNING.superCooldown;
+      this.emit({ type: 'superStart', who: this.index, name: m.name });
+    }
     // Cross-fade into the move: short for fast normals, longer when the body must change posture
     // (cancels, stand -> crouch) so no limb snaps across the screen in a single frame.
     const fromStance = this.crouching ? 'crouch' : this.body.onGround ? 'stand' : 'air';
@@ -344,6 +385,23 @@ export class Fighter {
     const b = this.body;
     mv.frame++;
     const total = m.startup + m.active + m.recovery;
+    // Kara-throw: light punch/kick followed 1-2 frames later by the other button becomes a throw.
+    if (mv.frame <= 3 && ['lp', 'lk'].includes(m.id) && this.def.moves.throw && this.input.pressed('lp', 3) && this.input.pressed('lk', 3)) {
+      this.input.consume('lp');
+      this.input.consume('lk');
+      this.startMove(this.def.moves.throw);
+      return;
+    }
+    if (m.steps) {
+      const st = sequenceStep(m, mv.frame);
+      if (st !== mv.step) {
+        mv.step = st;
+        mv.hitIds.clear(); // each step of a sequence may hit once
+        mv.hits = 0;
+        if (st.teleport && opp) this.teleportBehind(opp);
+      }
+    }
+    if (m.projectile && mv.frame === m.projectile.at && this.spawnProjectile) this.spawnProjectile(this, m.projectile);
     // Scripted forward motion (lunges) – otherwise decelerate on the ground.
     let moving = false;
     if (m.motion) {
@@ -358,11 +416,16 @@ export class Fighter {
       b.launch(m.air.vy);
       b.vx = m.air.vx * this.facing;
     }
+    if (!moving && mv.step?.vx && b.onGround) {
+      b.vx = mv.step.vx * this.facing;
+      moving = true;
+    }
     if (!moving && b.onGround && !(m.air && mv.frame >= m.air.at)) b.steer(0, 0.8);
     if (mv.frame === m.startup + 1) this.emit({ type: 'swing', who: this.index, move: m.id, strength: m.strength });
     if (mv.frame === m.startup + m.active + 1 && !mv.contact) {
       const hb = this.hitboxes[0];
-      this.emit({ type: 'whiff', who: this.index, move: m.id, strength: m.strength, x: hb ? hb.b.x : this.body.x, y: hb ? hb.b.y : 150, dir: this.facing });
+      if (m.hitboxes?.length) this.emit({ type: 'whiff', who: this.index, move: m.id, strength: m.strength, x: hb ? hb.b.x : this.body.x, y: hb ? hb.b.y : 150, dir: this.facing });
+      if (m.isSpecial && !m.super) this.gainMeter(TUNING.meterOnSpecialWhiff);
     }
 
     // Cancels: only after the move made contact, inside the cancel window.
@@ -385,6 +448,18 @@ export class Fighter {
       this.move = null;
       this.recoverToNeutral();
     }
+  }
+
+  /** Vanish and reappear behind the opponent (used by sequence steps with `teleport`). */
+  teleportBehind(opp) {
+    const from = this.body.x;
+    const side = Math.sign(opp.body.x - this.body.x) || this.facing;
+    const lo = STAGE.left + this.body.pushW, hi = STAGE.right - this.body.pushW;
+    let x = opp.body.x + side * (opp.body.pushW + this.body.pushW + 6);
+    if (x < lo || x > hi) x = opp.body.x - side * (opp.body.pushW + this.body.pushW + 6); // cornered: stay in front
+    this.body.x = this.body.prevX = Math.min(hi, Math.max(lo, x));
+    this.facing = Math.sign(opp.body.x - this.body.x) || this.facing;
+    this.emit({ type: 'teleport', who: this.index, from, to: this.body.x });
   }
 
   onLand() {
@@ -415,7 +490,7 @@ export class Fighter {
   /** Parts of the hurtbox that are intangible this tick. Returns 'all', a Set of parts, or null. */
   invulnerability() {
     if (this.state === 'knockdown' || this.state === 'getup' || this.state === 'intro' || this.state === 'victory') return 'all';
-    if (this.state === 'ko') return 'all';
+    if (this.state === 'ko' || this.state === 'thrown' || this.state === 'throwing') return 'all';
     if (this.state === 'dashB' && this.stateFrame <= 5) return 'all';
     if (this.state === 'attack' && this.move?.def.invuln) {
       const parts = new Set();
@@ -450,7 +525,7 @@ export class Fighter {
     this.body.vx = dir * m.push.block;
     const dur = m.blockstun;
     this.setState('blockstun', { duration: dur, low }, low ? 'blockLow' : 'blockHigh', { blend: 3, params: { duration: dur } });
-    if (m.isSpecial) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
+    if (m.isSpecial || m.chip) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
   }
 
   receiveHit(att, m, { damage, hitstun, part, hitstop, counter, reaction = m.reaction }) {
@@ -511,6 +586,7 @@ export class Fighter {
       airDir: this.airDir,
       moveFrame: this.move ? this.move.frame : 0,
       stance: this.stance,
+      throwRot: this.state === 'thrown' ? this.sd.rot : 0,
     };
   }
 

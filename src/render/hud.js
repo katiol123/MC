@@ -35,6 +35,39 @@ function portraitIcon(ctx, img, cx, cy, r, color, flip) {
   ctx.restore();
 }
 
+/** Super meter: bottom corners. Full = SUPER READY; after a super it is locked for a while. */
+function drawMeter(ctx, f, left, col) {
+  const W = VIEW.width, H = VIEW.height;
+  const w = 300, h = 16, y = H - 44;
+  const x = left ? 40 : W - 40 - w;
+  const k = Math.max(0, Math.min(1, f.meter / 100));
+  slanted(ctx, x - 4, y - 4, w + 8, h + 8, left ? 8 : -8);
+  ctx.fillStyle = 'rgba(12,6,18,0.85)';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = rgba(col, 0.8);
+  ctx.stroke();
+  const fw = w * k;
+  slanted(ctx, left ? x : x + w - fw, y, fw, h, left ? 6 : -6);
+  const ready = k >= 1;
+  const pulse = 0.75 + 0.25 * Math.sin(performance.now() / 120);
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, ready ? '#ffffff' : '#7fe8ff');
+  g.addColorStop(1, ready ? col : '#2a6aff');
+  ctx.globalAlpha = ready ? pulse : 1;
+  ctx.fillStyle = f.superLock > 0 ? '#4a4458' : g;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.font = `900 13px ${FONT}`;
+  ctx.textAlign = left ? 'left' : 'right';
+  const label = f.superLock > 0 ? `SUPER COOLDOWN ${Math.ceil(f.superLock / 60)}s` : ready ? 'SUPER READY  ↓↘→↓↘→ + P' : 'SUPER';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#120816';
+  ctx.strokeText(label, left ? x : x + w, y - 8);
+  ctx.fillStyle = ready ? '#fff6c8' : '#cdbfe0';
+  ctx.fillText(label, left ? x : x + w, y - 8);
+}
+
 export function drawHud(ctx, match, hud, portraits) {
   const W = VIEW.width;
   const fs = match.fighters;
@@ -96,6 +129,7 @@ export function drawHud(ctx, match, hud, portraits) {
       ctx.stroke();
     }
     portraitIcon(ctx, portraits[f.def.id], left ? 58 : W - 58, top + 22, 38, col, !left);
+    drawMeter(ctx, f, left, col);
     // combo counter
     const c = hud.combo[i];
     if (c && c.hits >= 2) {
