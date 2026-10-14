@@ -2,7 +2,7 @@
 // the debug overlay. Reads simulation state, never writes it.
 import { VIEW } from '../config/constants.js';
 import { lerp } from '../core/math.js';
-import { blendPoses, computeSkeleton, emptyPose } from '../anim/skeleton.js';
+import { blendPoses, computeSkeleton, emptyPose, clonePose } from '../anim/skeleton.js';
 import { ATTACK_POSES } from '../anim/attackPoses.js';
 import { FighterPainter } from './fighterPainter.js';
 import { SecondaryMotion } from './secondary.js';
@@ -77,7 +77,8 @@ export class FightRenderer {
 
   interpolated(f, alpha) {
     const sameFacing = f.prev.facing === f.facing;
-    const pose = sameFacing ? blendPoses(f.prev.pose, f.anim.pose, alpha, f.props, emptyPose()) : f.anim.pose;
+    let pose = sameFacing ? blendPoses(f.prev.pose, f.anim.pose, alpha, f.props, emptyPose()) : clonePose(f.anim.pose);
+    pose = this.secondary[f.index].inertia.apply(pose);
     return {
       x: lerp(f.prev.x, f.body.x, alpha),
       y: lerp(f.prev.y, f.body.y, alpha),

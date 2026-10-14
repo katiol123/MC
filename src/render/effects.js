@@ -43,6 +43,10 @@ export class Effects {
         this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: e.x > (fighters?.[e.target]?.body.x ?? e.x) ? 1 : -1 });
         break;
       }
+      case 'whiff':
+        // a faint air-cut arc: readable as a miss, clearly different from hit sparks / block shields
+        this.parts.push({ kind: 'whiff', x: e.x, y: e.y, dir: e.dir, life: 10, max: 10, r: e.strength === 'light' ? 16 : 26 });
+        break;
       case 'clash':
         this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 8, vr: 8, life: 14, max: 14, color: '#ffffff' });
         this.shake = Math.max(this.shake, 5);
@@ -116,6 +120,16 @@ export class Effects {
           ctx.lineTo(s.x + Math.cos(a) * r, s.y + Math.sin(a) * r);
         }
         ctx.fill();
+      } else if (p.kind === 'whiff') {
+        ctx.strokeStyle = rgba('#ffffff', 0.35 * k);
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          const r = (p.r + i * 7 + (1 - k) * 10) * cam.zoom;
+          const a0 = p.dir > 0 ? -0.7 : Math.PI - 0.7;
+          ctx.arc(s.x - p.dir * 10 * cam.zoom, s.y, r, a0, a0 + 1.4);
+          ctx.stroke();
+        }
       } else if (p.kind === 'shield') {
         ctx.strokeStyle = rgba('#7fe8ff', k);
         ctx.lineWidth = 4 * cam.zoom;

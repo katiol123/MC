@@ -206,3 +206,18 @@ test('damage scaling reduces later hits of a combo', async () => {
   assert.ok(damageScale(5) < damageScale(2));
   assert.ok(damageScale(50) >= TUNING.minDamageScale);
 });
+
+test('point-blank: every grounded normal connects when the pushboxes touch (no whiffing through)', () => {
+  for (const r of ROSTER) {
+    for (const opp of ['bruno', 'roxy']) {
+      for (const id of ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk']) {
+        const m = fightingMatch({ p1: r.id, p2: opp });
+        const [a, b] = m.fighters;
+        place(m, 1000, 1000 + a.body.pushW + b.body.pushW + 1);
+        a.startMove(a.def.moves[id]);
+        const ev = run(m, 30);
+        assert.ok(ev.some((e) => e.type === 'hit'), `${r.id} ${id} vs ${opp} whiffed at point blank (${a.hitLog.map((h) => h.reason).join('; ')})`);
+      }
+    }
+  }
+});

@@ -98,7 +98,7 @@ test('stance switch mirrors lead limbs and moves the jab hitbox to the other arm
   run(m, f.def.moves.lp.startup);
   assert.ok(f.hitboxes.length > 0);
   const hand = f.skel.j.handB;
-  const hb = f.hitboxes[0].b;
+  const hb = f.hitboxes[f.hitboxes.length - 1].b;
   assert.ok(Math.abs(hb.x - (f.body.x + hand.x * f.facing)) < 1e-6, 'hitbox follows the (now leading) rear-side arm');
 });
 

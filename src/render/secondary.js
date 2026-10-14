@@ -2,6 +2,7 @@
 // impact squash and turn-around scaling. Updated once per simulation tick (fixed step) so it is
 // frame-rate independent, and never fed back into the simulation.
 import { dirUp, dirDown, dirFwd, lerp, clamp } from '../core/math.js';
+import { LimbInertia } from '../physics/limbInertia.js';
 
 class Chain {
   constructor(n, segLen, opts = {}) {
@@ -85,6 +86,7 @@ export class SecondaryMotion {
       this.dreads = [0, 1, 2, 3, 4].map((i) => new Chain(5, 8 + (i % 2) * 2, { gravity: 0.7, bias: { x: -0.12, y: 0 } }));
       this.dreadsFront = [0, 1].map(() => new Chain(4, 8, { gravity: 0.7, bias: { x: -0.05, y: 0 } }));
     }
+    this.inertia = new LimbInertia();
     this.squash = 0;
     this.facingScale = 1;
     this.lastFacing = null;
@@ -101,6 +103,7 @@ export class SecondaryMotion {
       this.facingScale = -this.facingScale; // start of the turn-around squeeze
     }
     this.lastFacing = facing;
+    if (f.hitstop === 0) this.inertia.tick(f.anim.pose);
     this.facingScale = clamp(this.facingScale + (1 - this.facingScale) * 0.35 + (this.facingScale < 1 ? 0.12 : 0), -1, 1);
     this.squash *= 0.8;
 

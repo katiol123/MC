@@ -104,5 +104,5 @@ test('separation limit keeps both fighters on camera', () => {
   const m = fightingMatch();
   const [a, b] = m.fighters;
   run(m, 400, () => [raw({ left: true }), raw({ right: true })]);
-  assert.ok(Math.abs(a.body.x - b.body.x) <= 860 + 1e-6);
+  assert.ok(Math.abs(a.body.x - b.body.x) <= 780 + 1e-6);
 });

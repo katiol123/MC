@@ -91,7 +91,7 @@ export const HIT_HIGH = P(STANCE, {
   fa: [35, 55, 0], ba: [12, 70, 0], ff: [32, 8, 0], bf: [-40, 8, 0],
 });
 export const HIT_LOW = P(STANCE, {
-  x: -8, y: 98, lean: 38, chest: 16, neck: 12, head: 14,
+  x: -8, y: 100, lean: 31, chest: 14, neck: 10, head: 12,
   fa: [20, 85, 0], ba: [6, 95, 0], ff: [30, 8, 0], bf: [-38, 8, 0],
 });
 export const HIT_CROUCH = P(CROUCH, {

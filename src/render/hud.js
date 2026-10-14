@@ -85,7 +85,7 @@ export function drawHud(ctx, match, hud, portraits) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(name, left ? x + 4 : x + barW - 4, top + barH + 38);
     // round wins
-    for (let r = 0; r < match.opts.roundsToWin; r++) {
+    for (let r = 0; r < Math.min(match.opts.roundsToWin, 5); r++) {
       const px = left ? x + barW - 18 - r * 26 : x + 18 + r * 26;
       ctx.beginPath();
       ctx.arc(px, top + barH + 32, 8, 0, Math.PI * 2);

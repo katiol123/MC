@@ -10,4 +10,4 @@ export const STAGE_CENTER = (STAGE.left + STAGE.right) / 2;
 export const VIEW = { width: 1280, height: 720, groundY: 640 };
 
 /** Fighters may not drift further apart than the camera can show. */
-export const MAX_SEPARATION = 860;
+export const MAX_SEPARATION = 780;

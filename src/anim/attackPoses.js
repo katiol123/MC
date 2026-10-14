@@ -36,8 +36,8 @@ export const ATTACK_POSES = {
   uppercut: {
     base: 'crouch', layers: { ba: 'front' },
     windup: P(CROUCH, { x: 0, y: 60, lean: 28, chest: 8, fa: [54, 112, 0], ba: [44, 112, 0] }),
-    contact: P(STANCE, { x: 14, y: 106, lean: 4, chest: -12, neck: -12, head: -14, fa: [20, 124, 0], ba: [140, 10, 0], ff: [36, 8, 0], bf: [-24, 8, 0] }),
-    extend: P(STANCE, { x: 15, y: 110, lean: 0, chest: -14, neck: -12, head: -14, fa: [20, 124, 0], ba: [158, 8, 0], ff: [36, 8, 0], bf: [-24, 8, 0] }),
+    contact: P(STANCE, { x: 18, y: 106, lean: 10, chest: -8, neck: -12, head: -14, fa: [20, 124, 0], ba: [126, 12, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
+    extend: P(STANCE, { x: 18, y: 110, lean: 4, chest: -12, neck: -12, head: -14, fa: [20, 124, 0], ba: [150, 8, 0], ff: [38, 8, 0], bf: [-24, 8, 0] }),
   },
   crouchJab: {
     base: 'crouch',

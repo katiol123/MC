@@ -17,7 +17,7 @@ export class Camera {
     const ys = fighters.map((f) => lerp(f.prev.y, f.body.y, alpha));
     const mid = (xs[0] + xs[1]) / 2;
     const dist = Math.abs(xs[0] - xs[1]);
-    const tz = clamp(1.16 - (dist - 180) / 1500, 0.9, 1.12);
+    const tz = clamp(1.42 - (dist - 160) / 1300, 1.2, 1.42);
     this.zoom = lerp(this.zoom, tz, 0.08);
     const half = VIEW.width / 2 / this.zoom;
     const tx = clamp(mid, STAGE.left + half, STAGE.right - half);

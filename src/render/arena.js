@@ -142,7 +142,7 @@ export class Arena {
       ctx.fillRect(xx, yy, cw, 2);
     }
     // neon sign
-    const signX = (900 - cam.x) * 0.6 * cam.zoom + W / 2, signY = yardBase - 120 * cam.zoom;
+    const signX = (520 - cam.x) * 0.6 * cam.zoom + W / 2, signY = yardBase - 175 * cam.zoom;
     const flick = Math.sin(t * 0.7) > -0.92 && !(t % 233 < 6);
     ctx.save();
     ctx.font = `900 ${Math.round(46 * cam.zoom)}px "Arial Black", Impact, sans-serif`;
@@ -231,16 +231,17 @@ export class Arena {
     for (let wx = -2400; wx < 4400; wx += 900) {
       const sx = (wx - cam.x) * cam.zoom * 1.35 + W / 2;
       if (sx < -80 || sx > W + 80) continue;
+      // low foreground bollards + sagging chain: framing only, never covering the fighters' feet
       ctx.fillStyle = '#0b070d';
-      ctx.fillRect(sx - 18, H - 120, 36, 120);
+      ctx.fillRect(sx - 16, H - 46, 32, 46);
       ctx.beginPath();
-      ctx.ellipse(sx, H - 120, 22, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(sx, H - 46, 19, 7, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#0b070d';
-      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(11,7,13,0.9)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(sx + 18, H - 100);
-      ctx.quadraticCurveTo(sx + 450 * cam.zoom, H - 40 + Math.sin(t * 0.02) * 4, sx + 900 * cam.zoom * 1.35 - 18, H - 100);
+      ctx.moveTo(sx + 16, H - 34);
+      ctx.quadraticCurveTo(sx + 450 * cam.zoom, H + 6 + Math.sin(t * 0.02) * 3, sx + 900 * cam.zoom * 1.35 - 16, H - 34);
       ctx.stroke();
     }
     for (const m of this.motes) {

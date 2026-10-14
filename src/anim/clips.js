@@ -157,7 +157,7 @@ export const CLIPS = {
   stagger: {
     sample: (f, c, p, props) => {
       const d = p.duration || 30;
-      return keyed([[0, K.HIT_HIGH], [3, K.STAGGER[0]], [d * 0.45, K.STAGGER[1]], [d * 0.8, K.STAGGER[2]], [d, K.STANCE]], f, props);
+      return keyed([[0, K.STAGGER[0]], [5, K.STAGGER[0]], [d * 0.45, K.STAGGER[1]], [d * 0.8, K.STAGGER[2]], [d, K.STANCE]], f, props);
     },
   },
   airHit: { sample: (f, ctx, p, props) => airHitPose(f, ctx, p, props) },

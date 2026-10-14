@@ -360,6 +360,10 @@ export class Fighter {
     }
     if (!moving && b.onGround && !(m.air && mv.frame >= m.air.at)) b.steer(0, 0.8);
     if (mv.frame === m.startup + 1) this.emit({ type: 'swing', who: this.index, move: m.id, strength: m.strength });
+    if (mv.frame === m.startup + m.active + 1 && !mv.contact) {
+      const hb = this.hitboxes[0];
+      this.emit({ type: 'whiff', who: this.index, move: m.id, strength: m.strength, x: hb ? hb.b.x : this.body.x, y: hb ? hb.b.y : 150, dir: this.facing });
+    }
 
     // Cancels: only after the move made contact, inside the cancel window.
     if (mv.contact && (m.chain?.length || m.special) && mv.frame <= m.startup + m.active + (m.cancelWindow || 0)) {
@@ -387,12 +391,12 @@ export class Fighter {
     const s = this.state;
     this.emit({ type: 'land', who: this.index, x: this.body.x, heavy: s === 'juggle' || s === 'ko' });
     if (s === 'jump') {
-      this.setState('land', { duration: TUNING.landingFrames }, 'land', { blend: 2, params: { duration: TUNING.landingFrames } });
+      this.setState('land', { duration: TUNING.landingFrames }, 'land', { blend: 4, params: { duration: TUNING.landingFrames } });
     } else if (s === 'attack') {
       const m = this.move.def;
       const lock = m.landRecovery || TUNING.airAttackLandingFrames;
       this.move = null;
-      this.setState('land', { duration: lock, locked: true }, 'land', { blend: 2, params: { duration: lock } });
+      this.setState('land', { duration: lock, locked: true }, 'land', { blend: 5, params: { duration: lock } });
     } else if (s === 'juggle') {
       if (this.sd.knockdown) {
         this.body.vx *= 0.3;
@@ -489,7 +493,7 @@ export class Fighter {
     }
     b.vx = (dir * m.push.hit) / b.mass;
     if (reaction === 'stagger') {
-      this.setState('stagger', { duration: hitstun + 10 }, 'stagger', { blend: 3, params: { duration: hitstun + 10 } });
+      this.setState('stagger', { duration: hitstun + 10 }, 'stagger', { blend: 7, params: { duration: hitstun + 10 } });
       return;
     }
     const clip = wasCrouch ? 'hitCrouch' : part === 'head' || (m.hitLevel !== 'low' && part !== 'limb') ? 'hitHigh' : 'hitLow';

@@ -12,7 +12,7 @@ import { DEG, clamp, dirDown, dirUp, dirFwd, lerp, lerpAngle } from '../core/mat
 export const BASE_PROPORTIONS = {
   headR: 19.5,
   neck: 12,
-  torso: 80,
+  torso: 87,
   waistFrac: 0.42,
   shoulderDrop: 10,
   shoulderSpread: 5,
@@ -21,8 +21,8 @@ export const BASE_PROPORTIONS = {
   upperArm: 46,
   foreArm: 41,
   hand: 13,
-  thigh: 60,
-  shin: 56,
+  thigh: 58,
+  shin: 54,
   foot: 27,
   heel: 7,
   ankleH: 8,
@@ -33,7 +33,7 @@ export const BASE_PROPORTIONS = {
   rThigh: [15, 10],
   rShin: [10.5, 7],
   rNeck: 7.5,
-  chestW: 29,
+  chestW: 31,
   waistW: 21,
   hipW: 24,
 };
@@ -122,6 +122,9 @@ export function clonePose(p) {
   };
 }
 
+/** Wraps an angle to (-180, 180]. */
+export const wrapAngle = (a) => ((((a + 180) % 360) + 360) % 360) - 180;
+
 /** Returns pelvis tilt (absolute) used for the hips: the pelvis follows part of the spine lean. */
 const pelvisAngle = (pose) => pose.rot - pose.lean * 0.3;
 
@@ -155,9 +158,9 @@ export function solveLegIK(pose, props, side, target, footRot = 0, out = [0, 0, 
   const hipAbs = theta + alpha;
   const knee = 180 - beta;
   const shinAbs = hipAbs - knee;
-  out[0] = hipAbs - pelvisAngle(pose);
+  out[0] = wrapAngle(hipAbs - pelvisAngle(pose));
   out[1] = knee;
-  out[2] = footRot - shinAbs; // keep the foot at footRot in absolute space (0 = flat)
+  out[2] = wrapAngle(footRot - shinAbs); // keep the foot at footRot in absolute space (0 = flat)
   return out;
 }
 
