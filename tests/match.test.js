@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { ROSTER } from '../src/data/fighters.js';
 import { fightingMatch, run, raw, place } from './helpers.js';
 import { Match } from '../src/game/match.js';
 import { AIController } from '../src/ai/aiController.js';
@@ -42,13 +43,17 @@ test('the match ends after the configured number of round wins and can be restar
 test('time over: the fighter with more health (relative) wins the round', () => {
   const m = fightingMatch({ roundTime: 3 });
   m.fighters[0].health -= 100;
-  let guard = 0;
-  while (m.phase !== 'intro' && m.phase !== 'over' && guard++ < 2000) m.tick([raw(), raw()]);
+  let guard = 0, poses = new Set();
+  while (m.phase !== 'intro' && m.phase !== 'over' && guard++ < 2000) {
+    m.tick([raw(), raw()]);
+    poses.add(`${m.fighters[0].state}/${m.fighters[1].state}`);
+  }
   assert.deepEqual(m.wins, [0, 1]);
+  assert.ok(poses.has('defeat/victory'), 'loser on their feet plays the defeat pose, winner the victory pose');
 });
 
 test('AI vs AI plays complete matches to a result for every fighter pairing sample', () => {
-  const ids = ['brick', 'rattigan', 'smiles', 'jax', 'vellaro', 'roxy', 'bruno', 'jaguar'];
+  const ids = ROSTER.map((r) => r.id);
   for (let k = 0; k < ids.length; k++) {
     const m = new Match({ p1: ids[k], p2: ids[(k + 5) % ids.length], roundsToWin: 2, roundTime: 60 });
     const ai = [new AIController(0, { level: 'hard', seed: k }), new AIController(1, { level: 'normal', seed: 99 + k })];

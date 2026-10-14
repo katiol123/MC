@@ -159,6 +159,20 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
   const from = projectile ? { body: { x: projectile.x - Math.sign(projectile.vx) * 20 }, facing: Math.sign(projectile.vx) || 1 } : att;
   const block = trade ? { ok: false, why: 'trade' } : def.canBlock(from, spec.height);
   const ownHitstop = (n) => { if (!projectile) att.hitstop = n; };
+  // Armour (Grizz's charge): absorbs a strike during its window, taking half damage without
+  // flinching. Supers and throws break through; the armour holds a limited number of hits.
+  const arm = def.state === 'attack' && def.move?.def.armor;
+  if (arm && !spec.super && def.move.frame >= arm.from && def.move.frame <= arm.to && (def.move.armorUsed || 0) < arm.hits) {
+    def.move.armorUsed = (def.move.armorUsed || 0) + 1;
+    holder.contact = 'block';
+    const damage = Math.max(1, Math.round(spec.damage * TUNING.armorDamage));
+    def.health = Math.max(1, def.health - damage);
+    def.flash = 6;
+    def.hitstop = spec.hitstop;
+    ownHitstop(spec.hitstop);
+    note(att, 'ABSORBED by armour');
+    return { type: 'armor', who: att.index, target: def.index, x: res.point.x, y: res.point.y, damage };
+  }
   if (block.ok) {
     holder.contact = 'block';
     const hs = Math.round(spec.hitstop * TUNING.blockHitstopScale);
@@ -201,7 +215,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop, fire: !!spec.fire,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw,
   };
 }
 

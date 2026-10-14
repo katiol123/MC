@@ -23,7 +23,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170],
+  cinder: [60, 170], grizz: [100, 190],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
@@ -138,6 +138,11 @@ export class AIController {
     if (proj) {
       if (r.chance(cfg.antiAir * 0.5)) this.queue([{ d: 'uf', n: 3 }]);
       else this.hold = { d: 'b', n: 24 };
+      return;
+    }
+    // Armoured charge (Grizz): blow through an incoming strike.
+    if (me.def.id === 'grizz' && op.move && op.phase === 'startup' && dist < 260 && r.chance(cfg.signature * 0.25)) {
+      this.queue(M.s4);
       return;
     }
     // Counter stance (Vellaro): read an incoming strike.

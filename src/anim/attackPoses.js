@@ -99,6 +99,13 @@ export const ATTACK_POSES = {
     contact: P(AIR_FALL, { lean: 26, chest: 12, neck: -10, fa: [102, 12, 0], ba: [96, 16, 0], fl: [60, 96, 10], bl: [30, 90, 10] }),
     extend: P(AIR_FALL, { lean: 30, chest: 14, neck: -10, fa: [92, 10, 0], ba: [88, 14, 0], fl: [50, 80, 10], bl: [20, 70, 10] }),
   },
+  // shoulder-first charge with the lead forearm up as a shield (Grizz)
+  tackle: {
+    base: 'stand',
+    windup: P(STANCE, { x: -8, y: 104, lean: 12, chest: 6, fa: [44, 118, 0], ba: [24, 132, 0], ff: [30, 10, 0], bf: [-26, 10, 0] }),
+    contact: P(STANCE, { x: 22, y: 100, lean: 34, chest: 18, neck: -8, head: -10, fa: [72, 104, 0], ba: [20, 128, 0], ff: [44, 8, 0], bf: [-38, 10, 0] }),
+    extend: P(STANCE, { x: 24, y: 100, lean: 36, chest: 20, neck: -8, head: -10, fa: [74, 102, 0], ba: [20, 128, 0], ff: [46, 8, 0], bf: [-40, 10, 0] }),
+  },
   // backhand swing of the lead arm (Bruno's frying pan)
   panSwing: {
     base: 'stand',

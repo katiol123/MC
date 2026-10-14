@@ -106,6 +106,7 @@ export class FighterPainter {
     this.tint = opts.tint || 0;
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
+    this.claws = !!opts.claws;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
@@ -147,7 +148,7 @@ export class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -268,7 +269,7 @@ export class FighterPainter {
     if (pass === 'outline') return this.outlineFill(ctx);
     const skin = this.mat(darken(lk.species === 'weasel' ? lk.skin : lk.skin, depth), t).base;
     const gloveC = this.mat(darken(gl.color || lk.skin, depth), t).base;
-    const full = gl.type === 'gloves' || gl.type === 'gauntlet';
+    const full = gl.type === 'gloves' || gl.type === 'gauntlet' || gl.type === 'paws';
     ctx.fillStyle = full ? gloveC : skin;
     ctx.fill();
     this.shadeSeg(ctx, Wr, tip, w * 1.1);
@@ -284,6 +285,14 @@ export class FighterPainter {
       ctx.fillStyle = this.mat(gl.color, t).base;
       ctx.fill();
       this.line(ctx, [along(Wr, H, 0.25, w), along(Wr, H, 0.45, -w)], 0.9, this.outline, 0.35);
+    }
+    if (gl.type === 'paws') {
+      // onesie paw: claws over the knuckles, longer and brighter while the super rages
+      const len = this.claws ? 1.0 : 0.45;
+      for (const k of [-0.6, 0, 0.6]) {
+        const a = along(Wr, H, 1.0, w * k), b = along(Wr, H, 1.12 + len * 0.5, w * k * 1.15);
+        this.line(ctx, [a, b], this.claws ? 2.6 : 2, this.mat(gl.claws, t).base);
+      }
     }
     // knuckles + thumb
     this.line(ctx, [along(Wr, H, 0.78, w * 0.9), along(Wr, H, 0.82, 0), along(Wr, H, 0.78, -w * 0.9)], 1.2, this.outline, 0.55);
@@ -596,6 +605,34 @@ export class FighterPainter {
     const outl = this.outline;
     const chest = P2(N, uC, -up * 0.42, fC, cw * 0.55);
     switch (top.type) {
+      case 'onesie': {
+        // bear onesie: cream belly panel, magenta collar, snap buttons, a little bear patch
+        ctx.beginPath();
+        smoothClosed(ctx, [P2(N, fC, cw * 0.15, uC, -up * 0.35), P2(N, fC, cw * 0.95, uC, -up * 0.42), P2(W, fS, ww * 0.9, uS, -4),
+          P2(Pv, fS, ww * 0.7, uS, 4), P2(Pv, fS, -ww * 0.3, uS, 6), P2(W, fS, -ww * 0.2, uS, 10)], 0.4);
+        ctx.fillStyle = this.mat(top.belly, t).base;
+        ctx.fill();
+        ctx.beginPath();
+        smoothClosed(ctx, [P2(N, fC, cw * 0.05, uC, 6), P2(N, fC, cw * 0.75, uC, 2), P2(N, fC, cw * 0.55, uC, -up * 0.3), P2(N, fC, cw * 0.2, uC, -4)], 0.35);
+        ctx.fillStyle = this.mat(top.color2, t).base;
+        ctx.fill();
+        for (let i = 0; i < 3; i++) {
+          const b = P2(N, fC, cw * 0.62, uC, -up * (0.12 + i * 0.09));
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = '#e8e2d4';
+          ctx.fill();
+        }
+        const pt = P2(N, fC, cw * 0.55, uC, -up * 0.55);
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(top.patch, t).base;
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = outl;
+        ctx.stroke();
+        break;
+      }
       case 'tee': {
         // crew neckline
         ctx.beginPath();
@@ -1039,6 +1076,7 @@ export class FighterPainter {
     else this.drawFace(ctx, R, opts, weasel);
     this.drawHair(ctx, R);
     if (lk.hat) this.drawHat(ctx, R);
+    if (lk.hood?.bear) this.drawBearHood(ctx, R);
     ctx.restore();
     if (lk.headphones) this.drawHeadphones(ctx, J, A);
   }
@@ -1055,6 +1093,58 @@ export class FighterPainter {
     hg.addColorStop(1, rgba(rim, 0.7));
     ctx.fillStyle = hg;
     ctx.fillRect(-2 * R, -2 * R, 4.5 * R, 4 * R);
+  }
+
+  /** Bear-onesie hood worn over the head: round ears, brim, a snout with teeth and eyes on top. */
+  drawBearHood(ctx, R) {
+    const hd = this.look.hood, t = this.tint, outl = this.outline;
+    const fur = this.mat(hd.color, t).base;
+    const ring = (x, y, r, fill, w = 1.8) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = w;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
+    };
+    // ears
+    for (const [x, y] of [[-0.75, 1.3], [0.2, 1.55]]) {
+      ring(x * R, y * R, 0.36 * R, fur, 2.2);
+      ring(x * R, y * R, 0.18 * R, this.mat(hd.lining, t).base, 1);
+    }
+    // brim: the hood edge framing the forehead
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -1.25 * R, y: 0.1 * R }, { x: -1.0 * R, y: 1.2 * R }, { x: 0.1 * R, y: 1.5 * R }, { x: 1.05 * R, y: 1.05 * R }, { x: 1.2 * R, y: 0.5 * R },
+      { x: 0.85 * R, y: 0.45 * R }, { x: 0.1 * R, y: 0.78 * R }, { x: -0.9 * R, y: 0.35 * R }], 0.35);
+    ctx.fillStyle = fur;
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    this.shadeAcross(ctx, { x: 0.6 * R, y: 1.4 * R }, { x: -1.2 * R, y: 0.2 * R });
+    // teeth along the front of the brim
+    ctx.fillStyle = this.mat(hd.teeth, t).base;
+    for (const x of [0.32, 0.55, 0.78, 1.0]) {
+      ctx.beginPath();
+      ctx.moveTo((x - 0.09) * R, (0.62 - x * 0.1) * R);
+      ctx.lineTo(x * R, (0.38 - x * 0.1) * R);
+      ctx.lineTo((x + 0.09) * R, (0.6 - x * 0.1) * R);
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // snout + nose
+    ctx.beginPath();
+    ctx.ellipse(0.98 * R, 0.98 * R, 0.42 * R, 0.3 * R, -0.25, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(hd.snout, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ring(1.3 * R, 1.08 * R, 0.15 * R, this.mat('#3a1830', t).base, 1.4);
+    // stitched eye
+    ring(0.4 * R, 1.12 * R, 0.17 * R, this.mat('#f4f1ea', t).base, 1.4);
+    ring(0.44 * R, 1.1 * R, 0.08 * R, this.mat(hd.eyes, t).base, 0.8);
   }
 
   drawEars(ctx, pass, R, weasel) {

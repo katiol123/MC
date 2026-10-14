@@ -132,9 +132,11 @@ export class FightRenderer {
       : null;
     // flaming fists only on fire moves (specials / super), never on normal attacks
     const fire = !!(mv?.def.fire && f.state === 'attack');
+    const claws = !!(mv?.def.claws && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
+      claws,
       now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,

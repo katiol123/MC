@@ -48,6 +48,7 @@ export const TUNING = {
   superFreeze: 48, // cinematic freeze when a super starts
   // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
   burnInterval: 30,
+  armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,
   superMotionWindow: 26,
   meterOnHit: 0.09, // fraction of damage dealt

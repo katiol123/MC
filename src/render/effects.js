@@ -24,6 +24,7 @@ export class Effects {
         const n = heavy ? 18 : 10;
         const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
         if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
+        if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
           const sp = (heavy ? 7 : 4.5) + this.rnd() * 6;
@@ -72,6 +73,13 @@ export class Effects {
           const a = this.rnd() * Math.PI * 2;
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
+        break;
+      case 'armor':
+        // the charge shrugs the hit off: amber flash ring + label
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffb347' });
+        this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: 1 });
+        this.labels.push({ text: 'ARMOR', x: e.x, y: e.y + 60, life: 45, color: '#ffb347' });
+        this.shake = Math.max(this.shake, 4);
         break;
       case 'burn':
         // burn tick: a puff of embers off the burning body
@@ -186,6 +194,24 @@ export class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'claw') {
+        // three parallel claw slashes that draw in, then fade
+        const draw = Math.min(1, (p.max - p.life) / 4);
+        const L = 46 * cam.zoom, ang = (p.flip ? -1 : 1) * 0.9;
+        ctx.lineCap = 'round';
+        for (let i = -1; i <= 1; i++) {
+          const ox = Math.cos(ang + Math.PI / 2) * i * 11 * cam.zoom, oy = Math.sin(ang + Math.PI / 2) * i * 11 * cam.zoom;
+          const x0 = s.x + ox - Math.cos(ang) * L / 2, y0 = s.y + oy - Math.sin(ang) * L / 2;
+          ctx.strokeStyle = rgba('#ffffff', Math.min(1, k * 1.4));
+          ctx.lineWidth = 5 * cam.zoom * k + 1;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x0 + Math.cos(ang) * L * draw, y0 + Math.sin(ang) * L * draw);
+          ctx.stroke();
+          ctx.strokeStyle = rgba('#ff4fd8', 0.7 * k);
+          ctx.lineWidth = 2 * cam.zoom;
+          ctx.stroke();
+        }
       } else if (p.kind === 'ember') {
         const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';
         ctx.fillStyle = rgba(hot, Math.min(1, k * 1.6) * (0.75 + 0.25 * Math.sin(p.life * 1.7)));

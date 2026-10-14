@@ -41,7 +41,7 @@ test('command grab (Bruno) cannot be teched', () => {
 });
 
 test('every fighter has a working signature special that connects in its intended range', () => {
-  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90 };
+  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60 };
   for (const r of ROSTER) {
     if (!(r.id in range)) continue; // vellaro: counter stance, tested separately
     const m = fightingMatch({ p1: r.id, p2: 'jax' });
@@ -75,6 +75,29 @@ test('Cinder: the super sets the opponent on fire for 10 s with small ticks that
   // normal attacks carry no fire
   for (const id of ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk', 'jp', 'jk', 's1', 's2', 's3']) assert.ok(!f.def.moves[id].fire, `${id} is not a fire move`);
   assert.ok(f.def.moves.s4.fire && f.def.moves.su.fire);
+});
+
+test('Grizzly Charge: armour absorbs one strike (half damage, no flinch) and the charge still lands', () => {
+  const m = fightingMatch({ p1: 'grizz', p2: 'brick' });
+  const [g, o] = m.fighters;
+  place(m, 800, 1000);
+  const hp = g.health;
+  // Grizz charges; Brick jabs into the charge, then jabs again
+  const ev = run(m, 90, p1seq(S4, (i) => raw({ lp: i === 10 || i === 30 })));
+  const armor = ev.filter((e) => e.type === 'armor' && e.target === 0);
+  assert.equal(armor.length, 1, 'one strike absorbed');
+  assert.ok(g.health < hp && hp - g.health <= Math.ceil(o.def.moves.lp.damage * 0.5) + 1, 'took only half damage');
+  assert.ok(ev.some((e) => e.type === 'hit' && e.who === 0 && e.move === 's4'), 'the charge connected');
+});
+
+test('Grizzly Charge: supers break through the armour', () => {
+  const m = fightingMatch({ p1: 'grizz', p2: 'brick' });
+  place(m, 800, 900);
+  m.fighters[1].meter = 100;
+  const SU2 = [{ down: true }, { down: true, left: true }, { left: true }, { down: true }, { down: true, left: true }, { left: true, hp: true }];
+  const ev = run(m, 140, (i) => [raw(S4[Math.floor((i - 8) / 2)] || {}), raw(SU2[Math.floor(i / 2)] || {})]);
+  assert.ok(!ev.some((e) => e.type === 'armor'), 'no armour against a super');
+  assert.ok(ev.some((e) => e.type === 'hit' && e.who === 1 && e.super));
 });
 
 test('projectiles: one on screen per fighter, blockable, cancel each other', () => {

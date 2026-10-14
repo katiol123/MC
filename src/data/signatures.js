@@ -33,6 +33,10 @@ const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
 /** Fire strikes (Cinder's super): flaming fists, fire sparks, and a burn lasting 10 s (600 ticks). */
 const FIRE = { fire: true, burn: 600 };
 
+/** Bear claws (Grizz's super): whole arm plus the claws reaching past the paw; claw-slash effects. */
+const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
+const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
+
 export const SIGNATURES = {
   brick: {
     s4: {
@@ -170,6 +174,22 @@ export const SIGNATURES = {
       ...SUPER, name: 'Wildfire Rush', anim: 'sequence', fire: true,
       steps: [step('jab', 9, H(45, FIRE)), step('cross', 10, H(50, FIRE)), step('jab', 8, H(40, FIRE)), step('cross', 10, H(50, FIRE)), step('lunge', 18, FINISH(100, 'launch', FIRE), { vx: 6 })],
       recoveryAfter: 16,
+    },
+  },
+  grizz: {
+    // armoured shoulder charge: absorbs one strike during the run-up and keeps going
+    s4: {
+      name: 'Grizzly Charge', anim: 'tackle', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 14, active: 12, recovery: 28, motion: [{ from: 6, to: 24, vx: 8.5 }],
+      damage: 85, stun: 70, hitstun: 24, blockstun: 16, hitstop: 12,
+      height: 'mid', reaction: 'knockdown', push: { hit: 4, block: 6 }, launch: { vx: 5, vy: 6 },
+      hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 20 }, { a: 'neck', b: 'shoulderF', r: 20 }],
+      armor: { from: 4, to: 24, hits: 1 }, juggle: 2, priority: 3, shake: 7,
+    },
+    su: {
+      ...SUPER, name: 'Grizzly Fury', anim: 'sequence', claws: true,
+      steps: [step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('chop', 19, FINISH(115, 'knockdown', CLAW_F))],
+      recoveryAfter: 18,
     },
   },
 };

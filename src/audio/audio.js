@@ -114,6 +114,7 @@ export class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.claw) this.noise(0.14, { freq: 4200, q: 1.5, gain: 0.3, sweep: 0.5 }); // claw rake
         if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
         if (e.prop === 'pan') {
           // cast-iron "BONG": inharmonic partials with a long ring
@@ -159,6 +160,10 @@ export class AudioSystem {
         break;
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
+        break;
+      case 'armor':
+        this.tone(0.3, { freq: 110, to: 60, gain: 0.6 });
+        this.noise(0.12, { freq: 900, q: 2, gain: 0.3 });
         break;
       case 'burn':
         this.noise(0.07, { freq: 2600, q: 2, gain: 0.12 }); // crackle

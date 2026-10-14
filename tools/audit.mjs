@@ -36,6 +36,7 @@ for (let rep = 0; rep < perPair; rep++) {
             if (e.super) inc('hit: super hit');
             if (e.fire) inc('hit: fire hit (Cinder)');
             if (e.prop === 'pan') inc('hit: frying pan (Bruno)');
+            if (e.claw) inc('hit: claws (Grizz)');
             if (e.ko) inc('hit: KO blow');
             if (e.combo >= 3) inc('hit: 3+ hit combo');
             if (e.move?.startsWith('proj:')) inc(`hit: projectile ${e.move.slice(5)}`);
@@ -78,12 +79,12 @@ const want = [
   ['Reactions', ['state:hitstun', 'state:stagger', 'state:juggle', 'juggle chain (2+)', 'state:knockdown', 'state:getup', 'event:dizzy', 'state:dizzy', 'state:ko', 'state:victory', 'state:defeat']],
   ['Combo protection', ['reason: juggle limit', 'reason: repeated move limit', 'reason: combo hit cap']],
   ['Throws', ['event:grab', 'state:throwing', 'state:thrown', 'hit: throw damage', 'event:tech', 'reason: throw whiff']],
-  ['Specials', ['projectile spawned: coin', 'projectile spawned: wave', 'projectile spawned: flame', 'hit: projectile coin', 'hit: projectile wave', 'hit: projectile flame', 'event:projectileEnd', 'event:teleport', 'reason: invulnerable']],
-  ['Supers', ['event:superStart', 'super freeze (cinematic)', 'hit: super hit', 'hit: frying pan (Bruno)', 'hit: fire hit (Cinder)', 'burning (ticks)', 'event:burn']],
+  ['Specials', ['projectile spawned: coin', 'projectile spawned: wave', 'projectile spawned: flame', 'hit: projectile coin', 'hit: projectile wave', 'hit: projectile flame', 'event:projectileEnd', 'event:teleport', 'reason: invulnerable', 'event:armor']],
+  ['Supers', ['event:superStart', 'super freeze (cinematic)', 'hit: super hit', 'hit: frying pan (Bruno)', 'hit: fire hit (Cinder)', 'burning (ticks)', 'event:burn', 'hit: claws (Grizz)']],
   ['Misc', ['event:stance', 'stance: switched (ticks)', 'announce: TIME', 'announce: K.O.', 'event:roundEnd', 'event:matchEnd']],
 ];
 // safety nets that well-played CPU fights rarely reach; each has its own unit test
-const RARE = { 'reason: combo hit cap': 'tests/combat.test.js', 'announce: TIME': 'tests/match.test.js' };
+const RARE = { 'reason: combo hit cap': 'tests/combat.test.js', 'announce: TIME': 'tests/match.test.js', 'state:defeat': 'tests/match.test.js (time-over loser pose)' };
 let missing = 0;
 console.log(`${matches} CPU matches, ${rounds} rounds (levels easy/normal/hard)\n`);
 for (const [group, keys] of want) {

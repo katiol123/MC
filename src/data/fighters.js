@@ -1,7 +1,7 @@
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All nine are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All ten are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
@@ -239,6 +239,30 @@ export const ROSTER = [
     moves: {
       lp: { startup: 4 },
       s1: { name: 'Spark Fist' },
+    },
+  },
+  {
+    id: 'grizz',
+    name: 'TEDDY "GRIZZ" BARRETT',
+    title: 'Bear-Suit Bruiser',
+    blurb: 'Lost a bet, kept the bear suit. Shrugs off a punch mid-charge and mauls whoever threw it.',
+    body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
+    stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
+    look: {
+      skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
+      eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
+      hair: { style: 'short', color: '#1a1210' },
+      beard: { style: 'goatee', color: '#1a1210' },
+      hood: { color: '#7a4a28', lining: '#d4318f', bear: true, snout: '#c9a27a', teeth: '#f2ead8', eyes: '#4fb8a0' },
+      top: { type: 'onesie', color: '#7a4a28', color2: '#d4318f', belly: '#d8c39a', patch: '#d4318f' },
+      pants: { type: 'pants', color: '#6e4224' },
+      gloves: { type: 'paws', color: '#7a4a28', claws: '#f2ead8' },
+      shoes: { type: 'boots', color: '#6e4224', sole: '#3a2414' },
+      victory: 3,
+    },
+    moves: {
+      hp: { damage: 90, stun: 80 },
+      s1: { name: 'Honey Hammer' },
     },
   },
 ];

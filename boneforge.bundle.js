@@ -396,6 +396,7 @@ const TUNING = {
   superFreeze: 48, // cinematic freeze when a super starts
   // burn (Cinder's super): a small hit every burnInterval ticks while the timer runs; never KOs
   burnInterval: 30,
+  armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,
   superMotionWindow: 26,
   meterOnHit: 0.09, // fraction of damage dealt
@@ -523,6 +524,7 @@ class AudioSystem {
         this.tone(heavy ? 0.22 : 0.12, { freq: heavy ? 150 : 220, to: 40, gain: heavy ? 0.7 : 0.45 });
         this.noise(heavy ? 0.18 : 0.1, { freq: heavy ? 900 : 1600, q: 0.7, gain: heavy ? 0.7 : 0.45, sweep: 0.4 });
         if (e.counter) this.tone(0.25, { freq: 1200, to: 1800, type: 'triangle', gain: 0.12 });
+        if (e.claw) this.noise(0.14, { freq: 4200, q: 1.5, gain: 0.3, sweep: 0.5 }); // claw rake
         if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
         if (e.prop === 'pan') {
           // cast-iron "BONG": inharmonic partials with a long ring
@@ -569,6 +571,10 @@ class AudioSystem {
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
         break;
+      case 'armor':
+        this.tone(0.3, { freq: 110, to: 60, gain: 0.6 });
+        this.noise(0.12, { freq: 900, q: 2, gain: 0.3 });
+        break;
       case 'burn':
         this.noise(0.07, { freq: 2600, q: 2, gain: 0.12 }); // crackle
         break;
@@ -594,7 +600,7 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All nine are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All ten are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
@@ -834,6 +840,30 @@ const ROSTER = [
       s1: { name: 'Spark Fist' },
     },
   },
+  {
+    id: 'grizz',
+    name: 'TEDDY "GRIZZ" BARRETT',
+    title: 'Bear-Suit Bruiser',
+    blurb: 'Lost a bet, kept the bear suit. Shrugs off a punch mid-charge and mauls whoever threw it.',
+    body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
+    stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
+    look: {
+      skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
+      eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
+      hair: { style: 'short', color: '#1a1210' },
+      beard: { style: 'goatee', color: '#1a1210' },
+      hood: { color: '#7a4a28', lining: '#d4318f', bear: true, snout: '#c9a27a', teeth: '#f2ead8', eyes: '#4fb8a0' },
+      top: { type: 'onesie', color: '#7a4a28', color2: '#d4318f', belly: '#d8c39a', patch: '#d4318f' },
+      pants: { type: 'pants', color: '#6e4224' },
+      gloves: { type: 'paws', color: '#7a4a28', claws: '#f2ead8' },
+      shoes: { type: 'boots', color: '#6e4224', sole: '#3a2414' },
+      victory: 3,
+    },
+    moves: {
+      hp: { damage: 90, stun: 80 },
+      s1: { name: 'Honey Hammer' },
+    },
+  },
 ];
 
 const deepMerge = (base, over) => {
@@ -1049,6 +1079,10 @@ const FINISH = (damage, reaction = 'launch', o = {}) => H(damage, {
 /** Fire strikes (Cinder's super): flaming fists, fire sparks, and a burn lasting 10 s (600 ticks). */
 const FIRE = { fire: true, burn: 600 };
 
+/** Bear claws (Grizz's super): whole arm plus the claws reaching past the paw; claw-slash effects. */
+const CLAW_F = { claw: true, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 14 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: 22, r: 15 }] };
+const CLAW_B = { claw: true, hitboxes: [{ a: 'shoulderB', b: 'elbowB', r: 14 }, { a: 'elbowB', b: 'handB', r: 15 }, { a: 'handB', b: 'handB', dir: 'elbowB', ext: 22, r: 15 }] };
+
 const SIGNATURES = {
   brick: {
     s4: {
@@ -1186,6 +1220,22 @@ const SIGNATURES = {
       ...SUPER, name: 'Wildfire Rush', anim: 'sequence', fire: true,
       steps: [step('jab', 9, H(45, FIRE)), step('cross', 10, H(50, FIRE)), step('jab', 8, H(40, FIRE)), step('cross', 10, H(50, FIRE)), step('lunge', 18, FINISH(100, 'launch', FIRE), { vx: 6 })],
       recoveryAfter: 16,
+    },
+  },
+  grizz: {
+    // armoured shoulder charge: absorbs one strike during the run-up and keeps going
+    s4: {
+      name: 'Grizzly Charge', anim: 'tackle', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 14, active: 12, recovery: 28, motion: [{ from: 6, to: 24, vx: 8.5 }],
+      damage: 85, stun: 70, hitstun: 24, blockstun: 16, hitstop: 12,
+      height: 'mid', reaction: 'knockdown', push: { hit: 4, block: 6 }, launch: { vx: 5, vy: 6 },
+      hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 20 }, { a: 'neck', b: 'shoulderF', r: 20 }],
+      armor: { from: 4, to: 24, hits: 1 }, juggle: 2, priority: 3, shake: 7,
+    },
+    su: {
+      ...SUPER, name: 'Grizzly Fury', anim: 'sequence', claws: true,
+      steps: [step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('panSwing', 14, H(45, CLAW_F)), step('cross', 10, H(50, CLAW_B)), step('chop', 19, FINISH(115, 'knockdown', CLAW_F))],
+      recoveryAfter: 18,
     },
   },
 };
@@ -3425,6 +3475,13 @@ const ATTACK_POSES = {
     contact: P(AIR_FALL, { lean: 26, chest: 12, neck: -10, fa: [102, 12, 0], ba: [96, 16, 0], fl: [60, 96, 10], bl: [30, 90, 10] }),
     extend: P(AIR_FALL, { lean: 30, chest: 14, neck: -10, fa: [92, 10, 0], ba: [88, 14, 0], fl: [50, 80, 10], bl: [20, 70, 10] }),
   },
+  // shoulder-first charge with the lead forearm up as a shield (Grizz)
+  tackle: {
+    base: 'stand',
+    windup: P(STANCE, { x: -8, y: 104, lean: 12, chest: 6, fa: [44, 118, 0], ba: [24, 132, 0], ff: [30, 10, 0], bf: [-26, 10, 0] }),
+    contact: P(STANCE, { x: 22, y: 100, lean: 34, chest: 18, neck: -8, head: -10, fa: [72, 104, 0], ba: [20, 128, 0], ff: [44, 8, 0], bf: [-38, 10, 0] }),
+    extend: P(STANCE, { x: 24, y: 100, lean: 36, chest: 20, neck: -8, head: -10, fa: [74, 102, 0], ba: [20, 128, 0], ff: [46, 8, 0], bf: [-40, 10, 0] }),
+  },
   // backhand swing of the lead arm (Bruno's frying pan)
   panSwing: {
     base: 'stand',
@@ -3974,6 +4031,20 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   const from = projectile ? { body: { x: projectile.x - Math.sign(projectile.vx) * 20 }, facing: Math.sign(projectile.vx) || 1 } : att;
   const block = trade ? { ok: false, why: 'trade' } : def.canBlock(from, spec.height);
   const ownHitstop = (n) => { if (!projectile) att.hitstop = n; };
+  // Armour (Grizz's charge): absorbs a strike during its window, taking half damage without
+  // flinching. Supers and throws break through; the armour holds a limited number of hits.
+  const arm = def.state === 'attack' && def.move?.def.armor;
+  if (arm && !spec.super && def.move.frame >= arm.from && def.move.frame <= arm.to && (def.move.armorUsed || 0) < arm.hits) {
+    def.move.armorUsed = (def.move.armorUsed || 0) + 1;
+    holder.contact = 'block';
+    const damage = Math.max(1, Math.round(spec.damage * TUNING.armorDamage));
+    def.health = Math.max(1, def.health - damage);
+    def.flash = 6;
+    def.hitstop = spec.hitstop;
+    ownHitstop(spec.hitstop);
+    note(att, 'ABSORBED by armour');
+    return { type: 'armor', who: att.index, target: def.index, x: res.point.x, y: res.point.y, damage };
+  }
   if (block.ok) {
     holder.contact = 'block';
     const hs = Math.round(spec.hitstop * TUNING.blockHitstopScale);
@@ -4016,7 +4087,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     type: 'hit', who: att.index, target: def.index, x: res.point.x, y: res.point.y,
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
-    super: !!spec.super, prop: spec.prop, fire: !!spec.fire,
+    super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw,
   };
 }
 
@@ -4356,9 +4427,11 @@ class FightRenderer {
       : null;
     // flaming fists only on fire moves (specials / super), never on normal attacks
     const fire = !!(mv?.def.fire && f.state === 'attack');
+    const claws = !!(mv?.def.claws && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
+      claws,
       now,
       layers: f.anim.layers,
       tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
@@ -4693,6 +4766,7 @@ class FighterPainter {
     this.tint = opts.tint || 0;
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
+    this.claws = !!opts.claws;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
     this.skin = this.mat(lk.skin, t);
@@ -4734,7 +4808,7 @@ class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -4855,7 +4929,7 @@ class FighterPainter {
     if (pass === 'outline') return this.outlineFill(ctx);
     const skin = this.mat(darken(lk.species === 'weasel' ? lk.skin : lk.skin, depth), t).base;
     const gloveC = this.mat(darken(gl.color || lk.skin, depth), t).base;
-    const full = gl.type === 'gloves' || gl.type === 'gauntlet';
+    const full = gl.type === 'gloves' || gl.type === 'gauntlet' || gl.type === 'paws';
     ctx.fillStyle = full ? gloveC : skin;
     ctx.fill();
     this.shadeSeg(ctx, Wr, tip, w * 1.1);
@@ -4871,6 +4945,14 @@ class FighterPainter {
       ctx.fillStyle = this.mat(gl.color, t).base;
       ctx.fill();
       this.line(ctx, [along(Wr, H, 0.25, w), along(Wr, H, 0.45, -w)], 0.9, this.outline, 0.35);
+    }
+    if (gl.type === 'paws') {
+      // onesie paw: claws over the knuckles, longer and brighter while the super rages
+      const len = this.claws ? 1.0 : 0.45;
+      for (const k of [-0.6, 0, 0.6]) {
+        const a = along(Wr, H, 1.0, w * k), b = along(Wr, H, 1.12 + len * 0.5, w * k * 1.15);
+        this.line(ctx, [a, b], this.claws ? 2.6 : 2, this.mat(gl.claws, t).base);
+      }
     }
     // knuckles + thumb
     this.line(ctx, [along(Wr, H, 0.78, w * 0.9), along(Wr, H, 0.82, 0), along(Wr, H, 0.78, -w * 0.9)], 1.2, this.outline, 0.55);
@@ -5183,6 +5265,34 @@ class FighterPainter {
     const outl = this.outline;
     const chest = P2(N, uC, -up * 0.42, fC, cw * 0.55);
     switch (top.type) {
+      case 'onesie': {
+        // bear onesie: cream belly panel, magenta collar, snap buttons, a little bear patch
+        ctx.beginPath();
+        smoothClosed(ctx, [P2(N, fC, cw * 0.15, uC, -up * 0.35), P2(N, fC, cw * 0.95, uC, -up * 0.42), P2(W, fS, ww * 0.9, uS, -4),
+          P2(Pv, fS, ww * 0.7, uS, 4), P2(Pv, fS, -ww * 0.3, uS, 6), P2(W, fS, -ww * 0.2, uS, 10)], 0.4);
+        ctx.fillStyle = this.mat(top.belly, t).base;
+        ctx.fill();
+        ctx.beginPath();
+        smoothClosed(ctx, [P2(N, fC, cw * 0.05, uC, 6), P2(N, fC, cw * 0.75, uC, 2), P2(N, fC, cw * 0.55, uC, -up * 0.3), P2(N, fC, cw * 0.2, uC, -4)], 0.35);
+        ctx.fillStyle = this.mat(top.color2, t).base;
+        ctx.fill();
+        for (let i = 0; i < 3; i++) {
+          const b = P2(N, fC, cw * 0.62, uC, -up * (0.12 + i * 0.09));
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = '#e8e2d4';
+          ctx.fill();
+        }
+        const pt = P2(N, fC, cw * 0.55, uC, -up * 0.55);
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.mat(top.patch, t).base;
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = outl;
+        ctx.stroke();
+        break;
+      }
       case 'tee': {
         // crew neckline
         ctx.beginPath();
@@ -5626,6 +5736,7 @@ class FighterPainter {
     else this.drawFace(ctx, R, opts, weasel);
     this.drawHair(ctx, R);
     if (lk.hat) this.drawHat(ctx, R);
+    if (lk.hood?.bear) this.drawBearHood(ctx, R);
     ctx.restore();
     if (lk.headphones) this.drawHeadphones(ctx, J, A);
   }
@@ -5642,6 +5753,58 @@ class FighterPainter {
     hg.addColorStop(1, rgba(rim, 0.7));
     ctx.fillStyle = hg;
     ctx.fillRect(-2 * R, -2 * R, 4.5 * R, 4 * R);
+  }
+
+  /** Bear-onesie hood worn over the head: round ears, brim, a snout with teeth and eyes on top. */
+  drawBearHood(ctx, R) {
+    const hd = this.look.hood, t = this.tint, outl = this.outline;
+    const fur = this.mat(hd.color, t).base;
+    const ring = (x, y, r, fill, w = 1.8) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = w;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
+    };
+    // ears
+    for (const [x, y] of [[-0.75, 1.3], [0.2, 1.55]]) {
+      ring(x * R, y * R, 0.36 * R, fur, 2.2);
+      ring(x * R, y * R, 0.18 * R, this.mat(hd.lining, t).base, 1);
+    }
+    // brim: the hood edge framing the forehead
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -1.25 * R, y: 0.1 * R }, { x: -1.0 * R, y: 1.2 * R }, { x: 0.1 * R, y: 1.5 * R }, { x: 1.05 * R, y: 1.05 * R }, { x: 1.2 * R, y: 0.5 * R },
+      { x: 0.85 * R, y: 0.45 * R }, { x: 0.1 * R, y: 0.78 * R }, { x: -0.9 * R, y: 0.35 * R }], 0.35);
+    ctx.fillStyle = fur;
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    this.shadeAcross(ctx, { x: 0.6 * R, y: 1.4 * R }, { x: -1.2 * R, y: 0.2 * R });
+    // teeth along the front of the brim
+    ctx.fillStyle = this.mat(hd.teeth, t).base;
+    for (const x of [0.32, 0.55, 0.78, 1.0]) {
+      ctx.beginPath();
+      ctx.moveTo((x - 0.09) * R, (0.62 - x * 0.1) * R);
+      ctx.lineTo(x * R, (0.38 - x * 0.1) * R);
+      ctx.lineTo((x + 0.09) * R, (0.6 - x * 0.1) * R);
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // snout + nose
+    ctx.beginPath();
+    ctx.ellipse(0.98 * R, 0.98 * R, 0.42 * R, 0.3 * R, -0.25, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(hd.snout, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ring(1.3 * R, 1.08 * R, 0.15 * R, this.mat('#3a1830', t).base, 1.4);
+    // stitched eye
+    ring(0.4 * R, 1.12 * R, 0.17 * R, this.mat('#f4f1ea', t).base, 1.4);
+    ring(0.44 * R, 1.1 * R, 0.08 * R, this.mat(hd.eyes, t).base, 0.8);
   }
 
   drawEars(ctx, pass, R, weasel) {
@@ -6486,6 +6649,7 @@ class Effects {
         const n = heavy ? 18 : 10;
         const color = e.fire ? '#ffb040' : e.counter ? '#ffd23f' : '#ffffff';
         if (e.fire) this.fireBurst(e.x, e.y, heavy ? 16 : 10, e.dir);
+        if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
           const sp = (heavy ? 7 : 4.5) + this.rnd() * 6;
@@ -6534,6 +6698,13 @@ class Effects {
           const a = this.rnd() * Math.PI * 2;
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
+        break;
+      case 'armor':
+        // the charge shrugs the hit off: amber flash ring + label
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 8, life: 14, max: 14, color: '#ffb347' });
+        this.parts.push({ kind: 'shield', x: e.x, y: e.y, life: 12, max: 12, dir: 1 });
+        this.labels.push({ text: 'ARMOR', x: e.x, y: e.y + 60, life: 45, color: '#ffb347' });
+        this.shake = Math.max(this.shake, 4);
         break;
       case 'burn':
         // burn tick: a puff of embers off the burning body
@@ -6648,6 +6819,24 @@ class Effects {
         ctx.stroke();
         ctx.fillStyle = rgba('#7fe8ff', 0.15 * k);
         ctx.fill();
+      } else if (p.kind === 'claw') {
+        // three parallel claw slashes that draw in, then fade
+        const draw = Math.min(1, (p.max - p.life) / 4);
+        const L = 46 * cam.zoom, ang = (p.flip ? -1 : 1) * 0.9;
+        ctx.lineCap = 'round';
+        for (let i = -1; i <= 1; i++) {
+          const ox = Math.cos(ang + Math.PI / 2) * i * 11 * cam.zoom, oy = Math.sin(ang + Math.PI / 2) * i * 11 * cam.zoom;
+          const x0 = s.x + ox - Math.cos(ang) * L / 2, y0 = s.y + oy - Math.sin(ang) * L / 2;
+          ctx.strokeStyle = rgba('#ffffff', Math.min(1, k * 1.4));
+          ctx.lineWidth = 5 * cam.zoom * k + 1;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x0 + Math.cos(ang) * L * draw, y0 + Math.sin(ang) * L * draw);
+          ctx.stroke();
+          ctx.strokeStyle = rgba('#ff4fd8', 0.7 * k);
+          ctx.lineWidth = 2 * cam.zoom;
+          ctx.stroke();
+        }
       } else if (p.kind === 'ember') {
         const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';
         ctx.fillStyle = rgba(hot, Math.min(1, k * 1.6) * (0.75 + 0.25 * Math.sin(p.life * 1.7)));
@@ -7472,7 +7661,7 @@ const M = {
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
-  cinder: [60, 170],
+  cinder: [60, 170], grizz: [100, 190],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
 const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22 };
@@ -7587,6 +7776,11 @@ class AIController {
     if (proj) {
       if (r.chance(cfg.antiAir * 0.5)) this.queue([{ d: 'uf', n: 3 }]);
       else this.hold = { d: 'b', n: 24 };
+      return;
+    }
+    // Armoured charge (Grizz): blow through an incoming strike.
+    if (me.def.id === 'grizz' && op.move && op.phase === 'startup' && dist < 260 && r.chance(cfg.signature * 0.25)) {
+      this.queue(M.s4);
       return;
     }
     // Counter stance (Vellaro): read an incoming strike.
