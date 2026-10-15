@@ -21,6 +21,7 @@ const { FightScene } = __require("src/ui/fightScene.js");
 const { TitleScene } = __require("src/ui/titleScene.js");
 const { SelectScene } = __require("src/ui/selectScene.js");
 const { VersusScene } = __require("src/ui/versusScene.js");
+const { TournamentScene } = __require("src/ui/tournamentScene.js");
 
 const DEFAULT_SETTINGS = { roundsToWin: 2, roundTime: 99, difficulty: 'normal', arena: 'dusk', sound: true };
 
@@ -111,6 +112,10 @@ class App {
   goVersus(p1, p2, mode) {
     this.setScene(new VersusScene(this, p1, p2, mode));
   }
+  goTournament() {
+    this.audio.stopMusic();
+    this.setScene(new TournamentScene(this));
+  }
   startFight(p1, p2, mode = 'cpu') {
     this.setScene(new FightScene(this, { p1, p2, mode }));
   }
@@ -125,6 +130,7 @@ if (hash.has('fight')) {
   if (hash.has('debug')) app.settings.sound = false;
   app.startFight(p1 || 'brick', p2 || 'jax', mode || 'cpu');
 } else if (hash.has('select')) app.goSelect(hash.get('select') || 'cpu');
+else if (hash.has('tournament')) app.goTournament();
 else app.goTitle();
 
 });
@@ -2431,6 +2437,8 @@ const { FightRenderer } = __require("src/render/fightRenderer.js");
 const { AIController } = __require("src/ai/aiController.js");
 const { emptyRaw } = __require("src/input/inputBuffer.js");
 const { el, clearUI } = __require("src/ui/dom.js");
+const { setupMatch } = __require("src/tournament/tournament.js");
+const { MatchStats } = __require("src/tournament/stats.js");
 
 // Fresh AI seed per fight: the simulation is deterministic, so a fixed seed replays the same bout.
 const randomSeed = () => Math.floor(Math.random() * 1e9);
@@ -2439,22 +2447,29 @@ const SPEEDS = [1, 0.5, 0.25, 0.1];
 const DUMMY_MODES = ['stand', 'crouch', 'block', 'jump', 'cpu'];
 
 class FightScene {
-  constructor(app, { p1, p2, mode = 'cpu' }) {
+  constructor(app, { p1, p2, mode = 'cpu', tournament = null }) {
     this.app = app;
     this.mode = mode;
     this.p1 = p1;
     this.p2 = p2;
+    // tournament match (live or replay): seed, rules and the fighters' overrides come from the record
+    this.tournament = tournament;
     const s = app.settings;
-    this.match = new Match({
+    if (tournament) {
+      const { match, ai, overrides } = setupMatch(tournament.t, tournament.m);
+      Object.assign(this, { match, ai, overrides, stats: new MatchStats(), mode: 'watch' });
+      this.mode = 'watch';
+    } else this.match = new Match({
       p1, p2,
       roundsToWin: mode === 'training' ? 99 : s.roundsToWin,
       roundTime: mode === 'training' ? 0 : s.roundTime,
       training: mode === 'training',
     });
+    if (!tournament) this.ai = null;
     this.renderer = new FightRenderer(this.match, { arena: s.arena === 'random' ? (Math.random() < 0.5 ? 'dusk' : 'night') : s.arena, portraits: app.portraits });
     this.loop = new FixedStepLoop();
     this.debug = { enabled: mode === 'training', timeScale: 1, paused: false };
-    this.ai = [
+    this.ai = this.ai || [
       mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: randomSeed() }) : null,
       mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: randomSeed() }) : null,
     ];
@@ -2531,12 +2546,18 @@ class FightScene {
 
   tick() {
     const events = this.match.tick(this.inputs());
+    this.stats?.onTick(this.match, events);
     this.renderer.onTick(events);
     for (const e of events) {
       this.app.audio.onEvent(e);
       if (e.type === 'matchEnd') this.app.audio.fadeMusic(2500);
     }
-    if (this.match.phase === 'over' && !this.overlay) this.showResults();
+    if (this.match.phase === 'over' && !this.overlay) {
+      if (this.tournament && !this.ended) {
+        this.ended = true;
+        this.tournament.onEnd({ match: this.match, stats: this.stats, overrides: this.overrides });
+      } else if (!this.tournament) this.showResults();
+    }
   }
 
   frame(dt, now) {
@@ -2547,12 +2568,19 @@ class FightScene {
   showPause() {
     this.paused = true;
     this.app.audio.music?.pause();
-    this.overlay = this.app.menu('PAUSED', [
-      ['Resume', () => this.closeOverlay(true)],
-      ['Restart match', () => this.app.startFight(this.p1, this.p2, this.mode)],
-      ['Character select', () => this.app.goSelect(this.mode)],
-      ['Main menu', () => this.app.goTitle()],
-    ], { onBack: () => this.closeOverlay(true) });
+    const items = this.tournament
+      ? [
+        ['Resume', () => this.closeOverlay(true)],
+        [this.tournament.replay ? 'Back to tournament' : 'Skip to result (simulate)', () => this.tournament.onQuit()],
+        ['Main menu', () => this.app.goTitle()],
+      ]
+      : [
+        ['Resume', () => this.closeOverlay(true)],
+        ['Restart match', () => this.app.startFight(this.p1, this.p2, this.mode)],
+        ['Character select', () => this.app.goSelect(this.mode)],
+        ['Main menu', () => this.app.goTitle()],
+      ];
+    this.overlay = this.app.menu('PAUSED', items, { onBack: () => this.closeOverlay(true) });
   }
 
   closeOverlay(resume) {
@@ -12337,6 +12365,446 @@ class AIController {
 }
 
 });
+__define("src/tournament/tournament.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "TOURNAMENT_RULES", { enumerable: true, get: () => TOURNAMENT_RULES });
+  Object.defineProperty(__exports, "FAME_PER_SP", { enumerable: true, get: () => FAME_PER_SP });
+  Object.defineProperty(__exports, "AWARD_FAME", { enumerable: true, get: () => AWARD_FAME });
+  Object.defineProperty(__exports, "POINTS", { enumerable: true, get: () => POINTS });
+  Object.defineProperty(__exports, "roundRobin", { enumerable: true, get: () => roundRobin });
+  Object.defineProperty(__exports, "createTournament", { enumerable: true, get: () => createTournament });
+  Object.defineProperty(__exports, "allMatches", { enumerable: true, get: () => allMatches });
+  Object.defineProperty(__exports, "nextMatch", { enumerable: true, get: () => nextMatch });
+  Object.defineProperty(__exports, "isFinished", { enumerable: true, get: () => isFinished });
+  Object.defineProperty(__exports, "currentRound", { enumerable: true, get: () => currentRound });
+  Object.defineProperty(__exports, "snapshotOverrides", { enumerable: true, get: () => snapshotOverrides });
+  Object.defineProperty(__exports, "setupMatch", { enumerable: true, get: () => setupMatch });
+  Object.defineProperty(__exports, "MatchRunner", { enumerable: true, get: () => MatchRunner });
+  Object.defineProperty(__exports, "recordResult", { enumerable: true, get: () => recordResult });
+  Object.defineProperty(__exports, "standings", { enumerable: true, get: () => standings });
+  Object.defineProperty(__exports, "roundComplete", { enumerable: true, get: () => roundComplete });
+  Object.defineProperty(__exports, "awards", { enumerable: true, get: () => awards });
+  Object.defineProperty(__exports, "tournamentAwards", { enumerable: true, get: () => tournamentAwards });
+  Object.defineProperty(__exports, "save", { enumerable: true, get: () => save });
+  Object.defineProperty(__exports, "load", { enumerable: true, get: () => load });
+  Object.defineProperty(__exports, "clearSaved", { enumerable: true, get: () => clearSaved });
+// Round-robin tournament: schedule, results, standings, awards, persistence and the background
+// simulator. Pure logic (no DOM): the tournament scene draws it, tests exercise it in node.
+//
+// Every match is fully reproducible: the simulation is deterministic, so a match is defined by
+// (fighters, seed, AI level, rules) plus the fighters' definition overrides AT THAT MOMENT. Those
+// overrides (`o1`, `o2`: future level-ups, injuries, bought upgrades...) are snapshotted into the
+// match record when it is played, so a replay shows exactly the fight that happened, whatever the
+// fighters look like now.
+const { Match } = __require("src/game/match.js");
+const { AIController } = __require("src/ai/aiController.js");
+const { ROSTER } = __require("src/data/fighters.js");
+const { Rng } = __require("src/core/rng.js");
+const { MatchStats } = __require("src/tournament/stats.js");
+
+const TOURNAMENT_RULES = { roundsToWin: 2, roundTime: 99 };
+/**
+ * FAME is the currency (upgrades will be bought with it). Spectacle points earned in a match
+ * convert into fame; every award adds a bonus of about 25 % of what an average fighter earns in a
+ * match (measured: ~118 spectacle points per fighter per match).
+ */
+const FAME_PER_SP = 1;
+const AWARD_FAME = 30;
+/** League points by final score (winner's rounds : loser's rounds). */
+const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
+const STORAGE_KEY = 'boneforge.tournament';
+const VERSION = 2;
+
+/** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
+function roundRobin(ids) {
+  const list = ids.slice();
+  if (list.length % 2) list.push(null);
+  const n = list.length, rounds = [];
+  for (let r = 0; r < n - 1; r++) {
+    const pairs = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = list[i], b = list[n - 1 - i];
+      if (a && b) pairs.push(r % 2 ? [b, a] : [a, b]);
+    }
+    rounds.push(pairs);
+    list.splice(1, 0, list.pop()); // rotate everyone but the first
+  }
+  return rounds;
+}
+
+function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', seed = Math.floor(Math.random() * 1e9) } = {}) {
+  const rng = new Rng(seed);
+  const shuffled = ids.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const rounds = roundRobin(shuffled).map((pairs) => pairs.map(([a, b]) => ({ a, b, seed: rng.int(1, 1e9), result: null })));
+  return {
+    version: VERSION, created: Date.now(), seed, level, ids: ids.slice(), rounds,
+    // per-fighter state that will grow (level-ups, injuries, upgrades); empty overrides for now
+    fighters: Object.fromEntries(ids.map((id) => [id, { overrides: {}, sp: 0, fame: 0, fameEarned: 0 }])),
+    roundAwards: [], // per round: the awards list, filled in when the round completes
+    finalAwards: null,
+  };
+}
+
+function allMatches(t) {
+  return t.rounds.flatMap((r, ri) => r.map((m, mi) => ({ m, ri, mi })));
+}
+function nextMatch(t) {
+  return allMatches(t).find((x) => !x.m.result) || null;
+}
+function isFinished(t) {
+  return !nextMatch(t);
+}
+function currentRound(t) {
+  const n = nextMatch(t);
+  return n ? n.ri : t.rounds.length - 1;
+}
+
+/** Definition overrides for both fighters of a match, as they are right now (snapshot). */
+function snapshotOverrides(t, m) {
+  const clone = (o) => JSON.parse(JSON.stringify(o || {}));
+  return [clone(t.fighters[m.a]?.overrides), clone(t.fighters[m.b]?.overrides)];
+}
+
+/** A fresh Match + AI pair for a scheduled match (used for live viewing, simulation and replays). */
+function setupMatch(t, m, overrides = m.result?.overrides || snapshotOverrides(t, m)) {
+  const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], ...TOURNAMENT_RULES });
+  const ai = [new AIController(0, { level: t.level, seed: m.seed }), new AIController(1, { level: t.level, seed: m.seed * 7 + 3 })];
+  return { match, ai, overrides };
+}
+
+/**
+ * Background simulator for one match: advance() runs ticks until the time budget is spent, so the
+ * UI stays responsive. done/result once the match is over.
+ */
+class MatchRunner {
+  constructor(t, m) {
+    const { match, ai, overrides } = setupMatch(t, m);
+    Object.assign(this, { t, m, match, ai, overrides, stats: new MatchStats(), done: false, ticks: 0 });
+  }
+  advance(budgetMs = 12) {
+    const end = performance.now() + budgetMs;
+    const { match, ai, stats } = this;
+    while (!this.done && performance.now() < end) {
+      for (let i = 0; i < 60 && !this.done; i++) {
+        const ev = match.tick([ai[0].input(match), ai[1].input(match)]);
+        stats.onTick(match, ev);
+        if (match.phase === 'over' || ++this.ticks > 60 * 60 * 10) this.done = true;
+      }
+    }
+    return this.done;
+  }
+  /** Runs to the end synchronously (tests, node tools); returns the report without recording it. */
+  finish() {
+    while (!this.advance(1e9));
+    return this.stats.report(this.match);
+  }
+  /** Records the finished match into the tournament (once). */
+  record() {
+    return recordResult(this.t, this.m, this.match, this.stats, this.overrides);
+  }
+}
+
+/** Stores a finished match (winner, score, stats, spectacle points, the overrides used). */
+function recordResult(t, m, match, stats, overrides) {
+  const rep = stats.report(match);
+  m.result = { ...rep, overrides, playedAt: Date.now() };
+  const ids = [m.a, m.b];
+  rep.sides.forEach((s, i) => {
+    const fame = Math.round(s.spectacle.total * FAME_PER_SP);
+    s.fame = fame;
+    t.fighters[ids[i]].sp += s.spectacle.total;
+    addFame(t, ids[i], fame);
+  });
+  // a round (tour) that just completed hands out its awards; the last match closes the tournament
+  t.rounds.forEach((r, ri) => {
+    if (!t.roundAwards[ri] && roundComplete(t, ri)) t.roundAwards[ri] = grantAwards(t, awards(t, ri));
+  });
+  if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
+  save(t);
+  return m.result;
+}
+
+function addFame(t, id, n) {
+  const f = t.fighters[id];
+  f.fame += n;
+  f.fameEarned += n;
+}
+
+/** Each award winner gets AWARD_FAME bonus fame; returns the list with the bonus noted. */
+function grantAwards(t, list) {
+  return list.map((a) => {
+    if (a.id) addFame(t, a.id, AWARD_FAME);
+    return { ...a, fame: a.id ? AWARD_FAME : 0 };
+  });
+}
+
+/** League table with tie-breaks: points, head-to-head, round difference, damage dealt, perfects. */
+function standings(t) {
+  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame });
+  const rows = Object.fromEntries(t.ids.map((id) => [id, row(id)]));
+  const h2h = {};
+  for (const { m } of allMatches(t)) {
+    const r = m.result;
+    if (!r) continue;
+    const ids = [m.a, m.b];
+    ids.forEach((id, i) => {
+      const x = rows[id], s = r.sides[i];
+      x.played++;
+      x.rf += r.wins[i];
+      x.ra += r.wins[1 - i];
+      x.dmg += s.damageDealt;
+      x.taken += s.damageTaken;
+      x.perfect += s.perfect;
+      if (r.winner === 'draw') { x.drawn++; x.pts += POINTS.draw; x.form.push('D'); }
+      else if (r.winner === i) {
+        x.won++;
+        x.pts += r.wins[1 - i] === 0 ? POINTS.win20 : POINTS.win21;
+        x.form.push('W');
+        h2h[`${id}>${ids[1 - i]}`] = true;
+      } else {
+        x.lost++;
+        x.pts += r.wins[i] > 0 ? POINTS.loss12 : POINTS.loss02;
+        x.form.push('L');
+      }
+    });
+  }
+  const list = Object.values(rows);
+  list.sort((a, b) => b.pts - a.pts
+    || (h2h[`${a.id}>${b.id}`] ? -1 : h2h[`${b.id}>${a.id}`] ? 1 : 0)
+    || (b.rf - b.ra) - (a.rf - a.ra)
+    || b.dmg - a.dmg
+    || b.perfect - a.perfect
+    || a.id.localeCompare(b.id));
+  list.forEach((r) => { r.form = r.form.slice(-5); });
+  return list;
+}
+
+/**
+ * Awards over a set of matches: fastest K.O., most combos, longest combo, least damage taken (per
+ * match) and most spectacular (spectacle points earned). Each: { key, title, id, value, note }.
+ * awards(t, ri) = one round (tour); tournamentAwards(t) = the whole tournament.
+ */
+function awardsOver(matches) {
+  const per = {};
+  for (const m of matches) {
+    const r = m.result;
+    if (!r) continue;
+    [m.a, m.b].forEach((id, i) => {
+      const s = r.sides[i];
+      const p = (per[id] ||= { played: 0, combos: 0, longest: 0, longestVs: null, taken: 0, sp: 0, fastest: Infinity, fastestVs: null });
+      const vs = [m.a, m.b][1 - i];
+      p.played++;
+      p.combos += s.combos;
+      if (s.longestCombo > p.longest) { p.longest = s.longestCombo; p.longestVs = vs; }
+      p.taken += s.damageTaken;
+      p.sp += s.spectacle.total;
+      for (const k of s.koTimes) if (k < p.fastest) { p.fastest = k; p.fastestVs = vs; }
+    });
+  }
+  const ids = Object.keys(per);
+  const best = (score, lower = false, ok = () => true) => {
+    let id = null;
+    for (const x of ids) {
+      if (!ok(x)) continue;
+      if (id === null || (lower ? score(x) < score(id) : score(x) > score(id))) id = x;
+    }
+    return id;
+  };
+  const one = matches.length <= ids.length / 2; // a single round: every fighter played once
+  const fastest = best((x) => per[x].fastest, true, (x) => per[x].fastest < Infinity);
+  const combos = best((x) => per[x].combos, false, (x) => per[x].combos > 0);
+  const longest = best((x) => per[x].longest, false, (x) => per[x].longest > 0);
+  const iron = best((x) => per[x].taken / per[x].played, true);
+  const star = best((x) => per[x].sp);
+  return [
+    { key: 'fastest', title: 'Fastest K.O.', id: fastest, value: fastest ? `${per[fastest].fastest.toFixed(1)} s` : '—', note: fastest ? `vs ${per[fastest].fastestVs}` : '' },
+    { key: 'combos', title: 'Most combos', id: combos, value: combos ? String(per[combos].combos) : '—' },
+    { key: 'longest', title: 'Longest combo', id: longest, value: longest ? `${per[longest].longest} hits` : '—', note: longest ? `vs ${per[longest].longestVs}` : '' },
+    { key: 'iron', title: 'Least damage taken', id: iron, value: iron ? (one ? String(per[iron].taken) : `${Math.round(per[iron].taken / per[iron].played)} / match`) : '—' },
+    { key: 'star', title: 'Most spectacular', id: star, value: star ? `${per[star].sp} SP` : '—' },
+  ];
+}
+
+/** True when every match of round `ri` has been played. */
+function roundComplete(t, ri) {
+  return t.rounds[ri].every((m) => m.result);
+}
+
+/** Awards of one round (tour). */
+function awards(t, ri) {
+  return awardsOver(t.rounds[ri]);
+}
+
+/** Awards over the whole tournament. */
+function tournamentAwards(t) {
+  return awardsOver(allMatches(t).map((x) => x.m));
+}
+
+// --- persistence -----------------------------------------------------------------------------
+function save(t) {
+  try { globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(t)); } catch { /* storage unavailable */ }
+}
+function load() {
+  try {
+    const t = JSON.parse(globalThis.localStorage?.getItem(STORAGE_KEY) || 'null');
+    return t && t.version === VERSION ? t : null;
+  } catch {
+    return null;
+  }
+}
+function clearSaved() {
+  try { globalThis.localStorage?.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
+});
+__define("src/tournament/stats.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "SPECTACLE_RULES", { enumerable: true, get: () => SPECTACLE_RULES });
+  Object.defineProperty(__exports, "MatchStats", { enumerable: true, get: () => MatchStats });
+// Match statistics and SPECTACLE points.
+// A MatchStats object listens to the events of one match (watched or simulated: the same events
+// either way) and, at the end, reports per-fighter numbers plus the spectacle points each fighter
+// earned and what they were earned for. Spectacle points are the tournament currency.
+
+/** What earns spectacle points. `per` = points per occurrence; combos are scored by length. */
+const SPECTACLE_RULES = [
+  { key: 'combo', label: 'Combos', icon: '⚡', hint: '2 pts per hit after the first, +5 for 5+ hits' },
+  { key: 'variety', label: 'Move variety', icon: '🎯', per: 1, hint: 'different moves that landed', cap: 20 },
+  { key: 'special', label: 'Specials landed', icon: '✦', per: 3 },
+  { key: 'super', label: 'Supers landed', icon: '★', per: 10 },
+  { key: 'counter', label: 'Counter hits', icon: '↯', per: 2 },
+  { key: 'punish', label: 'Punishes', icon: '⚔', per: 2 },
+  { key: 'throw', label: 'Throws', icon: '⤴', per: 4 },
+  { key: 'parry', label: 'Parries', icon: '🛡', per: 5 },
+  { key: 'dizzy', label: 'Dizzied the rival', icon: '💫', per: 8 },
+  { key: 'fastKo', label: 'Quick K.O. (< 20 s)', icon: '⏱', per: 8 },
+  { key: 'perfect', label: 'Perfect round', icon: '💎', per: 20 },
+  { key: 'comeback', label: 'Comeback round', icon: '🔥', per: 12, hint: 'won with less than 15 % health' },
+  { key: 'fatality', label: 'Fatality', icon: '☠', per: 25 },
+  { key: 'win', label: 'Match won', icon: '🏆', per: 10 },
+  { key: 'flawless', label: 'Won without dropping a round', icon: '✪', per: 5 },
+];
+
+const SPECIAL_IDS = new Set(['s1', 's2', 's3', 's4', 'vc']);
+const QUICK_KO_TICKS = 20 * 60;
+
+const side = () => ({
+  hits: 0, damageDealt: 0, damageTaken: 0,
+  combos: 0, longestCombo: 0, comboPoints: 0,
+  moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
+  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0,
+  koTimes: [], // seconds of fighting before each K.O. this fighter scored
+});
+
+class MatchStats {
+  constructor() {
+    this.s = [side(), side()];
+    this.roundTicks = 0;
+    this.superPending = [false, false];
+  }
+
+  /** Feed one tick: the match (after its tick) and the events that tick produced. */
+  onTick(match, events) {
+    if (match.phase === 'fight' || match.phase === 'finish') this.roundTicks++;
+    for (const e of events) this.onEvent(e, match);
+  }
+
+  onEvent(e, match) {
+    const S = this.s;
+    switch (e.type) {
+      case 'roundIntro':
+        this.roundTicks = 0;
+        break;
+      case 'hit': {
+        const a = S[e.who], d = S[e.target];
+        if (!a || !d) break;
+        a.hits++;
+        a.damageDealt += e.damage;
+        d.damageTaken += e.damage;
+        const id = e.move ? (e.move.startsWith('proj:') ? 's4' : e.move) : null;
+        if (id) a.moves.add(id);
+        if (e.super) {
+          if (this.superPending[e.who]) { a.super++; this.superPending[e.who] = false; }
+        } else if (id && SPECIAL_IDS.has(id)) a.special++;
+        if (e.counter) a.counter++;
+        if (e.punish) a.punish++;
+        if (e.throw) a.throw++;
+        break;
+      }
+      case 'superStart':
+        this.superPending[e.who] = true;
+        break;
+      case 'comboEnd': {
+        // emitted by the fighter who took the combo
+        const a = S[1 - e.who];
+        if (e.hits >= 2) {
+          a.combos++;
+          a.longestCombo = Math.max(a.longestCombo, e.hits);
+          a.comboPoints += (e.hits - 1) * 2 + (e.hits >= 5 ? 5 : 0);
+        }
+        break;
+      }
+      case 'parry':
+        S[e.who].parry++;
+        break;
+      case 'dizzy':
+        S[1 - e.who].dizzy++;
+        break;
+      case 'ko':
+        if (e.winner === 0 || e.winner === 1) {
+          const w = S[e.winner];
+          w.koTimes.push(Math.round((this.roundTicks / 60) * 10) / 10);
+          if (this.roundTicks < QUICK_KO_TICKS) w.fastKo++;
+        }
+        break;
+      case 'fatalityStart':
+        S[e.who].fatality++;
+        break;
+      case 'roundEnd': {
+        if (e.result !== 0 && e.result !== 1) break;
+        const w = S[e.result], f = match.fighters[e.result];
+        w.roundsWon++;
+        if (f.health >= f.maxHealth) w.perfect++;
+        else if (f.health / f.maxHealth < 0.15) w.comeback++;
+        break;
+      }
+      default:
+    }
+  }
+
+  /** Final report: { winner, wins, sides: [{...numbers, spectacle: {total, items}}] } */
+  report(match) {
+    const winner = match.winner;
+    const sides = this.s.map((st, i) => {
+      const won = winner === i;
+      const counts = {
+        combo: st.combos, variety: st.moves.size, special: st.special, super: st.super, counter: st.counter,
+        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, fastKo: st.fastKo,
+        perfect: st.perfect, comeback: st.comeback, fatality: st.fatality,
+        win: won ? 1 : 0, flawless: won && match.wins[1 - i] === 0 ? 1 : 0,
+      };
+      const items = [];
+      for (const r of SPECTACLE_RULES) {
+        const count = counts[r.key];
+        if (!count) continue;
+        const points = r.key === 'combo' ? st.comboPoints : Math.min(count, r.cap ?? Infinity) * r.per;
+        items.push({ key: r.key, label: r.label, icon: r.icon, count, points });
+      }
+      const total = items.reduce((a, b) => a + b.points, 0);
+      return {
+        hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken,
+        combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
+        perfect: st.perfect, roundsWon: match.wins[i],
+        spectacle: { total, items },
+      };
+    });
+    return { winner, wins: match.wins.slice(), sides };
+  }
+}
+
+});
 __define("src/ui/titleScene.js", function (__exports, __require) {
   Object.defineProperty(__exports, "TitleScene", { enumerable: true, get: () => TitleScene });
 // Title screen: an attract-mode CPU vs CPU fight runs behind the logo and the main menu.
@@ -12380,6 +12848,7 @@ class TitleScene {
       ['Versus  ·  2 players', () => a.goSelect('versus')],
       ['Training', () => a.goSelect('training')],
       ['CPU vs CPU', () => a.goSelect('watch')],
+      ['Tournament  ·  round robin', () => a.goTournament()],
       ['Options', () => this.showOptions()],
       ['Controls', () => this.showControls()],
     ], { className: 'main-menu' });
@@ -12810,6 +13279,555 @@ class VersusScene {
     this.unsub?.();
     clearUI();
   }
+}
+
+});
+__define("src/ui/tournamentScene.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "TournamentScene", { enumerable: true, get: () => TournamentScene });
+// Tournament hub: league table, rounds and fixtures, watch / simulate controls, the results grid
+// (click a cell to replay that match), the background simulation progress, the animated
+// spectacle report after each match, and the final awards screen.
+const { ROSTER } = __require("src/data/fighters.js");
+const { el, clearUI } = __require("src/ui/dom.js");
+const { createTournament, load, save, clearSaved, standings, awards, tournamentAwards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
+const { showSpectacle } = __require("src/ui/spectacle.js");
+const { FightScene } = __require("src/ui/fightScene.js");
+
+const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
+const short = (id) => {
+  const n = NAME[id] || id;
+  const m = n.match(/"([^"]+)"/);
+  return m ? m[1] : n.split(' ').slice(-1)[0];
+};
+
+class TournamentScene {
+  constructor(app, { tournament = null, view = null } = {}) {
+    this.app = app;
+    this.t = tournament || load();
+    this.viewRound = null;
+    this.sim = null; // { queue: [{m}], runner, done, total, cancel }
+    this.afterEnter = view;
+  }
+
+  enter() {
+    clearUI();
+    this.app.audio.stopMusic();
+    this.unsub = this.app.keyboard.onPress((code) => this.onKey(code));
+    if (!this.t) return this.showNew();
+    this.render();
+    if (this.afterEnter) { const f = this.afterEnter; this.afterEnter = null; f(this); }
+  }
+
+  exit() {
+    this.unsub?.();
+    clearUI();
+  }
+
+  onKey(code) {
+    if (this.modal || this.sim) {
+      if (code === 'Escape' && this.sim) this.sim.cancel = true;
+      return;
+    }
+    if (!this.t) return;
+    if (code === 'Enter' && !isFinished(this.t)) this.watchNext();
+    else if (code === 'Space' && !isFinished(this.t)) this.simulate('one');
+    else if (code === 'KeyG') this.showGrid();
+    else if (code === 'ArrowLeft' || code === 'KeyA') this.browse(-1);
+    else if (code === 'ArrowRight' || code === 'KeyD') this.browse(1);
+    else if (code === 'Escape') this.app.goTitle();
+  }
+
+  frame(dt) {
+    const ctx = this.app.ctx;
+    ctx.fillStyle = '#07030b';
+    ctx.fillRect(0, 0, 1280, 720);
+    if (this.sim) this.stepSim();
+  }
+
+  // --- new tournament -----------------------------------------------------------------------------
+  showNew() {
+    clearUI();
+    const ui = document.getElementById('ui');
+    const level = this.app.settings.difficulty || 'normal';
+    this.root = el('div', { class: 'tour tour-new' }, [
+      el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
+      el('div', { class: 'tour-new-panel' }, [
+        el('div', { class: 'tour-kicker' }, ['PIER 9 PRESENTS']),
+        el('h1', { class: 'tour-logo', 'data-text': 'ROUND ROBIN' }, ['ROUND ROBIN']),
+        el('p', { class: 'tour-lead' }, [`${ROSTER.length} fighters · everyone fights everyone · ${ROSTER.length - 1} rounds · ${(ROSTER.length * (ROSTER.length - 1)) / 2} matches`]),
+        el('p', { class: 'tour-lead small' }, [`Best of 3 · CPU level: ${level} · 2:0 win = ${POINTS.win20} pts, 2:1 = ${POINTS.win21}, 1:2 loss = ${POINTS.loss12}`]),
+        el('p', { class: 'tour-lead small' }, [`Spectacle points turn into FAME (${FAME_PER_SP}:1) · every round award: +${AWARD_FAME} fame`]),
+        el('div', { class: 'tour-faces' }, ROSTER.map((f, i) => el('div', { class: 'tour-face', style: { backgroundImage: `url(${this.app.portraitURL(f.id)})`, '--i': i } }))),
+        el('div', { class: 'tour-actions' }, [
+          btn('START TOURNAMENT', () => { this.t = createTournament({ level }); save(this.t); this.app.audio.ui('confirm'); this.render(); }, 'big'),
+          btn('MAIN MENU', () => this.app.goTitle()),
+        ]),
+      ]),
+    ]);
+    ui.appendChild(this.root);
+  }
+
+  // --- hub ------------------------------------------------------------------------------------------
+  render() {
+    clearUI();
+    const t = this.t;
+    const ui = document.getElementById('ui');
+    const table = standings(t);
+    const played = allMatches(t).filter((x) => x.m.result).length, total = allMatches(t).length;
+    const cr = currentRound(t);
+    const vr = this.viewRound ?? cr;
+    const finished = isFinished(t);
+    const nx = nextMatch(t);
+
+    const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
+      el('span', { class: 'tpos' }, [String(i + 1)]),
+      el('span', { class: 'tface', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }),
+      el('span', { class: 'tname' }, [NAME[r.id]]),
+      el('span', { class: 'tnum' }, [String(r.played)]),
+      el('span', { class: 'tnum' }, [String(r.won)]),
+      el('span', { class: 'tnum' }, [String(r.lost)]),
+      el('span', { class: 'tnum' }, [`${r.rf - r.ra >= 0 ? '+' : ''}${r.rf - r.ra}`]),
+      el('span', { class: 'tform' }, r.form.map((x) => el('i', { class: `f${x}` }, [x]))),
+      el('span', { class: 'tsp', title: `${r.sp} spectacle points earned` }, [`★${r.fame}`]),
+      el('span', { class: 'tpts' }, [String(r.pts)]),
+    ]));
+
+    const fixtures = t.rounds[vr].map((m) => {
+      const r = m.result, isNext = nx && nx.m === m;
+      const side = (id, i) => el('div', { class: `fx-side ${r && r.winner === i ? 'won' : ''} ${r && r.winner !== i && r.winner !== 'draw' ? 'lost' : ''}` }, [
+        el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+        el('span', { class: 'fx-name' }, [short(id)]),
+      ]);
+      return el('div', { class: `fx ${isNext ? 'next' : ''} ${r ? 'done' : ''}`, onclick: r ? () => this.replay(m) : null, title: r ? 'Click to replay' : '' }, [
+        side(m.a, 0),
+        el('div', { class: 'fx-score' }, [r ? `${r.wins[0]} : ${r.wins[1]}` : isNext ? 'NEXT' : 'vs']),
+        side(m.b, 1),
+      ]);
+    });
+
+    this.root = el('div', { class: 'tour' }, [
+      el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
+      el('div', { class: 'tour-head' }, [
+        el('div', { class: 'tour-title' }, ['ROUND ROBIN']),
+        el('div', { class: 'tour-progress' }, [
+          el('span', {}, [finished ? 'TOURNAMENT COMPLETE' : `ROUND ${cr + 1} / ${t.rounds.length}`]),
+          el('div', { class: 'tbar' }, [el('div', { class: 'tbar-fill', style: { width: `${(played / total) * 100}%` } })]),
+          el('span', { class: 'tcount' }, [`${played} / ${total} matches`]),
+        ]),
+      ]),
+      el('div', { class: 'tour-table' }, [
+        el('div', { class: 'trow thead' }, ['#', '', 'FIGHTER', 'P', 'W', 'L', 'R±', 'FORM', 'FAME', 'PTS'].map((h) => el('span', {}, [h]))),
+        ...rows,
+      ]),
+      el('div', { class: 'tour-side' }, [
+        el('div', { class: 'round-nav' }, [
+          btn('◀', () => this.browse(-1), 'mini'),
+          el('span', {}, [`ROUND ${vr + 1}`]),
+          btn('▶', () => this.browse(1), 'mini'),
+        ]),
+        el('div', { class: 'fixtures' }, fixtures),
+        roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
+        el('div', { class: 'tour-actions col' }, finished
+          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          : [
+            btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
+            el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
+            el('div', { class: 'tour-actions' }, [btn('SIMULATE ALL', () => this.simulate('all')), btn('RESULTS GRID', () => this.showGrid())]),
+            el('div', { class: 'tour-actions' }, [btn('NEW', () => this.confirmNew(), 'mini wide'), btn('MAIN MENU', () => this.app.goTitle(), 'mini wide')]),
+          ]),
+        el('div', { class: 'tour-help' }, ['Enter watch · Space simulate · ◀ ▶ rounds · G grid · click a result to replay']),
+      ]),
+    ]);
+    ui.appendChild(this.root);
+  }
+
+  browse(d) {
+    const cur = this.viewRound ?? currentRound(this.t);
+    this.viewRound = Math.max(0, Math.min(this.t.rounds.length - 1, cur + d));
+    this.render();
+  }
+
+  confirmNew() {
+    this.modal = this.app.menu('NEW TOURNAMENT?', [
+      ['Yes, start over', () => { this.modal = null; clearSaved(); this.t = null; this.showNew(); }],
+      ['Cancel', () => { this.modal = null; }],
+    ], { subtitle: 'The current table and all results will be lost.', onBack: () => { this.modal = null; } });
+  }
+
+  // --- watching / replays -------------------------------------------------------------------------
+  watchNext() {
+    const nx = nextMatch(this.t);
+    if (!nx) return;
+    this.app.audio.ui('confirm');
+    this.playLive(nx.m);
+  }
+
+  playLive(m) {
+    const app = this.app, t = this.t;
+    const back = (view) => app.setScene(new TournamentScene(app, { tournament: t, view }));
+    app.setScene(new FightScene(app, {
+      p1: m.a, p2: m.b, mode: 'watch',
+      tournament: {
+        t, m, replay: false,
+        onEnd: ({ match, stats, overrides }) => {
+          const before = spSnapshot(t, m);
+          recordResult(t, m, match, stats, overrides);
+          setTimeout(() => back((s) => s.spectacle(m, before)), 600);
+        },
+        // quitting a live match: the result is decided by simulating the same seed
+        onQuit: () => back((s) => s.simulate('match', m)),
+      },
+    }));
+  }
+
+  replay(m) {
+    const app = this.app, t = this.t;
+    this.app.audio.ui('confirm');
+    const back = () => app.setScene(new TournamentScene(app, { tournament: t }));
+    app.setScene(new FightScene(app, {
+      p1: m.a, p2: m.b, mode: 'watch',
+      tournament: { t, m, replay: true, onEnd: () => setTimeout(back, 1200), onQuit: back },
+    }));
+  }
+
+  // --- background simulation ----------------------------------------------------------------------
+  simulate(scope, only = null) {
+    const t = this.t;
+    let queue;
+    if (only) queue = [only];
+    else if (scope === 'one') queue = [nextMatch(t)?.m].filter(Boolean);
+    else if (scope === 'round') queue = t.rounds[currentRound(t)].filter((m) => !m.result);
+    else queue = allMatches(t).filter((x) => !x.m.result).map((x) => x.m);
+    if (!queue.length) return;
+    this.app.audio.ui('confirm');
+    this.sim = { queue, runner: null, done: 0, total: queue.length, cancel: false, single: queue.length === 1, before: spSnapshot(t, queue[0]) };
+    this.modal = true;
+    this.simEl = el('div', { class: 'menu-overlay sim' }, [
+      el('div', { class: 'sim-panel' }, [
+        el('div', { class: 'sim-title' }, ['SIMULATING']),
+        this.simVs = el('div', { class: 'sim-vs' }),
+        el('div', { class: 'tbar big' }, [this.simFill = el('div', { class: 'tbar-fill' })]),
+        this.simCount = el('div', { class: 'sim-count' }),
+        btn('STOP', () => { this.sim.cancel = true; }, 'mini'),
+      ]),
+    ]);
+    document.getElementById('ui').appendChild(this.simEl);
+  }
+
+  stepSim() {
+    const s = this.sim;
+    if (!s.runner) {
+      if (s.cancel || !s.queue.length) return this.endSim();
+      const m = s.queue.shift();
+      s.runner = new MatchRunner(this.t, m);
+      this.simVs.replaceChildren(
+        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.a)})` } }),
+        el('b', {}, ['VS']),
+        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.b)})` } }),
+      );
+    }
+    if (s.runner.advance(14)) {
+      s.runner.record();
+      s.last = s.runner.m;
+      s.runner = null;
+      s.done++;
+    }
+    const k = (s.done + (s.runner ? Math.min(0.95, s.runner.ticks / 9000) : 0)) / s.total;
+    this.simFill.style.width = `${k * 100}%`;
+    this.simCount.textContent = `${s.done} / ${s.total}`;
+  }
+
+  endSim() {
+    const s = this.sim;
+    this.sim = null;
+    this.modal = null;
+    this.simEl?.remove();
+    this.viewRound = null;
+    this.render();
+    if (s.single && s.last) this.spectacle(s.last, s.before);
+    else this.afterResults();
+  }
+
+  // --- spectacle report ---------------------------------------------------------------------------
+  spectacle(m, before) {
+    this.modal = true;
+    showSpectacle(this.app, m, before, () => {
+      this.modal = null;
+      this.render();
+      this.afterResults();
+    });
+  }
+
+  // --- results grid -------------------------------------------------------------------------------
+  showGrid() {
+    const t = this.t;
+    const order = standings(t).map((r) => r.id);
+    const res = {};
+    for (const { m } of allMatches(t)) {
+      if (!m.result) continue;
+      res[`${m.a}|${m.b}`] = { m, i: 0 };
+      res[`${m.b}|${m.a}`] = { m, i: 1 };
+    }
+    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(id)})` }, title: NAME[id] }))];
+    const body = order.flatMap((rid) => [
+      el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(rid)})` }, title: NAME[rid] }),
+      ...order.map((cid) => {
+        if (rid === cid) return el('div', { class: 'gcell self' });
+        const x = res[`${rid}|${cid}`];
+        if (!x) return el('div', { class: 'gcell empty' }, ['·']);
+        const r = x.m.result, me = x.i;
+        const cls = r.winner === 'draw' ? 'draw' : r.winner === me ? 'win' : 'loss';
+        return el('div', { class: `gcell ${cls}`, title: `${NAME[rid]} vs ${NAME[cid]} — click to replay`, onclick: () => { close(); this.replay(x.m); } }, [`${r.wins[me]}:${r.wins[1 - me]}`]);
+      }),
+    ]);
+    const close = () => { wrap.remove(); this.modal = null; unsub(); };
+    const wrap = el('div', { class: 'menu-overlay grid-overlay' }, [
+      el('div', { class: 'grid-panel' }, [
+        el('div', { class: 'grid-title' }, ['RESULTS GRID', el('small', {}, ['row = fighter · click a score to replay'])]),
+        el('div', { class: 'grid', style: { '--n': order.length + 1 } }, [...head, ...body]),
+        btn('CLOSE', close, 'mini'),
+      ]),
+    ]);
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'KeyG') close(); });
+    document.getElementById('ui').appendChild(wrap);
+  }
+
+  // --- awards ---------------------------------------------------------------------------------------
+  /** After results come in: newly completed rounds get their awards screen, then the final. */
+  afterResults() {
+    const t = this.t;
+    t.awardsSeen = t.awardsSeen || [];
+    const fresh = t.rounds.map((_, i) => i).filter((i) => roundComplete(t, i) && !t.awardsSeen[i]);
+    for (const i of fresh) t.awardsSeen[i] = true;
+    save(t);
+    const done = () => { if (isFinished(t)) this.showFinal(); };
+    // a long batch completes many rounds at once: show the latest one (the rest stay viewable)
+    if (fresh.length) this.showRoundAwards(fresh[fresh.length - 1], done);
+    else done();
+  }
+
+  awardCards(list, delay = 0.4) {
+    return el('div', { class: 'awards' }, list.map((a, i) => el('div', { class: 'award', style: { '--d': `${delay + i * 0.3}s` } }, [
+      el('div', { class: 'award-title' }, [a.title]),
+      a.id ? el('div', { class: 'award-face', style: { backgroundImage: `url(${this.app.portraitURL(a.id)})` } }) : el('div', { class: 'award-face none' }),
+      el('div', { class: 'award-name' }, [a.id ? short(a.id) : 'nobody']),
+      el('div', { class: 'award-value' }, [a.value]),
+      a.note ? el('div', { class: 'award-note' }, [a.note.replace(/vs (\w+)/, (_, id) => `vs ${short(id)}`)]) : null,
+      a.fame ? el('div', { class: 'award-fame' }, [`+${a.fame} FAME`]) : null,
+    ])));
+  }
+
+  showRoundAwards(ri, then = null) {
+    const close = () => { wrap.remove(); this.modal = null; unsub(); then?.(); };
+    const wrap = el('div', { class: 'menu-overlay final round-awards' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, [`ROUND ${ri + 1} OF ${this.t.rounds.length}`]),
+        el('div', { class: 'awards-title' }, ['ROUND AWARDS']),
+        this.awardCards(this.t.roundAwards?.[ri] || awards(this.t, ri), 0.35),
+        el('div', { class: 'tour-actions' }, [btn('CONTINUE', close, 'big')]),
+      ]),
+    ]);
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (['Escape', 'Enter', 'Space'].includes(code)) close(); });
+    document.getElementById('ui').appendChild(wrap);
+    this.app.audio.ui('slam');
+  }
+
+  // --- final screen -------------------------------------------------------------------------------
+  showFinal() {
+    const t = this.t;
+    const table = standings(t);
+    const champ = table[0];
+    const list = t.finalAwards || tournamentAwards(t);
+    const close = () => { wrap.remove(); this.modal = null; unsub(); };
+    const wrap = el('div', { class: 'menu-overlay final' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, ['TOURNAMENT CHAMPION']),
+        el('div', { class: 'final-champ' }, [
+          el('div', { class: 'final-portrait', style: { backgroundImage: `url(${this.app.portraitURL(champ.id)})` } }),
+          el('div', { class: 'final-name' }, [NAME[champ.id], el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
+        ]),
+        el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
+          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
+        el('div', { class: 'awards-label' }, ['TOURNAMENT AWARDS']),
+        this.awardCards(list, 0.9),
+        el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
+      ]),
+    ]);
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'Enter') close(); });
+    document.getElementById('ui').appendChild(wrap);
+    this.app.audio.ui('slam');
+  }
+}
+
+/** Fame balance of both fighters before a match (for the "before → after" bar). */
+function spSnapshot(t, m) {
+  return m ? [t.fighters[m.a].fame, t.fighters[m.b].fame] : [0, 0];
+}
+
+function btn(label, fn, cls = '') {
+  return el('button', { class: `tbtn ${cls}`, onclick: (e) => { e.stopPropagation(); fn(); } }, [label]);
+}
+
+});
+__define("src/ui/spectacle.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "showSpectacle", { enumerable: true, get: () => showSpectacle });
+// Post-match SPECTACLE report: an animated, multi-step window showing the spectacle points each
+// fighter earned in the match and what for.
+//   1. the band sweeps in, both portraits slide in, the score slams down, the winner is stamped
+//   2. each fighter's highlights reveal one by one (icon pops, label slides, points count up)
+//   3. the match totals count up and convert into FAME, then each fighter's fame bar fills up
+//   4. CONTINUE pulses. Enter / Space / click skips straight to the end; again closes.
+const { ROSTER } = __require("src/data/fighters.js");
+const { SPECTACLE_RULES } = __require("src/tournament/stats.js");
+const { el } = __require("src/ui/dom.js");
+
+const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
+const HINT = Object.fromEntries(SPECTACLE_RULES.map((r) => [r.key, r.hint || (r.per ? `${r.per} pts each` : '')]));
+
+function showSpectacle(app, m, before, onClose) {
+  const r = m.result;
+  const ids = [m.a, m.b];
+  const timers = [];
+  const steps = []; // [{at, fn}] - fn(instant)
+  let finished = false;
+  let closed = false;
+  const at = (ms, fn) => steps.push({ at: ms, fn });
+
+  const countUp = (node, to, ms, instant, prefix = '') => {
+    if (instant || ms <= 0) { node.textContent = `${prefix}${to}`; return; }
+    const t0 = performance.now();
+    const tick = () => {
+      if (closed) return;
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      node.textContent = `${prefix}${Math.round(to * (1 - Math.pow(1 - k, 3)))}`;
+      if (k < 1 && !finished) requestAnimationFrame(tick);
+      else node.textContent = `${prefix}${to}`;
+    };
+    requestAnimationFrame(tick);
+  };
+
+  // --- layout ----------------------------------------------------------------------------------
+  const fameOf = (i) => r.sides[i].fame ?? r.sides[i].spectacle.total;
+  const maxSp = Math.max(1, ...ids.map((id, i) => (before[i] || 0) + fameOf(i)));
+  const cols = ids.map((id, i) => {
+    const s = r.sides[i].spectacle;
+    const won = r.winner === i;
+    const rows = s.items.map((it) => {
+      const pts = el('b', { class: 'sp-pts' }, ['+0']);
+      const row = el('div', { class: 'sp-row', title: HINT[it.key] || '' }, [
+        el('span', { class: 'sp-icon' }, [it.icon]),
+        el('span', { class: 'sp-label' }, [it.label]),
+        el('span', { class: 'sp-count' }, [`×${it.count}`]),
+        pts,
+      ]);
+      return { row, pts, it };
+    });
+    const total = el('div', { class: 'sp-total-num' }, ['0']);
+    const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
+    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`]);
+    const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
+    const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });
+    const balNum = el('span', { class: 'sp-bal-num' }, [String(balFrom)]);
+    const col = el('div', { class: `sp-col ${i ? 'right' : 'left'} ${won ? 'won' : ''}` }, [
+      el('div', { class: 'sp-head' }, [
+        el('div', { class: 'sp-portrait', style: { backgroundImage: `url(${app.portraitURL(id)})` } }),
+        el('div', { class: 'sp-name' }, [NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
+      ]),
+      el('div', { class: 'sp-list' }, rows.length ? rows.map((x) => x.row) : [el('div', { class: 'sp-row empty' }, ['no highlights this time'])]),
+      el('div', { class: 'sp-total' }, [el('span', {}, ['SPECTACLE']), total]),
+      fameChip,
+      el('div', { class: 'sp-bal' }, [
+        el('div', { class: 'sp-bal-label' }, [el('span', {}, ['★ FAME']), balNum]),
+        el('div', { class: 'sp-bar' }, [barOld, barNew]),
+      ]),
+    ]);
+    return { col, rows, total, s, barNew, balNum, balFrom, balTo, won };
+  });
+
+  const score = el('div', { class: 'sp-score' }, [`${r.wins[0]} : ${r.wins[1]}`]);
+  const cont = el('button', { class: 'tbtn big sp-continue', onclick: (e) => { e.stopPropagation(); advance(); } }, ['CONTINUE ▸']);
+  const root = el('div', { class: 'menu-overlay spectacle' }, [
+    el('div', { class: 'sp-band' }, [el('span', {}, ['SPECTACLE REPORT'])]),
+    el('div', { class: 'sp-body' }, [cols[0].col, el('div', { class: 'sp-mid' }, [score, el('div', { class: 'sp-vs' }, ['FINAL'])]), cols[1].col]),
+    el('div', { class: 'sp-foot' }, [cont, el('div', { class: 'sp-hint' }, ['Spectacle points turn into fame · fame buys upgrades between fights'])]),
+  ]);
+  root.addEventListener('click', () => advance());
+
+  // --- timeline --------------------------------------------------------------------------------
+  at(0, () => root.classList.add('s0'));
+  at(250, () => { root.classList.add('s1'); app.audio.ui('slam'); });
+  at(700, () => { root.classList.add('s2'); app.audio.ui('slam'); });
+  let tl = 1100;
+  const n = Math.max(cols[0].rows.length, cols[1].rows.length);
+  for (let k = 0; k < n; k++) {
+    for (const c of cols) {
+      const x = c.rows[k];
+      if (!x) continue;
+      at(tl, (instant) => {
+        x.row.classList.add('in');
+        countUp(x.pts, x.it.points, 380, instant, '+');
+        if (!instant) app.audio.ui('move');
+      });
+    }
+    tl += 230;
+  }
+  tl += 200;
+  at(tl, (instant) => {
+    root.classList.add('s3');
+    for (const c of cols) countUp(c.total, c.s.total, 700, instant);
+    if (!instant) app.audio.ui('confirm');
+  });
+  tl += 850;
+  at(tl, (instant) => {
+    root.classList.add('s4');
+    for (const c of cols) {
+      c.barNew.style.width = `${(c.balTo / maxSp) * 100}%`;
+      if (instant) c.balNum.textContent = String(c.balTo);
+      // the counter runs from the old balance to the new one
+      if (!instant) {
+        const from = c.balFrom, to = c.balTo, t0 = performance.now();
+        const tick = () => {
+          if (closed) return;
+          const k = Math.min(1, (performance.now() - t0) / 900);
+          c.balNum.textContent = String(Math.round(from + (to - from) * k));
+          if (k < 1 && !finished) requestAnimationFrame(tick);
+          else c.balNum.textContent = String(to);
+        };
+        requestAnimationFrame(tick);
+      }
+    }
+  });
+  tl += 1000;
+  at(tl, () => { root.classList.add('s5'); finished = true; });
+
+  for (const s of steps) timers.push(setTimeout(() => { if (!finished || s.at === tl) s.fn(false); }, s.at));
+
+  function skip() {
+    finished = true;
+    for (const id of timers) clearTimeout(id);
+    root.classList.add('instant');
+    for (const s of steps) s.fn(true);
+  }
+  function close() {
+    if (closed) return;
+    closed = true;
+    for (const id of timers) clearTimeout(id);
+    unsub();
+    root.classList.add('out');
+    setTimeout(() => { root.remove(); onClose?.(); }, 220);
+  }
+  function advance() {
+    if (!finished) skip();
+    else { app.audio.ui('confirm'); close(); }
+  }
+  const unsub = app.keyboard.onPress((code) => {
+    if (['Enter', 'Space', 'Escape', 'KeyF', 'KeyJ'].includes(code)) advance();
+  });
+  document.getElementById('ui').appendChild(root);
+  return { close };
 }
 
 });

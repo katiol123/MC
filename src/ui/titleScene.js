@@ -39,6 +39,7 @@ export class TitleScene {
       ['Versus  ·  2 players', () => a.goSelect('versus')],
       ['Training', () => a.goSelect('training')],
       ['CPU vs CPU', () => a.goSelect('watch')],
+      ['Tournament  ·  round robin', () => a.goTournament()],
       ['Options', () => this.showOptions()],
       ['Controls', () => this.showControls()],
     ], { className: 'main-menu' });

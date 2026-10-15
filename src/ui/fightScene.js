@@ -6,6 +6,8 @@ import { FightRenderer } from '../render/fightRenderer.js';
 import { AIController } from '../ai/aiController.js';
 import { emptyRaw } from '../input/inputBuffer.js';
 import { el, clearUI } from './dom.js';
+import { setupMatch } from '../tournament/tournament.js';
+import { MatchStats } from '../tournament/stats.js';
 
 // Fresh AI seed per fight: the simulation is deterministic, so a fixed seed replays the same bout.
 const randomSeed = () => Math.floor(Math.random() * 1e9);
@@ -14,22 +16,29 @@ const SPEEDS = [1, 0.5, 0.25, 0.1];
 const DUMMY_MODES = ['stand', 'crouch', 'block', 'jump', 'cpu'];
 
 export class FightScene {
-  constructor(app, { p1, p2, mode = 'cpu' }) {
+  constructor(app, { p1, p2, mode = 'cpu', tournament = null }) {
     this.app = app;
     this.mode = mode;
     this.p1 = p1;
     this.p2 = p2;
+    // tournament match (live or replay): seed, rules and the fighters' overrides come from the record
+    this.tournament = tournament;
     const s = app.settings;
-    this.match = new Match({
+    if (tournament) {
+      const { match, ai, overrides } = setupMatch(tournament.t, tournament.m);
+      Object.assign(this, { match, ai, overrides, stats: new MatchStats(), mode: 'watch' });
+      this.mode = 'watch';
+    } else this.match = new Match({
       p1, p2,
       roundsToWin: mode === 'training' ? 99 : s.roundsToWin,
       roundTime: mode === 'training' ? 0 : s.roundTime,
       training: mode === 'training',
     });
+    if (!tournament) this.ai = null;
     this.renderer = new FightRenderer(this.match, { arena: s.arena === 'random' ? (Math.random() < 0.5 ? 'dusk' : 'night') : s.arena, portraits: app.portraits });
     this.loop = new FixedStepLoop();
     this.debug = { enabled: mode === 'training', timeScale: 1, paused: false };
-    this.ai = [
+    this.ai = this.ai || [
       mode === 'watch' ? new AIController(0, { level: s.difficulty, seed: randomSeed() }) : null,
       mode === 'cpu' || mode === 'watch' ? new AIController(1, { level: s.difficulty, seed: randomSeed() }) : null,
     ];
@@ -106,12 +115,18 @@ export class FightScene {
 
   tick() {
     const events = this.match.tick(this.inputs());
+    this.stats?.onTick(this.match, events);
     this.renderer.onTick(events);
     for (const e of events) {
       this.app.audio.onEvent(e);
       if (e.type === 'matchEnd') this.app.audio.fadeMusic(2500);
     }
-    if (this.match.phase === 'over' && !this.overlay) this.showResults();
+    if (this.match.phase === 'over' && !this.overlay) {
+      if (this.tournament && !this.ended) {
+        this.ended = true;
+        this.tournament.onEnd({ match: this.match, stats: this.stats, overrides: this.overrides });
+      } else if (!this.tournament) this.showResults();
+    }
   }
 
   frame(dt, now) {
@@ -122,12 +137,19 @@ export class FightScene {
   showPause() {
     this.paused = true;
     this.app.audio.music?.pause();
-    this.overlay = this.app.menu('PAUSED', [
-      ['Resume', () => this.closeOverlay(true)],
-      ['Restart match', () => this.app.startFight(this.p1, this.p2, this.mode)],
-      ['Character select', () => this.app.goSelect(this.mode)],
-      ['Main menu', () => this.app.goTitle()],
-    ], { onBack: () => this.closeOverlay(true) });
+    const items = this.tournament
+      ? [
+        ['Resume', () => this.closeOverlay(true)],
+        [this.tournament.replay ? 'Back to tournament' : 'Skip to result (simulate)', () => this.tournament.onQuit()],
+        ['Main menu', () => this.app.goTitle()],
+      ]
+      : [
+        ['Resume', () => this.closeOverlay(true)],
+        ['Restart match', () => this.app.startFight(this.p1, this.p2, this.mode)],
+        ['Character select', () => this.app.goSelect(this.mode)],
+        ['Main menu', () => this.app.goTitle()],
+      ];
+    this.overlay = this.app.menu('PAUSED', items, { onBack: () => this.closeOverlay(true) });
   }
 
   closeOverlay(resume) {

@@ -8,6 +8,7 @@ import { FightScene } from './ui/fightScene.js';
 import { TitleScene } from './ui/titleScene.js';
 import { SelectScene } from './ui/selectScene.js';
 import { VersusScene } from './ui/versusScene.js';
+import { TournamentScene } from './ui/tournamentScene.js';
 
 const DEFAULT_SETTINGS = { roundsToWin: 2, roundTime: 99, difficulty: 'normal', arena: 'dusk', sound: true };
 
@@ -98,6 +99,10 @@ class App {
   goVersus(p1, p2, mode) {
     this.setScene(new VersusScene(this, p1, p2, mode));
   }
+  goTournament() {
+    this.audio.stopMusic();
+    this.setScene(new TournamentScene(this));
+  }
   startFight(p1, p2, mode = 'cpu') {
     this.setScene(new FightScene(this, { p1, p2, mode }));
   }
@@ -112,4 +117,5 @@ if (hash.has('fight')) {
   if (hash.has('debug')) app.settings.sound = false;
   app.startFight(p1 || 'brick', p2 || 'jax', mode || 'cpu');
 } else if (hash.has('select')) app.goSelect(hash.get('select') || 'cpu');
+else if (hash.has('tournament')) app.goTournament();
 else app.goTitle();
