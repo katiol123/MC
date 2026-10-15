@@ -5634,46 +5634,170 @@ const FATALITIES = {
     },
   },
 
-  // --- OZ JAGUAR: Skyfall -----------------------------------------------------------------------
+  // --- OZ JAGUAR: Altar of the Sun -----------------------------------------------------------------------
   jaguar: {
-    name: 'SKYFALL',
-    duration: 260,
+    name: 'ALTAR OF THE SUN',
+    duration: 310,
     run(d, t) {
       const { A, V, s } = d;
-      const top = P(STAND, { y: 120, lean: -6, fa: [178, 20, 0], ba: [40, 110, 0] });
-      if (t < 30) { d.at(A, d.ax); d.keys(A, t, [[0, STAND], [20, K.PREJUMP], [30, K.AIR_RISE]]); }
-      else if (t < 50) { d.at(A, d.ax, (t - 30) * 40); d.pose(A, K.AIR_RISE); }
-      else if (t < 110) { d.at(A, d.vx, 1600); d.pose(A, AP.pounce?.contact || K.AIR_FALL); }
-      else if (t < 122) { const k = d.span(t, 110, 122, ease.inQuad); d.at(A, d.vx, 1400 * (1 - k) + 30); d.pose(A, spin(AP.pounce?.contact || K.AIR_FALL, 60 * d.dir)); }
-      else if (t < 200) { d.at(A, d.vx, 22); d.keys(A, t, [[122, K.LAND], [150, top], [200, top]]); }
-      else { const k = d.span(t, 200, 222); d.at(A, d.vx - d.dir * 90 * k, 22 * (1 - k) + 40 * Math.sin(k * Math.PI)); d.keys(A, t, [[200, K.AIR_RISE], [222, K.LAND], [250, FLEX]]); }
-      if (t === 20) d.sfx('whoosh');
-      A.fx.noShadow = t > 34 && t < 118;
-      // the shadow on the floor grows while he is up there
-      s.shadow = t > 60 && t < 122 ? d.span(t, 60, 120, ease.inQuad) : 0;
-      if (t < 122) {
-        d.at(V, d.vx);
-        if (t < 60) daze(d, V, t);
-        else d.pose(V, LOOK_UP, P(LOOK_UP, { head: -40, neck: -30 }), d.span(t, 60, 100));
-        if (t === 96) d.fxEvent('label', { text: '?', x: d.vx, y: 290, color: '#ffffff', life: 30 });
-      } else {
-        // pancake
-        d.at(V, d.vx);
-        d.pose(V, STAND);
-        V.fx.sy = 0.12;
-        V.fx.sx = 1.5;
+      const dir = d.dir;
+      // the stepped pyramid: rises out of the planks under the victim, later sinks back with them
+      const PH = 250, N = 4, BASE = 460, TOP = 180;
+      const px = d.vx + dir * 20;
+      const rise = d.num(t, [[16, 0], [70, 1, ease.outQuad], [222, 1], [262, -0.45, ease.inQuad]]);
+      const topY = PH * rise;
+      Object.assign(s, { px, PH, N, BASE, TOP, topY, glyph: t > 120 && t < 210 ? d.span(t, 120, 140) * (1 - d.span(t, 196, 210)) : 0 });
+      // height of the step surface under world x (0 off the pyramid)
+      const surf = (x) => {
+        const dx = Math.abs(x - px);
+        for (let i = N - 1; i >= 0; i--) {
+          const half = (BASE - (i * (BASE - TOP)) / (N - 1)) / 2;
+          if (dx <= half) return Math.max(0, topY - PH + ((i + 1) * PH) / N);
+        }
+        return 0;
+      };
+      if (t >= 16 && t < 70 && t % 5 === 0) {
+        d.fxEvent('dust', { x: px + (t % 10 ? 1 : -1) * BASE * 0.45, y: 4, n: 4, spread: 30 });
+        d.fxEvent('shake', { amount: 6 });
       }
-      if (t === 122) { d.sfx('boom'); d.fxEvent('shake', { amount: 18 }); d.fxEvent('dust', { x: d.vx, y: 4, n: 34, spread: 120 }); }
-      if (t === 160) { d.sfx('pop'); d.fxEvent('label', { text: 'FLAT.', x: d.vx, y: 120, color: '#ffd23f', life: 60 }); }
+      if (t === 16) { d.sfx('crumble'); d.fxEvent('label', { text: 'RUMBLE', x: px, y: 60, color: '#e2b440', life: 50 }); }
+      if (t === 70) { d.sfx('boom'); d.fxEvent('shake', { amount: 12 }); }
+      if (t === 222) d.sfx('crumble');
+      if (t > 222 && t < 262 && t % 4 === 0) { d.fxEvent('shake', { amount: 8 }); d.fxEvent('dust', { x: px + (t % 8 ? 1 : -1) * BASE * 0.4, y: 4, n: 5, spread: 40 }); }
+
+      // --- Jaguar
+      const sunPose = P(STAND, { y: 116, lean: -10, chest: -12, neck: -18, head: -20, fa: [160, 30, 0], ba: [150, 40, 0] });
+      const stomp = P(STAND, { y: 112, lean: 6, chest: 4, neck: -8, head: -10, fa: [60, 100, 0], ba: [40, 110, 0], fl: [62, 40, 10], ff: null, bf: [-24, 8, 0] });
+      const roar = P(stomp, { lean: -16, chest: -16, neck: -34, head: -42, fa: [140, 30, 0], ba: [120, 40, 0] });
+      const xTop = px - dir * 55, xLand = d.ax - dir * 30;
+      if (t < 76) {
+        d.at(A, d.ax);
+        d.keys(A, t, [[0, STAND], [14, sunPose], [64, sunPose], [76, STAND]]);
+      } else if (t < 112) {
+        // runs up the steps
+        const k = d.span(t, 76, 112, ease.linear), x = d.ax + (xTop - d.ax) * k;
+        d.at(A, x, surf(x) + Math.abs(Math.sin(k * Math.PI * 4)) * 10);
+        d.pose(A, K.RUN[Math.floor(t / 4) % K.RUN.length]);
+      } else if (t < 204) {
+        d.at(A, xTop, topY);
+        d.keys(A, t, [[112, STAND], [122, stomp], [140, stomp], [150, roar], [196, roar], [204, K.PREJUMP]]);
+      } else if (t < 226) {
+        // a backflip off the top, down to the boards
+        const k = d.span(t, 204, 226, ease.linear);
+        d.at(A, xTop + (xLand - xTop) * k, topY * (1 - k) + 80 * Math.sin(k * Math.PI));
+        d.pose(A, spin(K.AIR_TUCK, 360 * k));
+      } else {
+        d.at(A, xLand);
+        d.keys(A, t, [[226, K.LAND], [240, STAND], [276, FLEX], [310, FLEX]]);
+      }
+      if (t === 122) { d.sfx('thud'); d.fxEvent('shake', { amount: 10 }); }
+      if (t === 150) {
+        d.sfx('boom'); d.sfx('chord');
+        d.fxEvent('shake', { amount: 16 });
+        d.fxEvent('label', { text: 'RRROOAAR!', x: xTop, y: topY + 300, color: '#ffd23f', life: 70 });
+        for (let i = 0; i < 3; i++) d.fxEvent('ring', { x: xTop, y: topY + 200, r: 20 + i * 18, vr: 8 + i * 3, life: 30, color: i % 2 ? '#ffd23f' : '#ff8a3a' });
+      }
+      if (t === 226) { d.sfx('thud'); d.fxEvent('dust', { x: xLand, y: 4, n: 12, spread: 40 }); }
+
+      // --- victim: carried up on the top platform, pushed onto the altar, taken down with it
+      const vx = px + dir * 18;
+      if (t < 116) {
+        d.at(V, vx + dir * 10, topY);
+        if (t < 40) daze(d, V, t);
+        else d.pose(V, P(STAND, { y: 104, lean: 10, neck: 10, head: 14, fa: [60, 90, 0], ba: [50, 100, 0], ff: [22, 8, 0], bf: [-20, 8, 0] }), P(STAND, { y: 100, lean: 14, fa: [70, 80, 0], ba: [56, 90, 0], ff: [30, 8, 0], bf: [-14, 8, 0] }), 0.5 + 0.5 * Math.sin(t * 0.9));
+        if (t === 50) d.fxEvent('label', { text: '!?', x: vx, y: topY + 250, color: '#ffffff', life: 40 });
+      } else {
+        d.at(V, vx, topY);
+        d.pose(V, K.LYING);
+      }
+      V.fx.clipFloor = t > 200;
+      V.fx.noShadow = t > 16;
+      V.fx.hidden = t > 262;
+      if (t === 266) {
+        d.sfx('boing');
+        d.fxEvent('prop', { prop: 'boot', x: px, y: 10, dir: dir, vx: 2.5, vy: 14, spin: 0.35, look: V.def.look });
+        d.fxEvent('dust', { x: px, y: 4, n: 20, spread: BASE * 0.4 });
+      }
+      d.order = [1 - d.who, d.who];
+      d.camX = (d.ax + px) / 2;
+      d.camZoom = d.num(t, [[0, 1.3], [40, 0.92], [226, 0.92], [270, 1.2]]);
+      d.camY = d.num(t, [[0, 0], [40, 78], [226, 78], [270, 0]]);
     },
     draw(ctx, d, cam, layer) {
       const { s } = d;
-      if (layer !== 'back' || !s.shadow) return;
-      const p = S(cam, d.vx, 0), z = cam.zoom;
-      ctx.fillStyle = `rgba(4,0,10,${0.25 + 0.45 * s.shadow})`;
+      if (s.topY === undefined || layer !== 'back') return;
+      const z = cam.zoom;
+      const floorY = S(cam, 0, 0).y;
+      // the sun flares behind the roar
+      if (s.glyph > 0) {
+        const c = S(cam, s.px, s.topY + 320);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 260 * z);
+        g.addColorStop(0, `rgba(255,220,120,${0.7 * s.glyph})`);
+        g.addColorStop(1, 'rgba(255,120,40,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(c.x - 260 * z, c.y - 260 * z, 520 * z, 520 * z);
+        ctx.translate(c.x, c.y);
+        ctx.rotate(d.t * 0.01);
+        for (let i = 0; i < 12; i++) {
+          ctx.rotate(TAU / 12);
+          ctx.fillStyle = `rgba(255,210,90,${0.25 * s.glyph})`;
+          ctx.beginPath();
+          ctx.moveTo(0, -60 * z);
+          ctx.lineTo(14 * z, -280 * z);
+          ctx.lineTo(-14 * z, -280 * z);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (s.topY <= -s.PH) return;
+      // stepped stone pyramid, clipped to what is above the boards
+      ctx.save();
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y + 2, (20 + 90 * s.shadow) * z, (5 + 14 * s.shadow) * z, 0, 0, TAU);
+      ctx.rect(0, 0, ctx.canvas.width, floorY);
+      ctx.clip();
+      for (let i = 0; i < s.N; i++) {
+        const w = s.BASE - (i * (s.BASE - s.TOP)) / (s.N - 1);
+        const y0 = s.topY - s.PH + (i * s.PH) / s.N, y1 = y0 + s.PH / s.N;
+        const a = S(cam, s.px - w / 2, y1), b = S(cam, s.px + w / 2, y0);
+        ctx.beginPath();
+        ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+        ink(ctx, i % 2 ? '#a88a5a' : '#b89a66', 3);
+        // block joints
+        ctx.strokeStyle = 'rgba(40,24,16,0.45)';
+        ctx.lineWidth = 1.5;
+        for (let x = a.x + 30 * z; x < b.x - 10 * z; x += 46 * z) { ctx.beginPath(); ctx.moveTo(x, a.y); ctx.lineTo(x, b.y); ctx.stroke(); }
+        ctx.fillStyle = 'rgba(255,240,200,0.18)';
+        ctx.fillRect(a.x, a.y, b.x - a.x, 4 * z);
+        // carved zig-zag band on each step
+        ctx.beginPath();
+        const my = (a.y + b.y) / 2;
+        for (let x = a.x + 6 * z, k = 0; x < b.x - 6 * z; x += 10 * z, k++) ctx[k ? 'lineTo' : 'moveTo'](x, my + (k % 2 ? -5 : 5) * z);
+        ctx.strokeStyle = 'rgba(70,40,20,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      // a sun glyph on the top step that glows during the roar
+      const top = S(cam, s.px, s.topY - s.PH / s.N / 2);
+      ctx.beginPath();
+      ctx.arc(top.x, top.y, 14 * z, 0, TAU);
+      ctx.fillStyle = s.glyph ? `rgba(255,${180 + 60 * s.glyph},80,1)` : '#7a5a34';
       ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = OUT;
+      ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const an = (i / 8) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(top.x + Math.cos(an) * 17 * z, top.y + Math.sin(an) * 17 * z);
+        ctx.lineTo(top.x + Math.cos(an) * 24 * z, top.y + Math.sin(an) * 24 * z);
+        ctx.lineWidth = 3 * z;
+        ctx.strokeStyle = s.glyph ? '#ffd23f' : '#7a5a34';
+        ctx.stroke();
+      }
+      ctx.restore();
     },
   },
 
