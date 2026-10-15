@@ -67,7 +67,6 @@ function createTournamentRaw({ ids = ROSTER.map((f) => f.id), level = 'normal', 
     underdogs: [], // per round: the bottom of the table when the round started (fame bonus)
     history: [], // per completed round (index 0 = before the first round): snapshot per fighter, for the charts
     roundAwards: [], // per round: the awards list, filled in when the round completes
-    finalAwards: null,
   };
 }
 
@@ -189,7 +188,6 @@ export function recordResult(t, m, match, stats, overrides) {
       t.history[ri + 1] = snapshot(t);
     }
   });
-  if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
   save(t);
   return m.result;
 }
@@ -268,7 +266,7 @@ export function standings(t) {
 /**
  * Awards over a set of matches: fastest K.O., most combos, biggest combo (damage), least damage taken (per
  * match) and most spectacular (spectacle points earned). Each: { key, title, id, value, note }.
- * awards(t, ri) = one round (tour); tournamentAwards(t) = the whole tournament.
+ * awards(t, ri) = one round (tour).
  */
 function awardsOver(matches) {
   const per = {};
@@ -320,11 +318,6 @@ export function roundComplete(t, ri) {
 /** Awards of one round (tour). */
 export function awards(t, ri) {
   return awardsOver(t.rounds[ri]);
-}
-
-/** Awards over the whole tournament. */
-export function tournamentAwards(t) {
-  return awardsOver(allMatches(t).map((x) => x.m));
 }
 
 // --- persistence -----------------------------------------------------------------------------

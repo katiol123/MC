@@ -4,7 +4,7 @@
 import { ROSTER } from '../data/fighters.js';
 import { el, clearUI } from './dom.js';
 import {
-  createTournament, load, save, clearSaved, standings, awards, tournamentAwards, allMatches, nextMatch, isFinished,
+  createTournament, load, save, clearSaved, standings, awards, allMatches, nextMatch, isFinished,
   currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME,
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
@@ -160,7 +160,7 @@ export class TournamentScene {
         el('div', { class: 'fixtures' }, fixtures),
         roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
         el('div', { class: 'tour-actions col' }, finished
-          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          ? [btn('CHAMPION', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
           : [
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
@@ -518,7 +518,6 @@ export class TournamentScene {
     const t = this.t;
     const table = standings(t);
     const champ = table[0];
-    const list = t.finalAwards || tournamentAwards(t);
     const close = () => { wrap.remove(); this.modal = null; unsub(); };
     const wrap = el('div', { class: 'menu-overlay final' }, [
       el('div', { class: 'final-panel' }, [
@@ -529,8 +528,6 @@ export class TournamentScene {
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
-        el('div', { class: 'awards-label' }, ['TOURNAMENT AWARDS']),
-        this.awardCards(list, 0.9),
         el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
       ]),
     ]);
