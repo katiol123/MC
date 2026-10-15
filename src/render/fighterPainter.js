@@ -16,6 +16,7 @@ import { drawFireFist } from './fire.js';
 const LIGHT_WORLD = { x: -0.46, y: 0.89 };
 const SHADOW_TINT = '#2a1440';
 const SHADOW_RGB = '30,10,46';
+const TAPER = 9; // width of the band where a limb's outline fades out over the body at a joint
 
 const fwdOf = (u) => ({ x: u.y, y: -u.x });
 const P = (o, d, k) => ({ x: o.x + d.x * k, y: o.y + d.y * k });
@@ -247,19 +248,43 @@ export class FighterPainter {
     ctx.lineCap = 'round';
 
     const groups = [];
-    const push = (z, fn) => groups.push({ z, fn });
+    const push = (z, fn, pre = null) => groups.push({ z, fn, pre });
     // Back-most secondary elements.
     push(0, (p) => this.drawChains(ctx, p, opts.chains, 'back', J, A));
+    // Seamless joints: limbs and body are separate outlined groups, so where a limb meets the body
+    // the outline of whichever is drawn on top would cut across the joint. Around each shoulder and
+    // hip (a circle at the joint):
+    //  - a limb drawn OVER the body (near arm, near leg) draws that part of its outline before the
+    //    body's fill, which then hides it wherever the body is;
+    //  - a body part drawn OVER a limb (torso over the far arm, pelvis over the far leg) gets that
+    //    part of the limb repainted between its outline and fill, which hides the body's outline.
+    // Where the limb sticks out past the body the silhouette outline stays.
+    const pr = this.pr;
+    const shR = (pr.rUpperArm[0] + 2.2) * 1.9, hipR = pr.rThigh[0] * 1.5 + 2;
+    const sF = { ...J.shoulderF, r: shR }, sB = { ...J.shoulderB, r: shR };
+    const hF = { ...J.hipF, r: hipR }, hB = { ...J.hipB, r: hipR };
     push(1, (p) => this.drawArm(ctx, p, J, A, 'B'));
     push(2, (p) => this.drawLeg(ctx, p, J, A, 'B'));
     push(3, (p) => this.drawCoatSkirt(ctx, p, J, A, 'back', opts.chains));
-    push(4, (p) => this.drawPelvis(ctx, p, J, A));
-    push(5, (p) => this.drawLeg(ctx, p, J, A, 'F'));
-    push(6, (p) => this.drawTorso(ctx, p, J, A));
+    push(4, (p) => this.drawPelvis(ctx, p, J, A), () => {
+      this.clipped(ctx, hB, true, () => this.drawLeg(ctx, 'fill', J, A, 'B'));
+      this.clipped(ctx, { ...hF, r: hF.r + TAPER }, true, () => this.drawLeg(ctx, 'outline', J, A, 'F'));
+    });
+    push(5, (p) => (p === 'outline' ? this.taperedOutline(ctx, hF, () => this.drawLeg(ctx, p, J, A, 'F')) : this.drawLeg(ctx, p, J, A, 'F')));
+    push(6, (p) => this.drawTorso(ctx, p, J, A), () => {
+      this.clipped(ctx, sB, true, () => this.drawArm(ctx, 'fill', J, A, 'B'));
+      // below the belt the torso is the trousers' seat: no line where the legs come out of it
+      // (far leg first, then the near leg over both areas so their overlap keeps the right order)
+      const lB = { ...hB, r: hB.r * 1.5 }, lF = { ...hF, r: hF.r * 1.5 };
+      this.clipped(ctx, lB, true, () => this.drawLeg(ctx, 'fill', J, A, 'B'));
+      this.clipped(ctx, lB, true, () => this.drawLeg(ctx, 'outline', J, A, 'F'));
+      for (const c of [lB, lF]) this.clipped(ctx, c, true, () => this.drawLeg(ctx, 'fill', J, A, 'F'));
+      this.clipped(ctx, { ...sF, r: sF.r + TAPER }, true, () => this.drawArm(ctx, 'outline', J, A, 'F'));
+    });
     push(6.5, (p) => this.drawCoatSkirt(ctx, p, J, A, 'front', opts.chains));
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
-    push(8, (p) => this.drawArm(ctx, p, J, A, 'F'));
+    push(8, (p) => (p === 'outline' ? this.taperedOutline(ctx, sF, () => this.drawArm(ctx, p, J, A, 'F')) : this.drawArm(ctx, p, J, A, 'F')));
     // Fixed depth order: far arm < far leg < torso < near leg < near arm. Attack animations do not
     // re-layer limbs: switching layers mid-move makes a limb "pop" over the body for a frame and
     // makes the far (left) limb read as the near (right) one.
@@ -267,8 +292,46 @@ export class FighterPainter {
     groups.sort((a, b) => a.z - b.z);
     for (const g of groups) {
       g.fn('outline');
+      g.pre?.();
       g.fn('fill');
     }
+  }
+
+  /**
+   * Outline pass of a limb drawn over the body, outside joint circle c. Across a band just outside
+   * the circle the outline gets thinner toward the joint, so over the body it tapers off instead of
+   * ending in a hard cut (the full-width part inside the band was drawn before the body's fill).
+   */
+  taperedOutline(ctx, c, fn) {
+    const ow = this.ow;
+    this.clipped(ctx, { ...c, r: c.r + TAPER }, false, fn);
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      const r0 = c.r + (TAPER * i) / steps, r1 = c.r + (TAPER * (i + 1)) / steps;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(c.x + r1, c.y);
+      ctx.arc(c.x, c.y, r1, 0, Math.PI * 2);
+      ctx.moveTo(c.x + r0, c.y);
+      ctx.arc(c.x, c.y, r0, 0, Math.PI * 2);
+      ctx.clip('evenodd');
+      this.ow = ow * ((i + 1) / (steps + 1));
+      fn();
+      ctx.restore();
+    }
+    this.ow = ow;
+  }
+
+  /** Runs fn clipped inside (or outside) circle c = { x, y, r }. */
+  clipped(ctx, c, inside, fn) {
+    ctx.save();
+    ctx.beginPath();
+    if (!inside) ctx.rect(c.x - 4000, c.y - 4000, 8000, 8000);
+    ctx.moveTo(c.x + c.r, c.y);
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.clip(inside ? 'nonzero' : 'evenodd');
+    fn();
+    ctx.restore();
   }
 
   // --- limbs -----------------------------------------------------------------------------------
