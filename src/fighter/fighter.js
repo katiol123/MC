@@ -169,6 +169,7 @@ export class Fighter {
     if (this.focus > 0) this.focus--;
     // the stun meter only recovers after a pause in the punishment
     this.sinceHit++;
+    if (this.marks.pie > 0) this.marks.pie--;
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat', 'dazed'].includes(this.state);
@@ -588,6 +589,7 @@ export class Fighter {
     this.stun += m.stun * (counter ? 1.25 : 1);
     this.sinceHit = 0;
     if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
+    if (m.pie) this.marks.pie = m.pie; // cream pie over the face (ticks, render-only)
     if (m.super) {
       // a super leaves its signature mark on the victim (render-only)
       const mk = this.marks, id = att.def.id;

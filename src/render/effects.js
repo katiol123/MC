@@ -39,6 +39,24 @@ export class Effects {
           this.parts.push({ kind: 'tether', who: e.who, target: e.target, x: e.x, y: e.y, life: 36, max: 36 });
           this.labels.push({ text: 'HOOKED!', x: e.x, y: e.y + 70, life: 45, color: '#3fe6d0' });
         }
+        if (e.bite) this.parts.push({ kind: 'bite', x: e.x, y: e.y, dir: e.dir, life: 14, max: 14 });
+        if (e.pie) {
+          // cream splatters
+          for (let i = 0; i < 14; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 2 + this.rnd() * 5;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 2, life: 22, max: 22, color: i % 3 ? '#fff6e8' : '#f2a0c8', w: 5 });
+          }
+          this.labels.push({ text: 'SPLAT!', x: e.x, y: e.y + 60, life: 40, color: '#fff6e8' });
+        }
+        if (e.smash) {
+          // the guitar shatters: splinters, a few strings and a sour chord
+          for (let i = 0; i < 18; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 3 + this.rnd() * 8;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 3, life: 26, max: 26, color: i % 3 ? '#2fb8a8' : '#7a4a28', w: 4 });
+          }
+          this.labels.push({ text: 'KRANG!', x: e.x, y: e.y + 70, life: 50, color: '#3fe6d0' });
+        }
+        if (e.prop === 'glove') this.labels.push({ text: 'BOING!', x: e.x, y: e.y + 60, life: 40, color: '#ff5fbf' });
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
@@ -357,6 +375,22 @@ export class Effects {
           ctx.strokeStyle = rgba('#ff4fd8', 0.7 * k);
           ctx.lineWidth = 2 * cam.zoom;
           ctx.stroke();
+        }
+      } else if (p.kind === 'bite') {
+        // two rows of white teeth snapping shut on the spot
+        const shut = Math.min(1, (p.max - p.life) / 4), gap = (1 - shut) * 22 * cam.zoom + 2;
+        const w = 46 * cam.zoom;
+        ctx.fillStyle = rgba('#ffffff', Math.min(1, k * 1.5));
+        for (const sgn of [-1, 1]) {
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            const x0 = s.x - w / 2 + (i / 5) * w, x1 = x0 + w / 5;
+            const yb = s.y + sgn * (gap + 8 * cam.zoom);
+            ctx.moveTo(x0, yb);
+            ctx.lineTo((x0 + x1) / 2, s.y + sgn * gap);
+            ctx.lineTo(x1, yb);
+          }
+          ctx.fill();
         }
       } else if (p.kind === 'ember') {
         const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';

@@ -7,7 +7,7 @@
 import { limbPath, smoothClosed, smoothOpen, boxAlong, along } from './shapes.js';
 import { mix, lighten, darken, rgba } from './color.js';
 import { dirUp, dirFwd, DEG } from '../core/math.js';
-import { PAN_COCK } from '../data/signatures.js';
+import { PAN_COCK, GUITAR_COCK, SPRING_REACH } from '../data/signatures.js';
 import { drawFireFist } from './fire.js';
 
 // Key light in WORLD space (upper left of the stage, unit vector pointing toward the light). The
@@ -239,6 +239,8 @@ export class FighterPainter {
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
     this.clawMarks = opts.clawMarks || 0;
+    this.biting = !!opts.bite;
+    this.springExt = opts.springExt || 0;
     this.marks = opts.marks || {};
     this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
@@ -253,6 +255,7 @@ export class FighterPainter {
     const push = (z, fn, pre = null) => groups.push({ z, fn, pre });
     // Back-most secondary elements.
     push(0, (p) => this.drawChains(ctx, p, opts.chains, 'back', J, A));
+    push(0.5, (p) => this.drawBackGuitar(ctx, p, J, A));
     // Seamless joints: limbs and body are separate outlined groups, so where a limb meets the body
     // the outline of whichever is drawn on top would cut across the joint. Around each shoulder and
     // hip (a circle at the joint):
@@ -344,7 +347,7 @@ export class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi', 'tunic'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -406,6 +409,8 @@ export class FighterPainter {
       for (const k of [0.7, 0.8, 0.9]) this.line(ctx, [along(E, Wr, k, rf1 + 1), along(E, Wr, k + 0.04, -(rf1 + 1))], 0.9, this.outline, 0.4);
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
+    if (this.prop?.type === 'guitar' && this.prop.hand === side) this.drawGuitar(ctx, pass, E, H, depth);
+    if (this.prop?.type === 'glove' && this.prop.hand === side) this.drawSpringGlove(ctx, pass, E, H);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
     if (this.flurry && pass === 'fill') {
@@ -483,6 +488,116 @@ export class FighterPainter {
     ctx.ellipse(c.x - dx * 3, c.y - dy * 3, 7, 3.5, ang + 0.6, 0, Math.PI * 2);
     ctx.fillStyle = rgba('#ffffff', 0.12);
     ctx.fill();
+  }
+
+  /** Chuy's guitar swung by the neck (same geometry as the GUITAR hitbox). */
+  drawGuitar(ctx, pass, E, H, depth) {
+    const g = this.look.guitar || { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' };
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + GUITAR_COCK;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    this.guitarShape(ctx, pass, at, Math.atan2(dy, dx), g, depth);
+  }
+
+  /** Guitar drawn along a local axis: `at(k, n)` maps distance along the neck / across it. */
+  guitarShape(ctx, pass, at, ang, g, depth = 0) {
+    const t = this.tint;
+    const body = () => {
+      ctx.beginPath();
+      const c1 = at(52), c2 = at(76, 2);
+      ctx.ellipse(c1.x, c1.y, 15, 17, ang, 0, Math.PI * 2);
+      ctx.moveTo(c2.x + 20, c2.y);
+      ctx.ellipse(c2.x, c2.y, 21, 22, ang, 0, Math.PI * 2);
+    };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-14), at(44), 4.2, 4.2);
+      this.outlineFill(ctx);
+      body();
+      return this.outlineFill(ctx);
+    }
+    // neck + head
+    ctx.beginPath();
+    limbPath(ctx, at(-6), at(44), 3.2, 3.2);
+    ctx.fillStyle = this.mat(darken(g.neck, depth), t).base;
+    ctx.fill();
+    ctx.beginPath();
+    limbPath(ctx, at(-16), at(-5), 4.4, 3.6);
+    ctx.fillStyle = this.mat(darken(g.head, depth), t).base;
+    ctx.fill();
+    // body
+    body();
+    ctx.fillStyle = this.mat(darken(g.color, depth), t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = rgba(this.outline, 0.6);
+    ctx.stroke();
+    const hole = at(56);
+    ctx.beginPath();
+    ctx.arc(hole.x, hole.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(darken(g.dark, depth), t).base;
+    ctx.fill();
+    const br = at(82);
+    ctx.beginPath();
+    limbPath(ctx, at(80, -6), at(80, 6), 2, 2);
+    ctx.fillStyle = this.mat(g.neck, t).base;
+    ctx.fill();
+    void br;
+    // strings
+    for (const n of [-1.6, 0, 1.6]) this.line(ctx, [at(-10, n * 0.6), at(80, n)], 0.6, '#e8e8f0', 0.8);
+  }
+
+  /** Sobby's boxing glove on a spring: springExt (0..1) shoots it out past the fist. */
+  drawSpringGlove(ctx, pass, E, H) {
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x);
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const L = SPRING_REACH * this.springExt;
+    const c = { x: H.x + dx * (L + 6), y: H.y + dy * (L + 6) };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 15, 0, Math.PI * 2);
+      return this.outlineFill(ctx);
+    }
+    if (L > 2) {
+      // coiled spring
+      ctx.beginPath();
+      const n = 9;
+      for (let i = 0; i <= n * 4; i++) {
+        const k = i / (n * 4), w = Math.sin(k * n * Math.PI * 2) * 6;
+        const x = H.x + dx * L * k - dy * w, y = H.y + dy * L * k + dx * w;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#c9cbd6';
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 15, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat('#e8203a', this.tint).base;
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x - dx * 4 + dy * 5, c.y - dy * 4 - dx * 5, 6, 4, a0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fill();
+  }
+
+  /** Chuy's guitar slung on his back (hidden while it is in his hands). */
+  drawBackGuitar(ctx, pass, J, A) {
+    const g = this.look.guitar;
+    if (!g || this.prop?.type === 'guitar') return;
+    const F = this.torsoFrame(J, A);
+    const base = P2(F.W, F.fS, -F.ww * 1.1, F.uS, -6);
+    const top = P2(F.N, F.fC, -F.cw * 0.9, F.uC, 34);
+    const ang = Math.atan2(top.y - base.y, top.x - base.x) + Math.PI;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const at = (k, n = 0) => ({ x: top.x + dx * (k + 16) - dy * n, y: top.y + dy * (k + 16) + dx * n });
+    this.guitarShape(ctx, pass, at, ang, g, 0.15);
   }
 
   drawFist(ctx, pass, Wr, H, side, depth) {
@@ -670,6 +785,12 @@ export class FighterPainter {
     ];
     ctx.beginPath();
     smoothClosed(ctx, pts, 0.35);
+    if (shoes.big) {
+      // clown shoes: a big round toe bulb
+      const toe = P2(Tt, fw, 7, up, h * 0.55);
+      ctx.moveTo(toe.x + 11, toe.y);
+      ctx.ellipse(toe.x, toe.y, 11, h * 0.95, Math.atan2(fw.y, fw.x), 0, Math.PI * 2);
+    }
     if (pass === 'outline') return this.outlineFill(ctx);
     const bare = shoes.type === 'wrapped';
     ctx.fillStyle = bare ? this.mat(darken(lk.skin, depth), t).base : this.mat(darken(shoes.color, depth), t).base;
@@ -812,7 +933,48 @@ export class FighterPainter {
     smoothClosed(ctx, pts, 0.55);
     this.shadeAcross(ctx, P2(F.W, F.fS, F.cw * 1.1, F.uS, 10), P2(F.W, F.fS, -F.cw * 1.05, F.uS, -6));
     ctx.restore();
+    if (lk.chain) this.drawChainLock(ctx, F, lk.chain);
     if (this.marks.collar) this.drawCrookedCollar(ctx, F, top);
+  }
+
+  /** Heavy chain around the neck with a padlock hanging on the chest (Snapper). */
+  drawChainLock(ctx, F, ch) {
+    const { N, uC, fC, up, cw } = F;
+    const t = this.tint;
+    const lock = P2(N, fC, cw * 0.5, uC, -up * 0.55);
+    const pts = [];
+    for (let i = 0; i <= 10; i++) {
+      const k = i / 10;
+      const a = P2(N, fC, -cw * 0.3 + k * cw * 0.8, uC, -2 - Math.sin(k * Math.PI) * up * 0.55);
+      pts.push(a);
+    }
+    const c = this.mat(ch.color, t).base;
+    for (let i = 0; i < pts.length; i++) {
+      ctx.beginPath();
+      ctx.ellipse(pts[i].x, pts[i].y, 3.2, 2.2, i % 2 ? 0.6 : -0.6, 0, Math.PI * 2);
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = c;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(lock.x, lock.y + 5, 4.5, Math.PI * 0.1, Math.PI * 0.9, true);
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = c;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.rect(lock.x - 7, lock.y - 9, 14, 12);
+    ctx.fillStyle = this.mat(ch.lock, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(lock.x, lock.y - 2, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = this.outline;
+    ctx.fill();
   }
 
   /**
@@ -1190,12 +1352,36 @@ export class FighterPainter {
           ctx.fillStyle = this.mat(top.color2, t).base;
           ctx.fill();
         }
+        if (this.look.tie) this.drawTie(ctx, F, this.look.tie);
+        if (this.look.guitar) {
+          // guitar strap across the chest
+          this.line(ctx, [P2(N, fC, -cw * 0.6, uC, -2), P2(N, fC, cw * 0.1, uC, -up * 0.5), P2(W, fS, ww * 0.85, uS, 4)], 5, outl);
+          this.line(ctx, [P2(N, fC, -cw * 0.6, uC, -2), P2(N, fC, cw * 0.1, uC, -up * 0.5), P2(W, fS, ww * 0.85, uS, 4)], 3, this.mat(top.color2, t).base);
+        }
+        if (top.patches?.length === 3 && this.look.guitar) {
+          // charro embroidery: gold scrolls along the jacket front
+          for (let i = 0; i < 3; i++) {
+            const a = P2(N, uC, -up * (0.25 + i * 0.22), fC, cw * 0.2), b = P2(N, uC, -up * (0.33 + i * 0.22), fC, -cw * 0.35);
+            this.line(ctx, [a, P2(a, uC, 5, fC, -cw * 0.2), b], 1.6, this.mat(top.color2, t).base, 0.9);
+          }
+        }
         // studs
         const st = P2(N, fC, cw * 0.4, uC, -up * 0.16);
         ctx.beginPath();
         ctx.arc(st.x, st.y, 2.4, 0, Math.PI * 2);
         ctx.fillStyle = '#cfcfd6';
         ctx.fill();
+        break;
+      }
+      case 'tunic': {
+        // mandarin-collar tunic: stand-up collar band, a front seam with knot buttons, a cross-over flap
+        this.line(ctx, [P2(N, fC, -cw * 0.55, uC, 2), P2(N, fC, cw * 0.15, uC, 6), P2(N, fC, cw * 0.75, uC, 1)], 7, outl);
+        this.line(ctx, [P2(N, fC, -cw * 0.55, uC, 2), P2(N, fC, cw * 0.15, uC, 6), P2(N, fC, cw * 0.75, uC, 1)], 4.5, this.mat(top.color2, t).base);
+        this.line(ctx, [P2(N, fC, cw * 0.55, uC, -2), P2(N, fC, cw * 0.8, uC, -up * 0.35), P2(W, fS, ww * 0.75, uS, 0)], 1.6, outl, 0.8);
+        for (let i = 0; i < 4; i++) {
+          const b = P2(N, uC, -up * (0.15 + i * 0.2), fC, cw * (0.66 + i * 0.04));
+          this.line(ctx, [P2(b, fC, -4, uC, 0), P2(b, fC, 4, uC, 0)], 2.4, this.mat(top.trim, t).base);
+        }
         break;
       }
       case 'trench': {
@@ -1223,6 +1409,12 @@ export class FighterPainter {
         ctx.fillStyle = this.mat(top.color2, t).base;
         ctx.fill();
         this.line(ctx, [P2(N, fC, cw * 0.2, uC, 6), P2(N, fC, cw * 0.25, uC, -up * 0.6), P2(Pv, fS, ww * 0.25, uS, -8)], 1.6, outl, 0.8);
+        if (top.plaid) {
+          for (let i = 0; i < 4; i++) {
+            this.line(ctx, [P2(N, uC, -up * (0.2 + i * 0.25), fC, -cw * 1.5), P2(N, uC, -up * (0.2 + i * 0.25), fC, cw * 0.15)], 1.3, this.mat(top.plaid, t).base, 0.6);
+            this.line(ctx, [P2(N, fC, -cw * (0.2 + i * 0.35), uC, 4), P2(Pv, fS, -ww * (0.2 + i * 0.4), uS, -8)], 1.3, this.mat(top.plaid, t).base, 0.6);
+          }
+        }
         break;
       }
       case 'longcoat': {
@@ -1425,6 +1617,33 @@ export class FighterPainter {
     if (!tie) return;
     const { N, uC, fC, up, cw } = F;
     const t = this.tint;
+    if (tie.bow) {
+      // big floppy bow tie with a plaid check
+      const k = P2(N, fC, cw * 0.62, uC, -4);
+      const wing = (sx) => [k, P2(k, fC, cw * 0.12, uC, sx * 14), P2(k, fC, -cw * 0.12, uC, sx * 17), P2(k, fC, -cw * 0.02, uC, sx * 4)];
+      for (const sx of [1, -1]) {
+        ctx.beginPath();
+        smoothClosed(ctx, wing(sx), 0.35);
+        ctx.fillStyle = this.mat(tie.color, t).base;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        for (let i = -3; i <= 3; i++) {
+          this.line(ctx, [P2(k, uC, sx * 30, fC, i * 4), P2(k, uC, -sx * 2, fC, i * 4)], 1.2, this.mat(tie.check || darken(tie.color, 0.3), t).base, 0.7);
+        }
+        ctx.restore();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = this.outline;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(k.x, k.y, 4.2, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(darken(tie.color, 0.15), t).base;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      return;
+    }
     const knot = P2(N, fC, cw * 0.62, uC, -3);
     const pts = [knot, P2(N, fC, cw * 0.78, uC, -up * 0.35), P2(N, fC, cw * 0.86, uC, -up * 0.75), P2(N, fC, cw * 0.66, uC, -up * 0.82), P2(N, fC, cw * 0.55, uC, -up * 0.3)];
     ctx.beginPath();
@@ -1554,6 +1773,7 @@ export class FighterPainter {
     const masked = !!lk.mask;
     // Back-of-head items (hat brim back half, collars) are drawn with the head.
     if (lk.hair?.style === 'pompadour' || lk.hair?.style === 'swept' || lk.hair?.style === 'spiky') this.drawHairBack(ctx, pass, R);
+    if (lk.hat?.type === 'sombrero') this.drawSombrero(ctx, pass, R, 'back');
     if (lk.hood) {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: 0.75 * R, y: 1.25 * R }, { x: -0.2 * R, y: 1.45 * R }, { x: -1.3 * R, y: 0.6 * R }, { x: -1.4 * R, y: -1.1 * R }, { x: -0.4 * R, y: -1.5 * R }, { x: 0.1 * R, y: -0.4 * R }], 0.4);
@@ -1567,7 +1787,12 @@ export class FighterPainter {
     }
 
     // Skull + face as one silhouette: both sub-paths share the same winding so the union fills cleanly.
-    const facePts = weasel
+    const croc = lk.species === 'croc';
+    const facePts = croc
+      // long flat upper snout, eye bump on top
+      ? [{ x: -0.35, y: -0.3 }, { x: 0.5, y: -0.26 }, { x: 1.3, y: -0.22 }, { x: 2.15, y: -0.2 }, { x: 2.38, y: -0.08 }, { x: 2.3, y: 0.1 },
+        { x: 1.6, y: 0.2 }, { x: 1.0, y: 0.36 }, { x: 0.85, y: 0.72 }, { x: 0.45, y: 0.86 }, { x: 0.1, y: 0.62 }]
+      : weasel
       ? [{ x: 0.0, y: 0.35 }, { x: 0.95, y: 0.18 }, { x: 1.55, y: -0.08 }, { x: 1.66, y: -0.3 }, { x: 1.25, y: -0.55 }, { x: 0.6, y: -0.8 }, { x: -0.1, y: -0.6 }]
       : [{ x: -0.4, y: -0.45 }, { x: 0.15, y: -0.95 }, { x: 0.6, y: -1.0 }, { x: 0.88, y: -0.72 }, { x: 1.0, y: -0.36 }, { x: 1.06, y: -0.12 },
         { x: 1.18, y: 0.04 }, { x: 1.02, y: 0.26 }, { x: 0.96, y: 0.52 }, { x: 0.6, y: 0.85 }, { x: -0.2, y: 0.5 }];
@@ -1579,9 +1804,11 @@ export class FighterPainter {
     const pts = (area < 0 ? facePts.slice().reverse() : facePts).map((p) => ({ x: p.x * R, y: p.y * R }));
     const head = () => {
       ctx.beginPath();
-      ctx.ellipse(-0.06 * R, 0.08 * R, 0.98 * R, 1.04 * R, 0, 0, Math.PI * 2);
-      smoothClosed(ctx, pts, weasel ? 0.5 : 0.45);
+      if (croc) ctx.ellipse(-0.1 * R, 0.12 * R, 0.92 * R, 0.82 * R, 0, 0, Math.PI * 2);
+      else ctx.ellipse(-0.06 * R, 0.08 * R, 0.98 * R, 1.04 * R, 0, 0, Math.PI * 2);
+      smoothClosed(ctx, pts, weasel || croc ? 0.5 : 0.45);
     };
+    if (croc) this.drawCrocJaw(ctx, pass, R, opts);
     head();
     if (pass === 'outline') {
       this.outlineFill(ctx);
@@ -1607,22 +1834,270 @@ export class FighterPainter {
       ctx.fillStyle = rgba(this.mat(lk.facepaint, t).base, 0.85);
       ctx.fill();
     }
+    if (lk.clown) {
+      // white greasepaint over the face
+      ctx.beginPath();
+      ctx.ellipse(0.62 * R, -0.12 * R, 0.78 * R, 0.98 * R, -0.1, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(lk.clown.paint, t).base;
+      ctx.fill();
+    }
+    if (croc) {
+      // pale throat and scales
+      ctx.beginPath();
+      ctx.ellipse(-0.2 * R, -0.55 * R, 0.6 * R, 0.4 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(lk.fur2, t).base;
+      ctx.fill();
+      for (const [x, y] of [[0.4, 0.45], [0.05, 0.35], [-0.3, 0.55], [-0.55, 0.25], [1.2, 0.1], [1.6, 0.02], [-0.2, -0.05]]) {
+        ctx.beginPath();
+        ctx.ellipse(x * R, y * R, 0.1 * R, 0.07 * R, 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = rgba(darken(lk.skin, 0.25), 0.55);
+        ctx.fill();
+      }
+    }
     this.headShade(ctx, R);
     ctx.restore();
-    this.drawEars(ctx, 'fill', R, weasel);
+    this.drawEars(ctx, 'fill', R, weasel || croc);
     if (masked) this.drawMask(ctx, R);
     else this.drawFace(ctx, R, opts, weasel);
     if (masked && this.marks.shiner) this.drawShiner(ctx, R, 0.6 * R, 0.17 * R, 0.27 * R);
+    if (croc) this.drawCrocUpperTeeth(ctx, R);
     this.drawHair(ctx, R);
+    if (this.marks.pie > 0) this.drawPieFace(ctx, R, Math.min(1, this.marks.pie / 30));
     if (this.marks.bump) {
       // Bruno's pan: a cartoon bump on the crown; hats and hoods sit on top of it
       this.drawBump(ctx, R);
       ctx.translate(0, 0.34 * R);
     }
-    if (lk.hat) this.drawHat(ctx, R);
+    if (lk.hat?.type === 'sombrero') this.drawSombrero(ctx, 'fill', R, 'front');
+    else if (lk.hat) this.drawHat(ctx, R);
     if (lk.hood?.bear) this.drawBearHood(ctx, R);
     ctx.restore();
     if (lk.headphones) this.drawHeadphones(ctx, J, A);
+  }
+
+  // --- new heads: crocodile, clown, pie --------------------------------------------------------
+  /** How far the crocodile's jaw hangs open for the current expression (radians). */
+  jawOpen(opts) {
+    const xp = opts.expression;
+    if (this.biting) return 0.55 + 0.25 * Math.abs(Math.sin(this.time * 18));
+    return { shout: 0.5, attack: 0.32, hurt: 0.3, ko: 0.55, dizzy: 0.22, happy: 0.12, strain: 0.06 }[xp] ?? 0.04;
+  }
+
+  /** Lower jaw (with its teeth) hinged under the skull, and the dark mouth between the jaws. */
+  drawCrocJaw(ctx, pass, R, opts) {
+    const lk = this.look, t = this.tint;
+    const th = -this.jawOpen(opts);
+    const hx = 0.0, hy = -0.3 * R;
+    const rot = (x, y) => {
+      const dx = x * R - hx, dy = y * R - hy;
+      return { x: hx + dx * Math.cos(th) - dy * Math.sin(th), y: hy + dx * Math.sin(th) + dy * Math.cos(th) };
+    };
+    const jaw = [rot(-0.35, -0.3), rot(0.5, -0.32), rot(1.4, -0.3), rot(2.12, -0.27), rot(2.18, -0.42), rot(1.5, -0.55), rot(0.6, -0.66), rot(-0.15, -0.8)];
+    ctx.beginPath();
+    smoothClosed(ctx, jaw, 0.4);
+    if (pass === 'outline') return this.outlineFill(ctx);
+    // mouth inside (only shows when the jaw drops)
+    ctx.save();
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -0.2 * R, y: -0.2 * R }, { x: 2.2 * R, y: -0.2 * R }, rot(2.15, -0.3), rot(-0.2, -0.3)], 0.2);
+    ctx.fillStyle = '#5a1020';
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    smoothClosed(ctx, jaw, 0.4);
+    ctx.fillStyle = this.skin.base;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.beginPath();
+    smoothClosed(ctx, [rot(-0.2, -0.5), rot(1.6, -0.45), rot(1.6, -0.75), rot(-0.2, -0.95)], 0.3);
+    ctx.fillStyle = this.mat(lk.fur2, t).base;
+    ctx.fill();
+    ctx.restore();
+    // lower teeth pointing up
+    ctx.fillStyle = '#f4efe2';
+    ctx.strokeStyle = this.outline;
+    ctx.lineWidth = 1;
+    for (let x = 0.45; x <= 2.0; x += 0.22) {
+      const a = rot(x - 0.06, -0.3), b = rot(x, -0.12), c = rot(x + 0.06, -0.3);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  drawCrocUpperTeeth(ctx, R) {
+    ctx.fillStyle = '#f4efe2';
+    ctx.strokeStyle = this.outline;
+    ctx.lineWidth = 1;
+    for (let x = 0.55; x <= 2.15; x += 0.22) {
+      const big = Math.abs(x - 1.43) < 0.05 || Math.abs(x - 0.77) < 0.05;
+      ctx.beginPath();
+      ctx.moveTo((x - 0.06) * R, -0.21 * R);
+      ctx.lineTo(x * R, (big ? -0.46 : -0.36) * R);
+      ctx.lineTo((x + 0.06) * R, -0.21 * R);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    // heavy brow ridge over the eye bump
+    this.line(ctx, [{ x: 0.25 * R, y: 0.86 * R }, { x: 0.6 * R, y: 0.9 * R }, { x: 0.95 * R, y: 0.66 * R }], 3, darken(this.look.skin, 0.3));
+  }
+
+  /** Clown greasepaint details around the eye: purple diamonds and a painted tear track. */
+  drawClownPaint(ctx, R, ex, ey) {
+    const c = this.look.clown, t = this.tint;
+    ctx.fillStyle = this.mat(c.mouth, t).base;
+    for (const [dy, h] of [[0.32, 0.2], [-0.3, 0.26]]) {
+      ctx.beginPath();
+      ctx.moveTo(ex, ey + dy * R + h * R);
+      ctx.lineTo(ex + 0.1 * R, ey + dy * R);
+      ctx.lineTo(ex, ey + dy * R - h * 0.4 * R);
+      ctx.lineTo(ex - 0.1 * R, ey + dy * R);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // painted tear track + a real tear rolling down every couple of seconds
+    this.line(ctx, [{ x: ex - 0.02 * R, y: ey - 0.12 * R }, { x: ex + 0.02 * R, y: ey - 0.4 * R }, { x: ex - 0.02 * R, y: ey - 0.62 * R }], 2.2, this.mat(c.tear, t).base, 0.8);
+    const k = (this.time * 0.6) % 1;
+    if (k < 0.6) {
+      const y = ey - 0.15 * R - k * 0.9 * R;
+      ctx.beginPath();
+      ctx.moveTo(ex, y + 0.09 * R);
+      ctx.quadraticCurveTo(ex + 0.06 * R, y - 0.02 * R, ex, y - 0.05 * R);
+      ctx.quadraticCurveTo(ex - 0.06 * R, y - 0.02 * R, ex, y + 0.09 * R);
+      ctx.fillStyle = rgba('#9ad8ff', 0.9 * (1 - k / 0.6));
+      ctx.fill();
+    }
+  }
+
+  drawClownMouthPaint(ctx, R) {
+    const c = this.look.clown;
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: 0.3 * R, y: -0.7 * R }, { x: 0.55 * R, y: -0.3 * R }, { x: 1.0 * R, y: -0.28 * R }, { x: 1.18 * R, y: -0.62 * R }, { x: 0.8 * R, y: -0.82 * R }], 0.4);
+    ctx.fillStyle = this.mat(c.mouth, this.tint).base;
+    ctx.fill();
+  }
+
+  drawClownNose(ctx, R) {
+    const c = this.look.clown;
+    ctx.beginPath();
+    ctx.arc(1.14 * R, -0.04 * R, 0.24 * R, 0, Math.PI * 2);
+    const g = ctx.createRadialGradient(1.08 * R, 0.04 * R, 0.02 * R, 1.14 * R, -0.04 * R, 0.26 * R);
+    g.addColorStop(0, lighten(c.nose, 0.4));
+    g.addColorStop(1, c.nose);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(1.07 * R, 0.07 * R, 0.07 * R, 0.04 * R, -0.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fill();
+  }
+
+  /** Sobby's cream pie stuck to the face (fades as it slides off). */
+  drawPieFace(ctx, R, a) {
+    ctx.save();
+    ctx.globalAlpha *= a;
+    const pts = [];
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * Math.PI * 2, r = (0.62 + (i % 2) * 0.12) * R;
+      pts.push({ x: 0.75 * R + Math.cos(ang) * r * 0.85, y: -0.05 * R + Math.sin(ang) * r });
+    }
+    ctx.beginPath();
+    smoothClosed(ctx, pts, 0.4);
+    ctx.fillStyle = '#fff6e8';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    // drips and a cherry
+    for (const [x, l] of [[0.5, 0.35], [0.85, 0.5], [1.1, 0.25]]) {
+      ctx.beginPath();
+      ctx.ellipse(x * R, (-0.6 - l * 0.5) * R, 0.07 * R, l * 0.5 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff6e8';
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(0.8 * R, 0.55 * R, 0.13 * R, 0, Math.PI * 2);
+    ctx.fillStyle = '#e8203a';
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Sombrero: the back half of the brim is drawn behind the head, the crown and front half over it. */
+  drawSombrero(ctx, pass, R, part) {
+    const hat = this.look.hat, t = this.tint;
+    const c = this.mat(hat.color, t), band = this.mat(hat.band, t).base;
+    ctx.save();
+    ctx.translate(-0.05 * R, 0.62 * R);
+    ctx.rotate(-0.08);
+    const brim = (front) => {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2, front);
+      ctx.ellipse(0, 0.06 * R, 2.5 * R, 0.42 * R, 0, front ? Math.PI : Math.PI * 2, front ? 0 : Math.PI, !front);
+    };
+    if (part === 'back') {
+      // back half of the brim (the far side, above the head line)
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, 0, Math.PI);
+      ctx.closePath();
+      if (pass === 'outline') this.outlineFill(ctx);
+      else {
+        ctx.fillStyle = darken(c.base, 0.15);
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+    void brim;
+    // crown: a tall rounded cone
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -0.85 * R, y: 0.05 * R }, { x: -0.7 * R, y: 0.9 * R }, { x: -0.25 * R, y: 1.55 * R }, { x: 0.3 * R, y: 1.5 * R }, { x: 0.7 * R, y: 0.9 * R }, { x: 0.85 * R, y: 0.05 * R }], 0.4);
+    ctx.lineWidth = this.ow * 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.fillStyle = c.base;
+    ctx.fill();
+    this.shadeAcross(ctx, { x: 0.8 * R, y: 1.2 * R }, { x: -0.8 * R, y: 0.3 * R });
+    // zig-zag band
+    ctx.beginPath();
+    ctx.moveTo(-0.84 * R, 0.12 * R);
+    for (let i = 0; i <= 8; i++) ctx.lineTo((-0.84 + i * 0.21) * R, (i % 2 ? 0.42 : 0.2) * R);
+    ctx.lineTo(0.84 * R, 0.12 * R);
+    ctx.closePath();
+    ctx.fillStyle = band;
+    ctx.fill();
+    // front half of the brim, with a zig-zag trim along the edge
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.lineWidth = this.ow * 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.fillStyle = c.base;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * Math.PI;
+      const r = i % 2 ? 0.84 : 0.94;
+      const p = { x: Math.cos(a) * 2.5 * R * r, y: -Math.sin(a) * 0.5 * R * r };
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = this.mat(hat.trim, t).base;
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
   }
 
   drawBump(ctx, R) {
@@ -1732,7 +2207,7 @@ export class FighterPainter {
 
   drawEars(ctx, pass, R, weasel) {
     const lk = this.look, t = this.tint;
-    if (lk.mask) return;
+    if (lk.mask || lk.species === 'croc') return;
     if (weasel) {
       for (const [x, y, s] of [[-0.35, 0.9, 1], [0.15, 1.0, 0.85]]) {
         ctx.beginPath();
@@ -1775,6 +2250,10 @@ export class FighterPainter {
       smoothClosed(ctx, [{ x: -0.3 * R, y: -0.2 * R }, { x: 0.5 * R, y: -0.35 * R }, { x: 1.0 * R, y: -0.3 * R }, { x: 0.8 * R, y: -1.0 * R }, { x: 0.1 * R, y: -0.9 * R }], 0.5);
       ctx.fillStyle = rgba(c, 0.35);
       ctx.fill();
+    } else if (beard.style === 'sideburns') {
+      smoothClosed(ctx, [{ x: -0.3 * R, y: 0.4 * R }, { x: -0.05 * R, y: 0.42 * R }, { x: 0.05 * R, y: -0.55 * R }, { x: -0.12 * R, y: -0.72 * R }, { x: -0.3 * R, y: -0.4 * R }], 0.4);
+      ctx.fillStyle = c;
+      ctx.fill();
     } else if (beard.style === 'goatee') {
       smoothClosed(ctx, [{ x: 0.35 * R, y: -0.62 * R }, { x: 0.9 * R, y: -0.6 * R }, { x: 0.82 * R, y: -1.15 * R }, { x: 0.45 * R, y: -1.1 * R }], 0.5);
       ctx.fillStyle = c;
@@ -1801,7 +2280,9 @@ export class FighterPainter {
     if (xp === 'attack' || xp === 'strain') lid = Math.max(lid, 0.42);
     else if (xp === 'shout') lid = Math.max(lid, 0.22);
     const eyeMode = this.marks.shiner ? 'shiner' : lk.eyesClosed ? 'closed' : hurt ? 'squeeze' : xp === 'ko' ? 'x' : xp === 'dizzy' ? 'spiral' : xp === 'happy' ? 'happy' : lid > 0.85 ? 'closed' : 'open';
-    const ex = weasel ? 0.66 * R : 0.6 * R, ey = weasel ? 0.3 * R : 0.17 * R;
+    const croc = lk.species === 'croc';
+    const ex = croc ? 0.55 * R : weasel ? 0.66 * R : 0.6 * R, ey = croc ? 0.58 * R : weasel ? 0.3 * R : 0.17 * R;
+    if (lk.clown) this.drawClownPaint(ctx, R, ex, ey);
     const ew = 0.27 * R;
     // eye socket shadow
     ctx.beginPath();
@@ -1904,7 +2385,7 @@ export class FighterPainter {
     // brows
     if (lk.brows !== 'none') {
       const th = lk.brows === 'thick' ? 0.16 * R : 0.1 * R;
-      let inner = angry || lk.brows === 'thick' ? -0.12 * R : 0.02 * R;
+      let inner = angry || lk.brows === 'thick' ? -0.12 * R : lk.brows === 'sad' ? 0.12 * R : 0.02 * R;
       let by = 0;
       if (xp === 'attack' || xp === 'strain' || xp === 'shout') { inner = -0.17 * R; by = -0.04 * R; }
       else if (hurt) { inner = 0.12 * R; by = 0.02 * R; }
@@ -1915,8 +2396,18 @@ export class FighterPainter {
         { x: ex - 0.36 * R, y: ey + 0.28 * R + by }, { x: ex, y: ey + 0.36 * R + by }, { x: ex + 0.36 * R, y: ey + 0.26 * R + inner + by },
         { x: ex + 0.33 * R, y: ey + 0.26 * R + inner - th + by }, { x: ex, y: ey + 0.36 * R - th + by }, { x: ex - 0.36 * R, y: ey + 0.28 * R - th * 0.7 + by },
       ], 0.3);
-      ctx.fillStyle = this.mat(lk.hair?.color || lk.beard?.color || '#222', t).base;
+      ctx.fillStyle = this.mat(croc ? darken(lk.skin, 0.35) : lk.hair?.color || lk.beard?.color || '#222', t).base;
       ctx.fill();
+    }
+    if (croc) {
+      // nostrils on the snout tip; the jaw does the talking
+      for (const x of [2.12, 2.24]) {
+        ctx.beginPath();
+        ctx.ellipse(x * R, 0.08 * R, 0.05 * R, 0.03 * R, 0, 0, Math.PI * 2);
+        ctx.fillStyle = outl;
+        ctx.fill();
+      }
+      return;
     }
     if (lk.freckles) {
       for (const [x, y] of [[0.75, -0.08], [0.85, -0.12], [0.68, -0.15], [0.8, -0.2]]) {
@@ -1945,6 +2436,7 @@ export class FighterPainter {
       return;
     }
     // mouth
+    if (lk.clown) this.drawClownMouthPaint(ctx, R);
     const mouth = { hurt: 'grimace', shout: 'shout', attack: 'grit', strain: 'grit', ko: 'slack', dizzy: 'wavy', happy: 'grin' }[xp] || lk.mouth;
     if (mouth === 'shout' || mouth === 'grimace' || mouth === 'slack') {
       // open mouth: dark inside, upper teeth, tongue
@@ -1989,6 +2481,22 @@ export class FighterPainter {
       ctx.stroke();
       this.line(ctx, [{ x: 0.53 * R, y: -0.47 * R }, { x: 0.97 * R, y: -0.47 * R }], 0.9, outl, 0.7);
       for (const x of [0.64, 0.76, 0.88]) this.line(ctx, [{ x: x * R, y: -0.4 * R }, { x: x * R, y: -0.54 * R }], 0.8, outl, 0.5);
+    } else if (mouth === 'clown') {
+      // the painted-on sad grimace: wide, down-turned, all teeth
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: 0.42 * R, y: -0.62 * R }, { x: 0.62 * R, y: -0.4 * R }, { x: 0.95 * R, y: -0.38 * R }, { x: 1.08 * R, y: -0.6 * R }, { x: 0.8 * R, y: -0.66 * R }], 0.35);
+      ctx.fillStyle = '#3a0e1a';
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#f6f1e6';
+      ctx.fillRect(0.4 * R, -0.52 * R, 0.7 * R, 0.16 * R);
+      ctx.fillRect(0.4 * R, -0.72 * R, 0.7 * R, 0.09 * R);
+      for (const x of [0.58, 0.7, 0.82, 0.94]) this.line(ctx, [{ x: x * R, y: -0.36 * R }, { x: x * R, y: -0.52 * R }], 0.8, outl, 0.5);
+      ctx.restore();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
     } else if (mouth === 'wavy') {
       this.line(ctx, [{ x: 0.55 * R, y: -0.44 * R }, { x: 0.66 * R, y: -0.4 * R }, { x: 0.78 * R, y: -0.48 * R }, { x: 0.9 * R, y: -0.42 * R }, { x: 0.98 * R, y: -0.46 * R }], 1.8, outl);
     } else if (mouth === 'grin' || mouth === 'teeth' || mouth === 'snarl') {
@@ -2027,6 +2535,7 @@ export class FighterPainter {
     ctx.fillStyle = rgba(outl, 0.55);
     ctx.fill();
     this.line(ctx, [{ x: 0.86 * R, y: -0.18 * R }, { x: 0.74 * R, y: -0.3 * R }], 1.4, outl, 0.35);
+    if (lk.clown) this.drawClownNose(ctx, R, ex, ey);
   }
 
   drawMask(ctx, R) {
@@ -2205,6 +2714,32 @@ export class FighterPainter {
         for (let i = 0; i < 3; i++) this.line(ctx, [{ x: (-0.55 + i * 0.12) * R, y: 0.15 * R }, { x: (-0.45 + i * 0.12) * R, y: 0.55 * R }], 1, this.outline, 0.6);
         break;
       }
+      case 'topknot': {
+        // sumo bowl cut: a flat fringe across the forehead, shaved line, topknot on the crown
+        ctx.beginPath();
+        smoothClosed(ctx, [{ x: 0.94 * R, y: 0.44 * R }, { x: 0.75 * R, y: 1.05 * R }, { x: -0.2 * R, y: 1.22 * R }, { x: -1.04 * R, y: 0.55 * R },
+          { x: -1.06 * R, y: -0.15 * R }, { x: -0.72 * R, y: -0.3 * R }, { x: -0.5 * R, y: 0.28 * R }, { x: 0.25 * R, y: 0.42 * R }], 0.35);
+        ctx.fillStyle = c;
+        ctx.fill();
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = this.outline;
+        ctx.stroke();
+        if (hair.sheen) this.line(ctx, [{ x: -0.6 * R, y: 0.95 * R }, { x: 0.0 * R, y: 1.12 * R }, { x: 0.55 * R, y: 0.98 * R }], 2.2, this.mat(hair.sheen, this.tint).base, 0.7);
+        for (let i = 0; i < 5; i++) this.line(ctx, [{ x: (-0.4 + i * 0.28) * R, y: 1.1 * R }, { x: (-0.35 + i * 0.3) * R, y: 0.5 * R }], 1, this.outline, 0.35);
+        if (hair.knot !== false) {
+          ctx.beginPath();
+          ctx.ellipse(-0.15 * R, 1.32 * R, 0.42 * R, 0.17 * R, 0.15, 0, Math.PI * 2);
+          ctx.fillStyle = c;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          this.line(ctx, [{ x: -0.42 * R, y: 1.2 * R }, { x: -0.4 * R, y: 1.44 * R }], 2.4, '#f2efe8');
+        } else {
+          // the knot came undone: a messy tuft
+          for (const [x, a] of [[-0.3, 0.4], [-0.1, 0.1], [0.1, -0.3]]) this.line(ctx, [{ x: x * R, y: 1.15 * R }, { x: (x + Math.sin(a) * 0.4) * R, y: 1.7 * R }], 3, c);
+        }
+        break;
+      }
       case 'crest': {
         ctx.beginPath();
         smoothClosed(ctx, [{ x: -0.7 * R, y: 0.7 * R }, { x: -0.2 * R, y: 1.35 * R }, { x: 0.5 * R, y: 1.25 * R }, { x: 0.6 * R, y: 0.9 * R }], 0.4);
@@ -2290,6 +2825,57 @@ export class FighterPainter {
     const hat = this.look.hat, t = this.tint;
     const c = this.mat(hat.color, t);
     if (hat.type === 'feathers') return this.drawFeathers(ctx, R, hat);
+    if (hat.type === 'cap') {
+      // checkered newsboy cap, puffed up and tilted back, goggles on the front
+      const crown = [{ x: 1.05 * R, y: 0.55 * R }, { x: 0.8 * R, y: 1.25 * R }, { x: -0.1 * R, y: 1.55 * R }, { x: -1.15 * R, y: 1.2 * R }, { x: -1.2 * R, y: 0.55 * R }, { x: 0.1 * R, y: 0.62 * R }];
+      ctx.beginPath();
+      smoothClosed(ctx, crown, 0.45);
+      ctx.lineWidth = this.ow * 2;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.fillStyle = c.base;
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      const sq = 0.32 * R;
+      for (let i = -5; i < 5; i++) for (let j = 1; j < 6; j++) {
+        if ((i + j) % 2) continue;
+        ctx.save();
+        ctx.translate(i * sq, j * sq * 0.9);
+        ctx.rotate(0.35);
+        ctx.fillStyle = this.mat((i + j * 3) % 4 === 0 ? hat.check2 : hat.check, t).base;
+        ctx.fillRect(0, 0, sq, sq * 0.9);
+        ctx.restore();
+      }
+      this.shadeAcross(ctx, { x: 0.8 * R, y: 1.4 * R }, { x: -1 * R, y: 0.6 * R });
+      ctx.restore();
+      // short visor
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: 0.7 * R, y: 0.7 * R }, { x: 1.45 * R, y: 0.6 * R }, { x: 1.5 * R, y: 0.48 * R }, { x: 0.8 * R, y: 0.52 * R }], 0.3);
+      ctx.fillStyle = darken(c.base, 0.2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (hat.goggles) {
+        for (const x of [0.3, 0.72]) {
+          ctx.beginPath();
+          ctx.arc(x * R, 1.05 * R, 0.24 * R, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(hat.goggles, t).base;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x * R, 1.05 * R, 0.15 * R, 0, Math.PI * 2);
+          ctx.fillStyle = '#2a3a4a';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x * R - 0.05 * R, 1.1 * R, 0.05 * R, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
+          ctx.fill();
+        }
+      }
+      return;
+    }
     if (hat.type === 'chef') {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: -0.85 * R, y: 0.55 * R }, { x: -1.15 * R, y: 1.5 * R }, { x: -0.6 * R, y: 2.2 * R }, { x: 0.1 * R, y: 2.05 * R }, { x: 0.7 * R, y: 2.25 * R }, { x: 1.2 * R, y: 1.55 * R }, { x: 0.85 * R, y: 0.6 * R }], 0.45);

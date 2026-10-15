@@ -133,6 +133,31 @@ const DRAW = {
     ctx.strokeStyle = '#d8d8e0'; ctx.lineWidth = 0.8;
     for (const y of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(20, y); ctx.stroke(); }
   },
+  cap(ctx, lk) {
+    const h = lk.hat || { color: '#e0952e', check: '#2f9a7a' };
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 24, 13, 0, 0, Math.PI * 2);
+    shape(ctx, h.color);
+    ctx.fillStyle = h.check || '#2f9a7a';
+    for (let i = -2; i <= 2; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2) ctx.fillRect(i * 8 - 3, j * 8 - 3, 7, 7);
+    ctx.beginPath();
+    ctx.ellipse(18, -6, 12, 4, 0.2, 0, Math.PI * 2);
+    shape(ctx, darken(h.color, 0.2), 1.6);
+  },
+  padlock(ctx, lk) {
+    const c = lk.chain || { color: '#b8b8c0', lock: '#9a9aa4' };
+    ctx.beginPath(); ctx.arc(0, 6, 6, Math.PI, 0); ctx.lineWidth = 3; ctx.strokeStyle = c.color; ctx.stroke();
+    ctx.beginPath(); ctx.rect(-8, -8, 16, 14); shape(ctx, c.lock, 1.8);
+    ctx.beginPath(); ctx.arc(0, -1, 2, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-14, 10); for (let i = 0; i < 5; i++) ctx.lineTo(-14 - i * 6, 10 + (i % 2) * 4);
+    ctx.lineWidth = 3; ctx.strokeStyle = c.color; ctx.stroke();
+  },
+  sombrero(ctx, lk) {
+    const h = lk.hat || { color: '#e8d4a0', band: '#d4318f' };
+    ctx.beginPath(); ctx.ellipse(0, 0, 46, 9, 0, 0, Math.PI * 2); shape(ctx, h.color);
+    ctx.beginPath(); ctx.moveTo(-16, 2); ctx.quadraticCurveTo(-12, 30, 0, 32); ctx.quadraticCurveTo(12, 30, 16, 2); ctx.closePath(); shape(ctx, h.color);
+    ctx.fillStyle = h.band; ctx.fillRect(-15, 3, 30, 6);
+  },
   tooth(ctx) {
     ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
     shape(ctx, '#f6f1e6', 1.4);

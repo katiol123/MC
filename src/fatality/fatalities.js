@@ -32,6 +32,8 @@ const FIST_UP = K.VICTORY[0];
 const daze = (d, f, t) => d.pose(f, K.DIZZY[0], K.DIZZY[1], 0.5 - 0.5 * Math.cos((t / 34) * TAU));
 const wobble = (t, a = 1) => Math.sin(t * 0.5) * a;
 const flail = (d, f, t, speed = 0.35) => d.pose(f, FLAIL_A, FLAIL_B, 0.5 + 0.5 * Math.sin(t * speed));
+/** Upside-down flailing (raw pose for d.pose). */
+const flailPose = (t) => spin(Math.sin(t * 0.5) > 0 ? FLAIL_A : FLAIL_B, 180);
 
 /** Rotation of a whole airborne body, in degrees, around its pelvis. */
 function spin(raw, deg) {
@@ -949,6 +951,322 @@ export const FATALITIES = {
         star(ctx, x, y, 34 * k, tt * 0.05, '#ffffff');
         star(ctx, x, y, 18 * k, -tt * 0.08, '#ffd23f');
         ctx.restore();
+      }
+    },
+  },
+
+  // --- GORO: Sumo Squash ------------------------------------------------------------------------
+  // two thunderous shiko stomps, a leap, and he sits on the victim: flat as a pancake, the paper-thin
+  // victim then flutters away on the sea breeze
+  goro: {
+    name: 'SUMO SQUASH',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const shikoF = P(STAND, { y: 92, lean: 14, chest: 6, fa: [40, 30, 0], ba: [30, 34, 0], fl: [118, 70, 10], ff: null, bf: [-34, 8, 0] });
+      const shikoB = P(STAND, { y: 92, lean: 14, chest: 6, fa: [40, 30, 0], ba: [30, 34, 0], bl: [118, 70, 10], bf: null, ff: [32, 8, 0] });
+      const squat = P(STAND, { y: 70, lean: 18, chest: 8, fa: [50, 40, 0], ba: [40, 44, 0], ff: [42, 8, 0], bf: [-44, 8, 0] });
+      const sit = P(STAND, { y: 34, lean: -14, chest: -6, neck: 6, head: 4, fa: [70, 40, 0], ba: [50, 50, 0], ff: null, bf: null, fl: [86, 8, 0], bl: [80, 12, 0] });
+      const fan = P(sit, { fa: [150, 120, 0] });
+      // Goro: stomp, stomp, squat, leap over, land seated on the victim, enjoy it, stand up, bow
+      d.keys(A, t, [[0, STAND], [12, shikoF], [26, shikoF], [30, squat], [44, shikoB], [58, shikoB], [62, squat], [80, K.PREJUMP],
+        [92, K.AIR_RISE], [112, K.AIR_TUCK], [124, sit], [150, sit], [160, fan], [176, sit], [196, sit], [212, STAND], [250, BOW], [300, BOW]]);
+      const xSit = d.vx - d.dir * 10;
+      if (t < 90) d.at(A, d.ax);
+      else if (t < 124) { const k = d.span(t, 90, 124, ease.linear); d.at(A, d.ax + (xSit - d.ax) * k, 300 * Math.sin(k * Math.PI) * (1 - k * 0.35) + 4 * k); }
+      else if (t < 200) d.at(A, xSit + Math.sin(t * 0.4) * (t > 130 && t < 150 ? 3 : 0), 4);
+      else d.at(A, xSit - d.dir * 70 * d.span(t, 200, 216), 0);
+      for (const st of [30, 62]) {
+        if (t === st) { d.sfx('boom'); d.fxEvent('shake', { amount: 12 }); d.fxEvent('dust', { x: A.body.x, y: 4, n: 18, spread: 80 }); d.fxEvent('label', { text: 'DOSUN!', x: d.ax, y: 260, color: '#ffd23f', life: 36 }); }
+      }
+      if (t === 92) d.sfx('whoosh');
+      // victim: hops on each stomp, looks up at the falling mountain, gets flattened
+      if (t < 124) {
+        const hop = Math.max(0, Math.sin(d.span(t, 30, 44, ease.linear) * Math.PI)) * 30 + Math.max(0, Math.sin(d.span(t, 62, 78, ease.linear) * Math.PI)) * 40;
+        d.at(V, d.vx, hop);
+        if (t < 96) daze(d, V, t); else d.pose(V, LOOK_UP, P(LOOK_UP, { fa: [150, 30, 0], ba: [160, 30, 0] }), d.span(t, 96, 110));
+        V.fx.sy = 1;
+      } else {
+        d.at(V, d.vx + (t > 214 ? d.dir * (t - 214) * 2.2 + Math.sin(t * 0.09) * 30 : 0), t > 214 ? (t - 214) * 2.4 : 0);
+        d.pose(V, K.LYING);
+        const flat = d.num(t, [[124, 0.6, ease.outQuad], [128, 0.26]]);
+        V.fx.sy = flat;
+        V.fx.sx = d.num(t, [[124, 1], [128, 1.35]]);
+        V.fx.noShadow = t > 214;
+        V.fx.rot = t > 214 ? Math.sin(t * 0.12) * 0.4 : 0;
+      }
+      if (t === 124) {
+        d.sfx('crash'); d.sfx('boom');
+        d.fxEvent('shake', { amount: 18 });
+        d.fxEvent('flash', { amount: 0.4 });
+        d.fxEvent('dust', { x: d.vx, y: 4, n: 30, spread: 110 });
+        d.fxEvent('label', { text: 'SQUISH!', x: d.vx, y: 230, color: '#ff3fd0', life: 60 });
+      }
+      if (t === 214) { d.sfx('whoosh'); d.fxEvent('label', { text: 'fwip...', x: d.vx, y: 120, color: '#ffffff', life: 50 }); }
+      V.fx.hidden = t > 296;
+      d.order = t >= 120 && t < 212 ? [1 - d.who, d.who] : [d.who, 1 - d.who];
+      d.camZoom = d.num(t, [[0, 1.34], [90, 1.15], [124, 1.3], [214, 1.3], [260, 1.1]]);
+      d.camY = d.num(t, [[0, 0], [90, 60], [124, 0], [214, 0], [270, 90]]);
+    },
+  },
+
+  // --- SOBBY: The Last Laugh --------------------------------------------------------------------
+  // a giant wooden mallet drives the victim into the pier like a nail; a flower for the grave and a
+  // fountain of tears
+  sobby: {
+    name: 'THE LAST LAUGH',
+    duration: 290,
+    run(d, t) {
+      const { A, V, s } = d;
+      const sob = P(STAND, { y: 110, lean: 16, chest: 10, neck: 14, head: 16, fa: [110, 150, 0], ba: [100, 150, 0] });
+      const sob2 = P(sob, { y: 108, chest: 13, head: 20 });
+      const keys = [[0, STAND], [10, sob], [16, sob2], [22, sob], [28, sob2], [40, STAND], [52, AP.hammer.windup]];
+      for (const h of [64, 100, 136, 168]) keys.push([h - 2, AP.hammer.windup], [h, P(AP.hammer.contact, { fl: null, bl: null, ff: [30, 8, 0], bf: [-30, 8, 0], y: 100 })], [h + 14, AP.hammer.windup]);
+      keys.push([196, STAND], [210, P(STAND, { lean: 30, chest: 20, fa: [80, 30, 0] })], [222, STAND], [236, sob], [244, sob2], [252, sob], [260, sob2], [268, sob], [290, sob2]);
+      d.keys(A, t, keys);
+      d.at(A, d.ax);
+      s.mallet = t >= 46 && t < 196;
+      s.hand = d.joint(A, 'handF');
+      s.handB = d.joint(A, 'handB');
+      s.elbow = d.joint(A, 'elbowF');
+      // the victim is hammered in: each bonk sinks them deeper
+      const hp = 130 * V.props.posScale;
+      const depth = d.num(t, [[0, 0], [64, 0], [66, hp * 0.3, ease.outQuad], [100, hp * 0.3], [102, hp * 0.62, ease.outQuad], [136, hp * 0.62], [138, hp * 0.92, ease.outQuad], [168, hp * 0.92], [172, hp * 1.6, ease.outQuad]]);
+      d.at(V, d.vx, -depth);
+      V.fx.clipFloor = true;
+      V.fx.noShadow = t > 64;
+      V.fx.stars = t > 66 && t < 172;
+      if (t < 64) daze(d, V, t); else d.pose(V, P(STAND, { fa: [10, 10, 0], ba: [6, 10, 0], neck: -6, head: -10 }));
+      V.fx.hidden = t > 176;
+      for (const h of [64, 100, 136]) {
+        if (t === h) {
+          d.sfx('clang'); d.sfx('boing');
+          d.fxEvent('shake', { amount: 12 });
+          d.fxEvent('label', { text: 'BONK!', x: d.vx, y: 280 - (h - 64) * 0.8, color: '#ffd23f', life: 40 });
+          d.fxEvent('dust', { x: d.vx, y: 4, n: 14, spread: 60 });
+          d.fxEvent('shards', { x: d.vx, y: 6, n: 8, color: '#5a3a2a' });
+        }
+      }
+      if (t === 168) { d.sfx('pop'); d.fxEvent('label', { text: 'tok.', x: d.vx, y: 110, color: '#ffffff', life: 40 }); }
+      if (t === 210) d.sfx('ding');
+      s.flower = t >= 210;
+      s.fx = d.vx;
+      if ((t > 4 && t < 34) || t > 234) {
+        // tears squirting sideways from both eyes
+        if (t % 3 === 0) {
+          const h = d.joint(A, 'head');
+          d.fxEvent('drops', { x: h.x + d.dir * 10, y: h.y, n: t > 234 ? 4 : 2, color: '#9ad8ff', cone: 2.4, speed: 6 });
+        }
+      }
+      if (t === 236) { d.sfx('laugh'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
+      d.camZoom = d.num(t, [[0, 1.34], [60, 1.3], [180, 1.45], [230, 1.3]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      if (layer !== 'front') return;
+      const z = cam.zoom;
+      if (s.mallet && s.hand) {
+        // giant wooden mallet held in both hands
+        const h = S(cam, s.hand.x, s.hand.y), e = S(cam, s.elbow.x, s.elbow.y);
+        const ang = Math.atan2(h.y - e.y, h.x - e.x);
+        ctx.save();
+        ctx.translate(h.x, h.y);
+        ctx.rotate(ang);
+        ctx.beginPath(); ctx.rect(-10 * z, -4 * z, 74 * z, 8 * z); ink(ctx, '#8a5a2a', 2);
+        ctx.beginPath(); ctx.rect(64 * z, -26 * z, 36 * z, 52 * z); ink(ctx, '#b07a3a', 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(68 * z, -22 * z, 6 * z, 44 * z);
+        ctx.strokeStyle = 'rgba(20,12,16,0.5)';
+        ctx.lineWidth = 1.5;
+        for (const y of [-14, 0, 14]) { ctx.beginPath(); ctx.moveTo(66 * z, y * z); ctx.lineTo(98 * z, y * z); ctx.stroke(); }
+        ctx.restore();
+      }
+      if (s.flower) {
+        const p = S(cam, s.fx, 0);
+        ctx.strokeStyle = '#2f8a3a'; ctx.lineWidth = 3 * z;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.quadraticCurveTo(p.x + 4 * z, p.y - 16 * z, p.x, p.y - 30 * z); ctx.stroke();
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU;
+          ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 6 * z, p.y - 30 * z + Math.sin(a) * 6 * z, 5 * z, 0, TAU); ink(ctx, '#ff5fbf', 1.5);
+        }
+        ctx.beginPath(); ctx.arc(p.x, p.y - 30 * z, 4 * z, 0, TAU); ink(ctx, '#ffd23f', 1.5);
+      }
+    },
+  },
+
+  // --- SNAPPER: Swamp Snack ---------------------------------------------------------------------
+  // lifts the victim, swallows them whole, a wriggling belly, a burp and a shoe
+  snapper: {
+    name: 'SWAMP SNACK',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const rub = P(STAND, { y: 114, lean: 6, fa: [70, 110, 0], ba: [60, 120, 0] });
+      const rub2 = P(rub, { fa: [62, 118, 0], ba: [68, 112, 0] });
+      const tilt = P(HOLD_UP, { neck: -26, head: -34, lean: -16, chest: -18 });
+      const pat = P(STAND, { y: 112, lean: -8, chest: -8, fa: [40, 100, 0], ba: [40, 110, 0] });
+      d.keys(A, t, [[0, STAND], [10, rub], [16, rub2], [22, rub], [28, rub2], [40, STAND], [54, AP.grab.contact], [76, HOLD_UP], [100, tilt],
+        [180, tilt], [196, P(STAND, { neck: -10 })], [216, pat], [228, P(pat, { fa: [46, 90, 0] })], [240, pat], [262, P(STAND, { neck: -20, head: -24, lean: -12 })], [300, FLEX]]);
+      d.at(A, d.ax);
+      A.fx.face = t >= 90 && t < 182 ? 'shout' : t >= 182 && t < 200 ? null : t > 262 ? 'happy' : null;
+      A.fx.bite = t >= 182 && t < 200; // chomp chomp
+      const mouth = () => { const h = d.joint(A, 'head'); return { x: h.x + d.dir * 34, y: h.y + 10 }; };
+      // the victim's head is steered to a point relative to the open mouth
+      const m = mouth(), hv = d.joint(V, 'head');
+      const offX = hv.x - V.body.x, offY = hv.y - V.body.y;
+      if (t < 54) { d.at(V, d.vx); daze(d, V, t); }
+      else if (t < 100) {
+        // grabbed and swung up overhead, upside down, head ending just above the jaws
+        const k = d.span(t, 54, 100);
+        const tx = m.x - offX, ty = m.y + 70 - offY;
+        d.at(V, d.vx + (tx - d.vx) * k, Math.max(0, ty) * k);
+        d.pose(V, spin(LIMP_AIR, 180 * k));
+      } else if (t < 176) {
+        // lowered head first into the open jaws, kicking
+        const k = d.span(t, 110, 176, ease.inQuad);
+        d.at(V, m.x - offX + Math.sin(t * 0.8) * (t > 130 ? 3 : 0), m.y + 70 - 150 * k - offY);
+        d.pose(V, t > 120 ? flailPose(t) : spin(LIMP_AIR, 180));
+        V.fx.sx = 1 - 0.3 * k;
+        V.fx.sy = 1 - 0.3 * k;
+      }
+      V.fx.hidden = t >= 176;
+      V.fx.noShadow = t >= 60;
+      // the victim disappears behind the croc's head: drawn first
+      d.order = [1 - d.who, d.who];
+      if (t === 110) d.sfx('heartbeat');
+      if (t === 176) { d.sfx('pop'); d.fxEvent('label', { text: 'GULP!', x: d.ax, y: 300, color: '#3fe6d0', life: 50 }); }
+      if (t === 184 || t === 192) d.sfx('snap');
+      s.belly = t >= 196 && t < 262 ? d.span(t, 196, 206) * (1 - d.span(t, 248, 262)) : 0;
+      s.wiggle = Math.sin(t * 0.7) * 6;
+      s.pelvis = d.joint(A, 'pelvis');
+      s.neck = d.joint(A, 'neck');
+      s.coat = A.def.look.top?.color || '#c8a878';
+      if (t === 250) {
+        d.sfx('boing');
+        d.fxEvent('label', { text: 'BURRRP!', x: d.ax + d.dir * 40, y: 330, color: '#ffd23f', life: 60 });
+        const m = mouth();
+        d.fxEvent('prop', { prop: 'boot', x: m.x, y: m.y, dir: d.dir, vx: 5, vy: 9, spin: 0.35, look: V.def.look });
+        d.fxEvent('smoke', { x: m.x, y: m.y, n: 6, spread: 20 });
+      }
+      d.camZoom = d.num(t, [[0, 1.34], [100, 1.25], [176, 1.45], [262, 1.3]]);
+      d.camY = d.num(t, [[0, 0], [60, 60], [176, 30], [200, 0]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      if (layer !== 'front' || !s.belly) return;
+      // the swallowed victim struggling inside the belly
+      const z = cam.zoom;
+      const c = { x: s.pelvis.x * 0.45 + s.neck.x * 0.55 + d.dir * 22, y: s.pelvis.y * 0.55 + s.neck.y * 0.45 };
+      const p = S(cam, c.x, c.y);
+      const r = 30 * z * s.belly;
+      ctx.beginPath();
+      ctx.ellipse(p.x + s.wiggle * z * 0.5, p.y, r * 1.1 + Math.abs(s.wiggle) * z * 0.3, r * (1 + s.wiggle * 0.02), 0, 0, TAU);
+      ink(ctx, s.coat, 3);
+      ctx.beginPath();
+      ctx.ellipse(p.x + s.wiggle * z * 0.5 - 8 * z, p.y - 8 * z, r * 0.3, r * 0.2, -0.5, 0, TAU);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+      // a fist print pushing out
+      if (s.wiggle > 3) {
+        ctx.beginPath();
+        ctx.arc(p.x + r * 0.6, p.y - r * 0.2, 7 * z, 0, TAU);
+        ink(ctx, s.coat, 2);
+      }
+    },
+  },
+
+  // --- CHUY: Piñata ------------------------------------------------------------------------------
+  // the victim is strung up as a piñata; Chuy swings blindfolded, misses twice, then the guitar
+  // connects and it rains candy
+  chuy: {
+    name: 'PIÑATA',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const strum = P(STAND, { y: 114, lean: 4, fa: [40, 100, 0], ba: [70, 60, 0] });
+      const strum2 = P(strum, { ba: [60, 80, 0] });
+      const keys = [[0, STAND], [8, strum], [12, strum2], [16, strum], [20, strum2], [24, strum], [28, strum2], [40, STAND], [58, P(STAND, { fa: [160, 150, 0], ba: [150, 150, 0], neck: 6 })], [70, STAND]];
+      for (const h of [100, 134, 172]) keys.push([h - 14, AP.panSwing.windup], [h, AP.panSwing.contact], [h + 10, AP.panSwing.contact]);
+      keys.push([196, STAND], [214, P(STAND, { fa: [160, 150, 0], ba: [150, 150, 0] })], [228, STAND], [250, FIST_UP], [300, FIST_UP]);
+      d.keys(A, t, keys);
+      // blind swings wander off target
+      const wander = t >= 80 && t < 180 ? d.num(t, [[80, 0], [100, -60], [118, 30], [134, 60], [152, -20], [172, 0]]) : 0;
+      d.at(A, d.ax + d.dir * wander);
+      A.fx.prop = t >= 80 && t < 173 ? { type: 'guitar', hand: 'F' } : null;
+      A.fx.look = t >= 172 ? { guitar: null } : null;
+      s.blind = t >= 62 && t < 214;
+      s.head = d.joint(A, 'head');
+      s.dirA = A.facing;
+      if (t % 6 === 0 && t < 30) d.fxEvent('label', { text: '♪', x: d.ax + d.dir * 40, y: 200 + (t % 12) * 3, color: '#ffd23f', life: 30 });
+      if (t === 10) d.sfx('chord');
+      // victim: hoisted up by the feet on a rope, swinging, dressed as a piñata
+      const hang = d.span(t, 30, 60);
+      const swing = Math.sin(t * 0.08) * 16 * hang + (t > 172 ? 0 : 0);
+      d.at(V, d.vx + swing, 40 + 150 * hang);
+      if (t < 30) daze(d, V, t);
+      else d.pose(V, spin(LIMP_AIR, 180 * hang));
+      V.fx.tint = 0.45 * hang;
+      V.fx.tintColor = '#ff8ad8';
+      V.fx.noShadow = t > 40;
+      V.fx.hidden = t >= 172;
+      s.rope = t >= 26 && t < 172;
+      s.foot = d.joint(V, 'ankleF');
+      s.vp = ['neck', 'waist', 'pelvis', 'kneeF', 'elbowF', 'head'].map((j) => d.joint(V, j));
+      s.paper = hang > 0.5 && t < 172;
+      for (const h of [100, 134]) {
+        if (t === h) { d.sfx('whoosh'); d.fxEvent('label', { text: 'MISS!', x: A.body.x + d.dir * 80, y: 220, color: '#ffffff', life: 30 }); }
+      }
+      if (t === 172) {
+        d.sfx('crash'); d.sfx('twang'); d.sfx('boom');
+        d.fxEvent('shake', { amount: 16 });
+        d.fxEvent('flash', { amount: 0.5 });
+        const c = d.joint(V, 'waist');
+        for (const color of ['#ff3fd0', '#3fe6d0', '#ffd23f', '#ff8a3a', '#7fd36a', '#ffffff']) d.fxEvent('shards', { x: c.x, y: c.y, n: 12, color, speed: 11 });
+        d.fxEvent('label', { text: '¡OLÉ!', x: c.x, y: c.y + 90, color: '#ffd23f', life: 70 });
+      }
+      // candy rain afterwards
+      if (t > 176 && t < 250 && t % 4 === 0) {
+        const x = d.vx + Math.sin(t * 1.7) * 80;
+        d.fxEvent('shards', { x, y: 420, n: 2, color: ['#ff3fd0', '#3fe6d0', '#ffd23f', '#7fd36a'][t % 4], speed: 3 });
+      }
+      if (t === 250) d.sfx('chord');
+      d.camZoom = d.num(t, [[0, 1.34], [60, 1.22], [172, 1.32], [250, 1.25]]);
+      d.camY = d.num(t, [[0, 0], [40, 50], [250, 30]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      const z = cam.zoom;
+      if (layer === 'back' && s.rope && s.foot) {
+        const a = S(cam, s.foot.x, s.foot.y), b = S(cam, s.foot.x, s.foot.y + 600);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.lineWidth = 3 * z; ctx.strokeStyle = '#c9a26a'; ctx.stroke();
+      }
+      if (layer !== 'front') return;
+      if (s.paper && s.vp) {
+        // crepe-paper frills over the victim
+        const cols = ['#ff3fd0', '#3fe6d0', '#ffd23f', '#ff8a3a', '#7fd36a'];
+        s.vp.forEach((j, i) => {
+          const p = S(cam, j.x, j.y);
+          ctx.beginPath();
+          for (let k = 0; k <= 8; k++) {
+            const x = p.x - 22 * z + k * 5.5 * z, y = p.y + (k % 2 ? -6 : 6) * z;
+            if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.lineWidth = 7 * z;
+          ctx.strokeStyle = cols[i % cols.length];
+          ctx.stroke();
+        });
+      }
+      if (s.blind && s.head) {
+        // blindfold
+        const h = S(cam, s.head.x, s.head.y + 4);
+        ctx.beginPath();
+        ctx.rect(h.x - 18 * z, h.y - 5 * z, 36 * z, 9 * z);
+        ink(ctx, '#1a1414', 2);
+        ctx.beginPath();
+        ctx.moveTo(h.x - s.dirA * 16 * z, h.y);
+        ctx.lineTo(h.x - s.dirA * 32 * z, h.y + 10 * z);
+        ctx.lineWidth = 4 * z; ctx.strokeStyle = '#1a1414'; ctx.stroke();
       }
     },
   },

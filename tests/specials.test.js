@@ -41,7 +41,7 @@ test('command grab (Bruno) cannot be teched', () => {
 });
 
 test('every fighter has a working signature special that connects in its intended range', () => {
-  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60, hawk: 100, tao: 20 };
+  const range = { brick: 120, rattigan: 400, smiles: 150, jax: 400, roxy: 10, bruno: 10, jaguar: 150, cinder: 90, grizz: 60, hawk: 100, tao: 20, goro: 150, sobby: 250, snapper: 40, chuy: 200 };
   for (const r of ROSTER) {
     if (!(r.id in range)) continue; // vellaro: counter stance, tested separately
     const m = fightingMatch({ p1: r.id, p2: 'jax' });

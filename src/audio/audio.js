@@ -146,6 +146,16 @@ export class AudioSystem {
         if (e.heal > 0) this.tone(0.3, { freq: 660, to: 1320, type: 'triangle', gain: 0.12 }); // heal chime
         if (e.claw) this.noise(0.14, { freq: 4200, q: 1.5, gain: 0.3, sweep: 0.5 }); // claw rake
         if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
+        if (e.bite) { this.noise(0.09, { freq: 2400, q: 2, gain: 0.45 }); this.tone(0.12, { freq: 180, to: 90, gain: 0.4 }); } // chomp
+        if (e.pie) { this.noise(0.25, { freq: 700, type: 'lowpass', gain: 0.6, sweep: 0.3 }); this.tone(0.2, { freq: 300, to: 120, type: 'sine', gain: 0.3 }); } // splat
+        if (e.notes) this.tone(0.25, { freq: [523, 659, 784][Math.floor(Math.random() * 3)], type: 'triangle', gain: 0.18 });
+        if (e.prop === 'guitar') {
+          // hollow wooden thunk + jangling strings; the finisher smashes the guitar
+          this.tone(0.3, { freq: 196, to: 150, type: 'triangle', gain: 0.35 });
+          for (const f of [330, 440, 554]) this.tone(0.5, { freq: f, to: f * 0.99, type: 'sawtooth', gain: 0.04 });
+          if (e.smash) this.noise(0.4, { freq: 1800, q: 0.6, gain: 0.6, sweep: 0.4 });
+        }
+        if (e.prop === 'glove') { this.tone(0.35, { freq: 220, to: 660, type: 'sine', gain: 0.3 }); this.tone(0.25, { freq: 120, to: 60, gain: 0.5 }); } // boing + thump
         if (e.prop === 'pan') {
           // cast-iron "BONG": inharmonic partials with a long ring
           this.tone(0.7, { freq: 520, to: 505, type: 'triangle', gain: 0.32 });

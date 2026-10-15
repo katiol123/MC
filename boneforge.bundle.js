@@ -561,6 +561,16 @@ class AudioSystem {
         if (e.heal > 0) this.tone(0.3, { freq: 660, to: 1320, type: 'triangle', gain: 0.12 }); // heal chime
         if (e.claw) this.noise(0.14, { freq: 4200, q: 1.5, gain: 0.3, sweep: 0.5 }); // claw rake
         if (e.fire) this.noise(0.4, { freq: 500, gain: 0.45, type: 'lowpass', sweep: 0.6 }); // fire whoomph
+        if (e.bite) { this.noise(0.09, { freq: 2400, q: 2, gain: 0.45 }); this.tone(0.12, { freq: 180, to: 90, gain: 0.4 }); } // chomp
+        if (e.pie) { this.noise(0.25, { freq: 700, type: 'lowpass', gain: 0.6, sweep: 0.3 }); this.tone(0.2, { freq: 300, to: 120, type: 'sine', gain: 0.3 }); } // splat
+        if (e.notes) this.tone(0.25, { freq: [523, 659, 784][Math.floor(Math.random() * 3)], type: 'triangle', gain: 0.18 });
+        if (e.prop === 'guitar') {
+          // hollow wooden thunk + jangling strings; the finisher smashes the guitar
+          this.tone(0.3, { freq: 196, to: 150, type: 'triangle', gain: 0.35 });
+          for (const f of [330, 440, 554]) this.tone(0.5, { freq: f, to: f * 0.99, type: 'sawtooth', gain: 0.04 });
+          if (e.smash) this.noise(0.4, { freq: 1800, q: 0.6, gain: 0.6, sweep: 0.4 });
+        }
+        if (e.prop === 'glove') { this.tone(0.35, { freq: 220, to: 660, type: 'sine', gain: 0.3 }); this.tone(0.25, { freq: 120, to: 60, gain: 0.5 }); } // boing + thump
         if (e.prop === 'pan') {
           // cast-iron "BONG": inharmonic partials with a long ring
           this.tone(0.7, { freq: 520, to: 505, type: 'triangle', gain: 0.32 });
@@ -652,7 +662,7 @@ __define("src/data/fighters.js", function (__exports, __require) {
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All twelve are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All sixteen are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
@@ -698,7 +708,7 @@ const ROSTER = [
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0, speed: 0.55, mobility: 0.6, health: 0.1, toughness: 0.15, reaction: 0.45, aggression: 0.25, combo: 0.3, antiAir: 0.35, cunning: 1 },
+    profile: { power: 0, speed: 0.6, mobility: 0.65, health: 0.2, toughness: 0.25, reaction: 0.5, aggression: 0.35, combo: 0.4, antiAir: 0.4, cunning: 1 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -729,7 +739,7 @@ const ROSTER = [
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.5, speed: 0.35, mobility: 0.45, health: 0.5, toughness: 0.45, reaction: 0.4, aggression: 0.45, combo: 0.65, antiAir: 0.85, cunning: 0.35 },
+    profile: { power: 0.45, speed: 0.3, mobility: 0.4, health: 0.45, toughness: 0.4, reaction: 0.35, aggression: 0.4, combo: 0.55, antiAir: 0.75, cunning: 0.3 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -912,7 +922,7 @@ const ROSTER = [
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
     stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.45, speed: 0.4, mobility: 0.35, health: 0.1, toughness: 0.15, reaction: 0.25, aggression: 0.55, combo: 0.45, antiAir: 0.25, cunning: 0.15 },
+    profile: { power: 0.45, speed: 0.45, mobility: 0.4, health: 0.15, toughness: 0.2, reaction: 0.3, aggression: 0.55, combo: 0.45, antiAir: 0.3, cunning: 0.2 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -940,7 +950,7 @@ const ROSTER = [
     body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
     stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.65, speed: 0.2, mobility: 0.1, health: 0.75, toughness: 0.8, reaction: 0.25, aggression: 0.55, combo: 0, antiAir: 0.5, cunning: 0.5 },
+    profile: { power: 0.7, speed: 0.3, mobility: 0.2, health: 0.75, toughness: 0.8, reaction: 0.3, aggression: 0.6, combo: 0, antiAir: 0.55, cunning: 0.55 },
     look: {
       skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
       eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
@@ -1014,6 +1024,122 @@ const ROSTER = [
     moves: {
       lp: { startup: 3 },
       s1: { name: 'Stone Fist' },
+    },
+  },
+  {
+    id: 'goro',
+    name: 'GORO "BOULDER" TAKEDA',
+    title: 'The Unmovable Mountain',
+    blurb: 'A retired sumo who never learned how to step back. Slow to start, impossible to shove, and every stomp shakes the pier.',
+    body: { height: 1.02, bulk: 1.5, arms: 0.98, legs: 0.9, head: 1.06, torso: 1.08, shoulders: 1.3, armBulk: 1.3, legBulk: 1.3, waist: 1.5, hands: 1.15 },
+    stats: { health: 1200, walkF: 2.4, walkB: 2.0, run: 5.4, dash: 7.8, jumpVY: 14.2, jumpVX: 3.3, mass: 1.55, stunMax: 820, pushW: 44 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.6, speed: 0.1, mobility: 0.05, health: 0.65, toughness: 0.6, reaction: 0.3, aggression: 0.4, combo: 0.2, antiAir: 0.3, cunning: 0.3 },
+    look: {
+      skin: '#d8a07a', outline: '#160e0e', rim: '#ff4fd8',
+      eyes: '#3a2a20', brows: 'thick', mouth: 'flat',
+      hair: { style: 'topknot', color: '#1a1416', sheen: '#3fd2c2', streak: '#f2efe8', knot: true },
+      beard: { style: 'sideburns', color: '#1a1416' },
+      top: { type: 'tunic', color: '#e0952e', color2: '#b8691c', trim: '#2a1c14' },
+      pants: { type: 'pants', color: '#2a2430' },
+      belt: { color: '#4a2a6a', buckle: '#4a2a6a' },
+      gloves: { type: 'none' },
+      shoes: { type: 'wrapped', color: '#e8dcc0' },
+      victory: 3,
+    },
+    // low-health look: the topknot comes undone, the hair tie flies off
+    damaged: { look: { hair: { knot: false } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 10, spin: 0.3 }] },
+    moves: {
+      hp: { armor: { from: 1, to: 12, hits: 1 } },
+      hk: { armor: { from: 1, to: 14, hits: 1 } },
+      s1: { name: 'Harite Palm', armor: { from: 1, to: 20, hits: 1 } },
+    },
+  },
+  {
+    id: 'sobby',
+    name: 'SOBBY PAGLIACCI',
+    title: 'The Weeping Jester',
+    blurb: 'The saddest clown on the boardwalk. He cries through every fight, and nobody laughs at the pie he throws.',
+    body: { height: 1.04, bulk: 0.9, arms: 1.06, legs: 1.06, head: 1.08, torso: 0.98, shoulders: 0.96 },
+    stats: { health: 940, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10, jumpVY: 16.8, jumpVX: 4.3, mass: 0.92, stunMax: 580, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.6, mobility: 0.65, health: 0.4, toughness: 0.35, reaction: 0.75, aggression: 0.15, combo: 0.5, antiAir: 0.6, cunning: 0.85 },
+    look: {
+      skin: '#c99a78', outline: '#160c14', rim: '#ff3fd0',
+      eyes: '#7a3ab0', brows: 'sad', mouth: 'clown',
+      clown: { paint: '#eeece6', mouth: '#7a2aa0', tear: '#3a8ae8', nose: '#e8203a' },
+      hair: { style: 'spiky', color: '#e83ab8', root: '#a0207a' },
+      earrings: '#e2b440',
+      hat: { type: 'cap', color: '#e0952e', check: '#2f9a7a', check2: '#d4318f', goggles: '#c99b4a' },
+      top: { type: 'jacket', color: '#d03aa8', color2: '#8a2a78', inner: '#c88a2a', patches: [] },
+      tie: { color: '#3a5a2a', bow: true, check: '#1e3016' },
+      pants: { type: 'pants', color: '#b87a26' },
+      gloves: { type: 'gloves', color: '#f2efe8' },
+      shoes: { type: 'shoes', color: '#d4318f', sole: '#3a1030', big: true },
+      victory: 2,
+    },
+    // low-health look: the checkered cap flies off (the red nose stays: it is his real nose)
+    damaged: { look: { hat: null }, props: [{ type: 'cap', from: 'head', vx: -3, vy: 11, spin: 0.25 }] },
+    moves: {
+      s1: { name: 'Seltzer Sneak' },
+    },
+  },
+  {
+    id: 'snapper',
+    name: 'SNAPPER LOCKJAW',
+    title: 'The Swamp Loan Shark',
+    blurb: 'Lends you money with a smile full of teeth. Pay late and he collects with a death roll.',
+    body: { height: 1.05, bulk: 1.12, arms: 1.0, legs: 0.96, head: 1.15, torso: 1.05, shoulders: 1.15, armBulk: 1.1 },
+    stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.4, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.15, stunMax: 700, pushW: 37 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.75, speed: 0.45, mobility: 0.35, health: 0.7, toughness: 0.6, reaction: 0.4, aggression: 0.8, combo: 0.55, antiAir: 0.3, cunning: 0.5 },
+    look: {
+      species: 'croc',
+      skin: '#6f8a2c', fur2: '#cfc58a', outline: '#10140a', rim: '#ff3fd0',
+      eyes: '#ff3fd0', brows: 'angry', mouth: 'fangs',
+      top: { type: 'trench', color: '#c8a878', color2: '#d4318f', vest: '#2a2a30', buttons: '#7a6a5a', plaid: '#8a6a48' },
+      tie: { color: '#d4318f' },
+      chain: { color: '#b8b8c0', lock: '#9a9aa4' },
+      pants: { type: 'pants', color: '#2a2a30' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#3a2a1a', sole: '#140c08' },
+      tail: '#6f8a2c',
+      victory: 1,
+    },
+    // low-health look: the padlock chain snaps off, and a tooth goes flying
+    damaged: { look: { chain: null }, props: [{ type: 'padlock', from: 'chest', vx: 2.5, vy: 7, spin: 0.4 }, { type: 'tooth', from: 'mouth', vx: 3, vy: 9, spin: 0.5 }] },
+    moves: {
+      s1: { name: 'Tail Lash' },
+    },
+  },
+  {
+    id: 'chuy',
+    name: 'CHUY "EL TROVADOR" VALDEZ',
+    title: 'Serenade of Fists',
+    blurb: 'Plays every bar on the pier and fights in most of them. His guitar has more dents than strings.',
+    body: { height: 1.0, bulk: 0.95, arms: 1.02, legs: 1.02, head: 1.0, torso: 1.0, shoulders: 1.0 },
+    stats: { health: 960, walkF: 3.5, walkB: 3.0, run: 7.2, dash: 10.4, jumpVY: 16.8, jumpVX: 4.4, mass: 0.96, stunMax: 600, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.6, mobility: 0.55, health: 0.3, toughness: 0.3, reaction: 0.5, aggression: 0.45, combo: 0.6, antiAir: 0.35, cunning: 0.4 },
+    look: {
+      skin: '#b47a52', outline: '#140c0c', rim: '#ff3fd0',
+      eyes: '#5a3a20', brows: 'sharp', mouth: 'grin',
+      hair: { style: 'ponytail', color: '#2a1a14', tie: '#d4318f' },
+      beard: { style: 'goatee', color: '#2a1a14' },
+      hat: { type: 'sombrero', color: '#e8d4a0', band: '#d4318f', trim: '#d4318f' },
+      scarf: '#d4318f',
+      top: { type: 'jacket', color: '#2a2422', color2: '#d4a03a', inner: '#c03aa0', patches: ['#e0952e', '#3fd2c2', '#d4318f'] },
+      guitar: { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' },
+      pants: { type: 'pants', color: '#2a2422', color2: '#d4a03a' },
+      belt: { color: '#1a1414', buckle: '#d4a03a' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#3a2418', sole: '#140c08' },
+      victory: 0,
+    },
+    // low-health look: the sombrero flies off
+    damaged: { look: { hat: null }, props: [{ type: 'sombrero', from: 'head', vx: -3.5, vy: 9, spin: 0.15 }] },
+    moves: {
+      s1: { name: 'Boot Stomp' },
     },
   },
 ];
@@ -1212,6 +1338,8 @@ const SPECIAL_ORDER = ['su', 's2', 's1', 's4', 's3'];
 __define("src/data/signatures.js", function (__exports, __require) {
   Object.defineProperty(__exports, "PAN_COCK", { enumerable: true, get: () => PAN_COCK });
   Object.defineProperty(__exports, "TALON_REACH", { enumerable: true, get: () => TALON_REACH });
+  Object.defineProperty(__exports, "SPRING_REACH", { enumerable: true, get: () => SPRING_REACH });
+  Object.defineProperty(__exports, "GUITAR_COCK", { enumerable: true, get: () => GUITAR_COCK });
   Object.defineProperty(__exports, "SIGNATURES", { enumerable: true, get: () => SIGNATURES });
 // Per-fighter signature special (s4, input ↓↙← + punch) and super (su, ↓↘→↓↘→ + punch).
 // Pure data: the generic systems (sequences, projectiles, throws, counter stance, air dives)
@@ -1259,6 +1387,17 @@ const HEAL = { lifesteal: 0.5 };
 
 /** Flurry jabs (Tao): tiny hits that keep the opponent locked; afterimage fists are drawn. */
 const JAB = (damage) => H(damage, { hitstun: 22, blockstun: 12, hitstop: 3, push: { hit: 0.6, block: 1.0 } });
+
+/** Open-hand palm strikes (Goro): a big flat hand. */
+const PALM = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 17 }, { a: 'elbowB', b: 'handB', r: 17 }] };
+/** Boxing glove on a spring (Sobby's super finisher): reaches far past the fist. */
+const SPRING_REACH = 70;
+const SPRING = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 16 }, { a: 'elbowF', b: 'handF', r: 16 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: SPRING_REACH, r: 24 }] };
+/** Bites (Snapper's super): the head and the long snout are the hitbox. */
+const BITE = { bite: true, hitboxes: [{ a: 'neck', b: 'head', r: 18 }, { a: 'head', b: 'head', dir: 'neck', rot: -1.3, ext: 44, r: 18 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }] };
+/** Guitar swung by the neck (Chuy's super): forearm plus a big capsule over the guitar body. */
+const GUITAR_COCK = 0.25;
+const GUITAR = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 15 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: GUITAR_COCK, ext: 64, r: 26 }], prop: 'guitar' };
 
 const SIGNATURES = {
   brick: {
@@ -1445,6 +1584,70 @@ const SIGNATURES = {
       steps: [step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)),
         step('lunge', 18, FINISH(95, 'knockback'), { vx: 6 })],
       recoveryAfter: 16,
+    },
+  },
+  goro: {
+    // a stomp that sends a ground tremor along the planks: must be blocked low (or jumped)
+    s4: {
+      name: 'Shiko Quake', anim: 'hammer', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 16, active: 2, recovery: 22, hitboxes: [],
+      projectile: { at: 17, kind: 'quake', speed: 7.5, y: 12, r: 24, life: 70, hits: 1,
+        hit: { damage: 62, hitstun: 24, blockstun: 14, hitstop: 9, reaction: 'light', push: { hit: 3, block: 4 }, stun: 60, height: 'low' } },
+      armor: { from: 2, to: 16, hits: 1 }, priority: 3, shake: 6,
+    },
+    su: {
+      ...SUPER, name: 'Yokozuna Crash', anim: 'sequence',
+      steps: [step('jab', 9, H(48, PALM)), step('cross', 10, H(52, PALM)), step('jab', 9, H(48, PALM)), step('cross', 10, H(52, PALM)), step('tackle', 18, FINISH(120, 'knockdown', { shake: 14, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 24 }, { a: 'neck', b: 'shoulderF', r: 24 }, { a: 'neck', b: 'pelvis', r: 26 }] }), { vx: 7 })],
+      recoveryAfter: 18,
+    },
+  },
+  sobby: {
+    // a cream pie in the face: long hitstun to follow up, and the face stays covered for a while
+    s4: {
+      name: 'Cream Pie', anim: 'flick', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 2, recovery: 20, hitboxes: [],
+      projectile: { at: 13, kind: 'pie', speed: 8.5, y: 150, r: 16, life: 90, hits: 1,
+        hit: { damage: 52, hitstun: 30, blockstun: 14, hitstop: 8, reaction: 'light', push: { hit: 2.5, block: 3.5 }, stun: 55, height: 'mid', pie: 240 } },
+      priority: 2,
+    },
+    // slaps and kicks between sobs, then the boxing glove on a spring
+    su: {
+      ...SUPER, name: 'Tears of a Clown', anim: 'sequence', prop: { type: 'glove', hand: 'F' },
+      steps: [step('jab', 8, H(40)), step('cross', 10, H(48)), step('frontKick', 14, H(45)), step('cross', 10, H(48)), step('lunge', 18, FINISH(110, 'knockback', SPRING), { vx: 4 })],
+      recoveryAfter: 18,
+    },
+  },
+  snapper: {
+    // a rolling lunge: he spins his whole body (and tail) through the opponent and knocks them down
+    s4: {
+      name: 'Death Roll', anim: 'whirl', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 10, recovery: 18, motion: [{ from: 4, to: 18, vx: 8 }],
+      damage: 95, stun: 80, hitstun: 24, blockstun: 16, hitstop: 12,
+      height: 'mid', reaction: 'knockdown', push: { hit: 4, block: 6 }, launch: { vx: 5, vy: 7 },
+      hitboxes: [{ a: 'neck', b: 'pelvis', r: 22 }, { a: 'shoulderF', b: 'handF', r: 16 }, { a: 'hipB', b: 'ankleB', r: 16 }],
+      juggle: 2, priority: 3, shake: 7,
+    },
+    // four bites, then a full-body tail whip
+    su: {
+      ...SUPER, name: 'Swamp Jaws', anim: 'sequence', bite: true,
+      steps: [step('jab', 9, H(42, BITE)), step('cross', 10, H(48, BITE)), step('jab', 9, H(42, BITE)), step('cross', 10, H(48, BITE)), step('whirl', 18, FINISH(115, 'knockdown'))],
+      recoveryAfter: 18,
+    },
+  },
+  chuy: {
+    // a strummed chord: three notes drift across the screen
+    s4: {
+      name: 'Serenata', anim: 'pushWave', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 2, recovery: 22, hitboxes: [],
+      projectile: { at: 13, kind: 'notes', speed: 6, y: 140, r: 24, life: 100, hits: 3, interval: 8,
+        hit: { damage: 24, hitstun: 16, blockstun: 11, hitstop: 5, reaction: 'light', push: { hit: 2, block: 2.5 }, stun: 28, height: 'mid' } },
+      priority: 2,
+    },
+    // the guitar comes off his back
+    su: {
+      ...SUPER, name: 'Mariachi Fury', anim: 'sequence', prop: { type: 'guitar', hand: 'F' },
+      steps: [step('panSwing', 14, H(50, GUITAR)), step('chop', 19, H(55, GUITAR)), step('panSwing', 14, H(50, GUITAR)), step('chop', 19, FINISH(125, 'knockdown', { ...GUITAR, smash: true }))],
+      recoveryAfter: 18,
     },
   },
 };
@@ -2942,6 +3145,7 @@ class Fighter {
     if (this.focus > 0) this.focus--;
     // the stun meter only recovers after a pause in the punishment
     this.sinceHit++;
+    if (this.marks.pie > 0) this.marks.pie--;
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
     const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat', 'dazed'].includes(this.state);
@@ -3361,6 +3565,7 @@ class Fighter {
     this.stun += m.stun * (counter ? 1.25 : 1);
     this.sinceHit = 0;
     if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
+    if (m.pie) this.marks.pie = m.pie; // cream pie over the face (ticks, render-only)
     if (m.super) {
       // a super leaves its signature mark on the victim (render-only)
       const mk = this.marks, id = att.def.id;
@@ -4619,6 +4824,7 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
     super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: !!spec.pull,
+    bite: !!spec.bite, smash: !!spec.smash, pie: !!spec.pie, quake: spec.id === 'proj:quake', notes: spec.id === 'proj:notes',
   };
 }
 
@@ -4967,6 +5173,8 @@ const FIST_UP = K.VICTORY[0];
 const daze = (d, f, t) => d.pose(f, K.DIZZY[0], K.DIZZY[1], 0.5 - 0.5 * Math.cos((t / 34) * TAU));
 const wobble = (t, a = 1) => Math.sin(t * 0.5) * a;
 const flail = (d, f, t, speed = 0.35) => d.pose(f, FLAIL_A, FLAIL_B, 0.5 + 0.5 * Math.sin(t * speed));
+/** Upside-down flailing (raw pose for d.pose). */
+const flailPose = (t) => spin(Math.sin(t * 0.5) > 0 ? FLAIL_A : FLAIL_B, 180);
 
 /** Rotation of a whole airborne body, in degrees, around its pelvis. */
 function spin(raw, deg) {
@@ -5887,6 +6095,322 @@ const FATALITIES = {
       }
     },
   },
+
+  // --- GORO: Sumo Squash ------------------------------------------------------------------------
+  // two thunderous shiko stomps, a leap, and he sits on the victim: flat as a pancake, the paper-thin
+  // victim then flutters away on the sea breeze
+  goro: {
+    name: 'SUMO SQUASH',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const shikoF = P(STAND, { y: 92, lean: 14, chest: 6, fa: [40, 30, 0], ba: [30, 34, 0], fl: [118, 70, 10], ff: null, bf: [-34, 8, 0] });
+      const shikoB = P(STAND, { y: 92, lean: 14, chest: 6, fa: [40, 30, 0], ba: [30, 34, 0], bl: [118, 70, 10], bf: null, ff: [32, 8, 0] });
+      const squat = P(STAND, { y: 70, lean: 18, chest: 8, fa: [50, 40, 0], ba: [40, 44, 0], ff: [42, 8, 0], bf: [-44, 8, 0] });
+      const sit = P(STAND, { y: 34, lean: -14, chest: -6, neck: 6, head: 4, fa: [70, 40, 0], ba: [50, 50, 0], ff: null, bf: null, fl: [86, 8, 0], bl: [80, 12, 0] });
+      const fan = P(sit, { fa: [150, 120, 0] });
+      // Goro: stomp, stomp, squat, leap over, land seated on the victim, enjoy it, stand up, bow
+      d.keys(A, t, [[0, STAND], [12, shikoF], [26, shikoF], [30, squat], [44, shikoB], [58, shikoB], [62, squat], [80, K.PREJUMP],
+        [92, K.AIR_RISE], [112, K.AIR_TUCK], [124, sit], [150, sit], [160, fan], [176, sit], [196, sit], [212, STAND], [250, BOW], [300, BOW]]);
+      const xSit = d.vx - d.dir * 10;
+      if (t < 90) d.at(A, d.ax);
+      else if (t < 124) { const k = d.span(t, 90, 124, ease.linear); d.at(A, d.ax + (xSit - d.ax) * k, 300 * Math.sin(k * Math.PI) * (1 - k * 0.35) + 4 * k); }
+      else if (t < 200) d.at(A, xSit + Math.sin(t * 0.4) * (t > 130 && t < 150 ? 3 : 0), 4);
+      else d.at(A, xSit - d.dir * 70 * d.span(t, 200, 216), 0);
+      for (const st of [30, 62]) {
+        if (t === st) { d.sfx('boom'); d.fxEvent('shake', { amount: 12 }); d.fxEvent('dust', { x: A.body.x, y: 4, n: 18, spread: 80 }); d.fxEvent('label', { text: 'DOSUN!', x: d.ax, y: 260, color: '#ffd23f', life: 36 }); }
+      }
+      if (t === 92) d.sfx('whoosh');
+      // victim: hops on each stomp, looks up at the falling mountain, gets flattened
+      if (t < 124) {
+        const hop = Math.max(0, Math.sin(d.span(t, 30, 44, ease.linear) * Math.PI)) * 30 + Math.max(0, Math.sin(d.span(t, 62, 78, ease.linear) * Math.PI)) * 40;
+        d.at(V, d.vx, hop);
+        if (t < 96) daze(d, V, t); else d.pose(V, LOOK_UP, P(LOOK_UP, { fa: [150, 30, 0], ba: [160, 30, 0] }), d.span(t, 96, 110));
+        V.fx.sy = 1;
+      } else {
+        d.at(V, d.vx + (t > 214 ? d.dir * (t - 214) * 2.2 + Math.sin(t * 0.09) * 30 : 0), t > 214 ? (t - 214) * 2.4 : 0);
+        d.pose(V, K.LYING);
+        const flat = d.num(t, [[124, 0.6, ease.outQuad], [128, 0.26]]);
+        V.fx.sy = flat;
+        V.fx.sx = d.num(t, [[124, 1], [128, 1.35]]);
+        V.fx.noShadow = t > 214;
+        V.fx.rot = t > 214 ? Math.sin(t * 0.12) * 0.4 : 0;
+      }
+      if (t === 124) {
+        d.sfx('crash'); d.sfx('boom');
+        d.fxEvent('shake', { amount: 18 });
+        d.fxEvent('flash', { amount: 0.4 });
+        d.fxEvent('dust', { x: d.vx, y: 4, n: 30, spread: 110 });
+        d.fxEvent('label', { text: 'SQUISH!', x: d.vx, y: 230, color: '#ff3fd0', life: 60 });
+      }
+      if (t === 214) { d.sfx('whoosh'); d.fxEvent('label', { text: 'fwip...', x: d.vx, y: 120, color: '#ffffff', life: 50 }); }
+      V.fx.hidden = t > 296;
+      d.order = t >= 120 && t < 212 ? [1 - d.who, d.who] : [d.who, 1 - d.who];
+      d.camZoom = d.num(t, [[0, 1.34], [90, 1.15], [124, 1.3], [214, 1.3], [260, 1.1]]);
+      d.camY = d.num(t, [[0, 0], [90, 60], [124, 0], [214, 0], [270, 90]]);
+    },
+  },
+
+  // --- SOBBY: The Last Laugh --------------------------------------------------------------------
+  // a giant wooden mallet drives the victim into the pier like a nail; a flower for the grave and a
+  // fountain of tears
+  sobby: {
+    name: 'THE LAST LAUGH',
+    duration: 290,
+    run(d, t) {
+      const { A, V, s } = d;
+      const sob = P(STAND, { y: 110, lean: 16, chest: 10, neck: 14, head: 16, fa: [110, 150, 0], ba: [100, 150, 0] });
+      const sob2 = P(sob, { y: 108, chest: 13, head: 20 });
+      const keys = [[0, STAND], [10, sob], [16, sob2], [22, sob], [28, sob2], [40, STAND], [52, AP.hammer.windup]];
+      for (const h of [64, 100, 136, 168]) keys.push([h - 2, AP.hammer.windup], [h, P(AP.hammer.contact, { fl: null, bl: null, ff: [30, 8, 0], bf: [-30, 8, 0], y: 100 })], [h + 14, AP.hammer.windup]);
+      keys.push([196, STAND], [210, P(STAND, { lean: 30, chest: 20, fa: [80, 30, 0] })], [222, STAND], [236, sob], [244, sob2], [252, sob], [260, sob2], [268, sob], [290, sob2]);
+      d.keys(A, t, keys);
+      d.at(A, d.ax);
+      s.mallet = t >= 46 && t < 196;
+      s.hand = d.joint(A, 'handF');
+      s.handB = d.joint(A, 'handB');
+      s.elbow = d.joint(A, 'elbowF');
+      // the victim is hammered in: each bonk sinks them deeper
+      const hp = 130 * V.props.posScale;
+      const depth = d.num(t, [[0, 0], [64, 0], [66, hp * 0.3, ease.outQuad], [100, hp * 0.3], [102, hp * 0.62, ease.outQuad], [136, hp * 0.62], [138, hp * 0.92, ease.outQuad], [168, hp * 0.92], [172, hp * 1.6, ease.outQuad]]);
+      d.at(V, d.vx, -depth);
+      V.fx.clipFloor = true;
+      V.fx.noShadow = t > 64;
+      V.fx.stars = t > 66 && t < 172;
+      if (t < 64) daze(d, V, t); else d.pose(V, P(STAND, { fa: [10, 10, 0], ba: [6, 10, 0], neck: -6, head: -10 }));
+      V.fx.hidden = t > 176;
+      for (const h of [64, 100, 136]) {
+        if (t === h) {
+          d.sfx('clang'); d.sfx('boing');
+          d.fxEvent('shake', { amount: 12 });
+          d.fxEvent('label', { text: 'BONK!', x: d.vx, y: 280 - (h - 64) * 0.8, color: '#ffd23f', life: 40 });
+          d.fxEvent('dust', { x: d.vx, y: 4, n: 14, spread: 60 });
+          d.fxEvent('shards', { x: d.vx, y: 6, n: 8, color: '#5a3a2a' });
+        }
+      }
+      if (t === 168) { d.sfx('pop'); d.fxEvent('label', { text: 'tok.', x: d.vx, y: 110, color: '#ffffff', life: 40 }); }
+      if (t === 210) d.sfx('ding');
+      s.flower = t >= 210;
+      s.fx = d.vx;
+      if ((t > 4 && t < 34) || t > 234) {
+        // tears squirting sideways from both eyes
+        if (t % 3 === 0) {
+          const h = d.joint(A, 'head');
+          d.fxEvent('drops', { x: h.x + d.dir * 10, y: h.y, n: t > 234 ? 4 : 2, color: '#9ad8ff', cone: 2.4, speed: 6 });
+        }
+      }
+      if (t === 236) { d.sfx('laugh'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
+      d.camZoom = d.num(t, [[0, 1.34], [60, 1.3], [180, 1.45], [230, 1.3]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      if (layer !== 'front') return;
+      const z = cam.zoom;
+      if (s.mallet && s.hand) {
+        // giant wooden mallet held in both hands
+        const h = S(cam, s.hand.x, s.hand.y), e = S(cam, s.elbow.x, s.elbow.y);
+        const ang = Math.atan2(h.y - e.y, h.x - e.x);
+        ctx.save();
+        ctx.translate(h.x, h.y);
+        ctx.rotate(ang);
+        ctx.beginPath(); ctx.rect(-10 * z, -4 * z, 74 * z, 8 * z); ink(ctx, '#8a5a2a', 2);
+        ctx.beginPath(); ctx.rect(64 * z, -26 * z, 36 * z, 52 * z); ink(ctx, '#b07a3a', 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(68 * z, -22 * z, 6 * z, 44 * z);
+        ctx.strokeStyle = 'rgba(20,12,16,0.5)';
+        ctx.lineWidth = 1.5;
+        for (const y of [-14, 0, 14]) { ctx.beginPath(); ctx.moveTo(66 * z, y * z); ctx.lineTo(98 * z, y * z); ctx.stroke(); }
+        ctx.restore();
+      }
+      if (s.flower) {
+        const p = S(cam, s.fx, 0);
+        ctx.strokeStyle = '#2f8a3a'; ctx.lineWidth = 3 * z;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.quadraticCurveTo(p.x + 4 * z, p.y - 16 * z, p.x, p.y - 30 * z); ctx.stroke();
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU;
+          ctx.beginPath(); ctx.arc(p.x + Math.cos(a) * 6 * z, p.y - 30 * z + Math.sin(a) * 6 * z, 5 * z, 0, TAU); ink(ctx, '#ff5fbf', 1.5);
+        }
+        ctx.beginPath(); ctx.arc(p.x, p.y - 30 * z, 4 * z, 0, TAU); ink(ctx, '#ffd23f', 1.5);
+      }
+    },
+  },
+
+  // --- SNAPPER: Swamp Snack ---------------------------------------------------------------------
+  // lifts the victim, swallows them whole, a wriggling belly, a burp and a shoe
+  snapper: {
+    name: 'SWAMP SNACK',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const rub = P(STAND, { y: 114, lean: 6, fa: [70, 110, 0], ba: [60, 120, 0] });
+      const rub2 = P(rub, { fa: [62, 118, 0], ba: [68, 112, 0] });
+      const tilt = P(HOLD_UP, { neck: -26, head: -34, lean: -16, chest: -18 });
+      const pat = P(STAND, { y: 112, lean: -8, chest: -8, fa: [40, 100, 0], ba: [40, 110, 0] });
+      d.keys(A, t, [[0, STAND], [10, rub], [16, rub2], [22, rub], [28, rub2], [40, STAND], [54, AP.grab.contact], [76, HOLD_UP], [100, tilt],
+        [180, tilt], [196, P(STAND, { neck: -10 })], [216, pat], [228, P(pat, { fa: [46, 90, 0] })], [240, pat], [262, P(STAND, { neck: -20, head: -24, lean: -12 })], [300, FLEX]]);
+      d.at(A, d.ax);
+      A.fx.face = t >= 90 && t < 182 ? 'shout' : t >= 182 && t < 200 ? null : t > 262 ? 'happy' : null;
+      A.fx.bite = t >= 182 && t < 200; // chomp chomp
+      const mouth = () => { const h = d.joint(A, 'head'); return { x: h.x + d.dir * 34, y: h.y + 10 }; };
+      // the victim's head is steered to a point relative to the open mouth
+      const m = mouth(), hv = d.joint(V, 'head');
+      const offX = hv.x - V.body.x, offY = hv.y - V.body.y;
+      if (t < 54) { d.at(V, d.vx); daze(d, V, t); }
+      else if (t < 100) {
+        // grabbed and swung up overhead, upside down, head ending just above the jaws
+        const k = d.span(t, 54, 100);
+        const tx = m.x - offX, ty = m.y + 70 - offY;
+        d.at(V, d.vx + (tx - d.vx) * k, Math.max(0, ty) * k);
+        d.pose(V, spin(LIMP_AIR, 180 * k));
+      } else if (t < 176) {
+        // lowered head first into the open jaws, kicking
+        const k = d.span(t, 110, 176, ease.inQuad);
+        d.at(V, m.x - offX + Math.sin(t * 0.8) * (t > 130 ? 3 : 0), m.y + 70 - 150 * k - offY);
+        d.pose(V, t > 120 ? flailPose(t) : spin(LIMP_AIR, 180));
+        V.fx.sx = 1 - 0.3 * k;
+        V.fx.sy = 1 - 0.3 * k;
+      }
+      V.fx.hidden = t >= 176;
+      V.fx.noShadow = t >= 60;
+      // the victim disappears behind the croc's head: drawn first
+      d.order = [1 - d.who, d.who];
+      if (t === 110) d.sfx('heartbeat');
+      if (t === 176) { d.sfx('pop'); d.fxEvent('label', { text: 'GULP!', x: d.ax, y: 300, color: '#3fe6d0', life: 50 }); }
+      if (t === 184 || t === 192) d.sfx('snap');
+      s.belly = t >= 196 && t < 262 ? d.span(t, 196, 206) * (1 - d.span(t, 248, 262)) : 0;
+      s.wiggle = Math.sin(t * 0.7) * 6;
+      s.pelvis = d.joint(A, 'pelvis');
+      s.neck = d.joint(A, 'neck');
+      s.coat = A.def.look.top?.color || '#c8a878';
+      if (t === 250) {
+        d.sfx('boing');
+        d.fxEvent('label', { text: 'BURRRP!', x: d.ax + d.dir * 40, y: 330, color: '#ffd23f', life: 60 });
+        const m = mouth();
+        d.fxEvent('prop', { prop: 'boot', x: m.x, y: m.y, dir: d.dir, vx: 5, vy: 9, spin: 0.35, look: V.def.look });
+        d.fxEvent('smoke', { x: m.x, y: m.y, n: 6, spread: 20 });
+      }
+      d.camZoom = d.num(t, [[0, 1.34], [100, 1.25], [176, 1.45], [262, 1.3]]);
+      d.camY = d.num(t, [[0, 0], [60, 60], [176, 30], [200, 0]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      if (layer !== 'front' || !s.belly) return;
+      // the swallowed victim struggling inside the belly
+      const z = cam.zoom;
+      const c = { x: s.pelvis.x * 0.45 + s.neck.x * 0.55 + d.dir * 22, y: s.pelvis.y * 0.55 + s.neck.y * 0.45 };
+      const p = S(cam, c.x, c.y);
+      const r = 30 * z * s.belly;
+      ctx.beginPath();
+      ctx.ellipse(p.x + s.wiggle * z * 0.5, p.y, r * 1.1 + Math.abs(s.wiggle) * z * 0.3, r * (1 + s.wiggle * 0.02), 0, 0, TAU);
+      ink(ctx, s.coat, 3);
+      ctx.beginPath();
+      ctx.ellipse(p.x + s.wiggle * z * 0.5 - 8 * z, p.y - 8 * z, r * 0.3, r * 0.2, -0.5, 0, TAU);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+      // a fist print pushing out
+      if (s.wiggle > 3) {
+        ctx.beginPath();
+        ctx.arc(p.x + r * 0.6, p.y - r * 0.2, 7 * z, 0, TAU);
+        ink(ctx, s.coat, 2);
+      }
+    },
+  },
+
+  // --- CHUY: Piñata ------------------------------------------------------------------------------
+  // the victim is strung up as a piñata; Chuy swings blindfolded, misses twice, then the guitar
+  // connects and it rains candy
+  chuy: {
+    name: 'PIÑATA',
+    duration: 300,
+    run(d, t) {
+      const { A, V, s } = d;
+      const strum = P(STAND, { y: 114, lean: 4, fa: [40, 100, 0], ba: [70, 60, 0] });
+      const strum2 = P(strum, { ba: [60, 80, 0] });
+      const keys = [[0, STAND], [8, strum], [12, strum2], [16, strum], [20, strum2], [24, strum], [28, strum2], [40, STAND], [58, P(STAND, { fa: [160, 150, 0], ba: [150, 150, 0], neck: 6 })], [70, STAND]];
+      for (const h of [100, 134, 172]) keys.push([h - 14, AP.panSwing.windup], [h, AP.panSwing.contact], [h + 10, AP.panSwing.contact]);
+      keys.push([196, STAND], [214, P(STAND, { fa: [160, 150, 0], ba: [150, 150, 0] })], [228, STAND], [250, FIST_UP], [300, FIST_UP]);
+      d.keys(A, t, keys);
+      // blind swings wander off target
+      const wander = t >= 80 && t < 180 ? d.num(t, [[80, 0], [100, -60], [118, 30], [134, 60], [152, -20], [172, 0]]) : 0;
+      d.at(A, d.ax + d.dir * wander);
+      A.fx.prop = t >= 80 && t < 173 ? { type: 'guitar', hand: 'F' } : null;
+      A.fx.look = t >= 172 ? { guitar: null } : null;
+      s.blind = t >= 62 && t < 214;
+      s.head = d.joint(A, 'head');
+      s.dirA = A.facing;
+      if (t % 6 === 0 && t < 30) d.fxEvent('label', { text: '♪', x: d.ax + d.dir * 40, y: 200 + (t % 12) * 3, color: '#ffd23f', life: 30 });
+      if (t === 10) d.sfx('chord');
+      // victim: hoisted up by the feet on a rope, swinging, dressed as a piñata
+      const hang = d.span(t, 30, 60);
+      const swing = Math.sin(t * 0.08) * 16 * hang + (t > 172 ? 0 : 0);
+      d.at(V, d.vx + swing, 40 + 150 * hang);
+      if (t < 30) daze(d, V, t);
+      else d.pose(V, spin(LIMP_AIR, 180 * hang));
+      V.fx.tint = 0.45 * hang;
+      V.fx.tintColor = '#ff8ad8';
+      V.fx.noShadow = t > 40;
+      V.fx.hidden = t >= 172;
+      s.rope = t >= 26 && t < 172;
+      s.foot = d.joint(V, 'ankleF');
+      s.vp = ['neck', 'waist', 'pelvis', 'kneeF', 'elbowF', 'head'].map((j) => d.joint(V, j));
+      s.paper = hang > 0.5 && t < 172;
+      for (const h of [100, 134]) {
+        if (t === h) { d.sfx('whoosh'); d.fxEvent('label', { text: 'MISS!', x: A.body.x + d.dir * 80, y: 220, color: '#ffffff', life: 30 }); }
+      }
+      if (t === 172) {
+        d.sfx('crash'); d.sfx('twang'); d.sfx('boom');
+        d.fxEvent('shake', { amount: 16 });
+        d.fxEvent('flash', { amount: 0.5 });
+        const c = d.joint(V, 'waist');
+        for (const color of ['#ff3fd0', '#3fe6d0', '#ffd23f', '#ff8a3a', '#7fd36a', '#ffffff']) d.fxEvent('shards', { x: c.x, y: c.y, n: 12, color, speed: 11 });
+        d.fxEvent('label', { text: '¡OLÉ!', x: c.x, y: c.y + 90, color: '#ffd23f', life: 70 });
+      }
+      // candy rain afterwards
+      if (t > 176 && t < 250 && t % 4 === 0) {
+        const x = d.vx + Math.sin(t * 1.7) * 80;
+        d.fxEvent('shards', { x, y: 420, n: 2, color: ['#ff3fd0', '#3fe6d0', '#ffd23f', '#7fd36a'][t % 4], speed: 3 });
+      }
+      if (t === 250) d.sfx('chord');
+      d.camZoom = d.num(t, [[0, 1.34], [60, 1.22], [172, 1.32], [250, 1.25]]);
+      d.camY = d.num(t, [[0, 0], [40, 50], [250, 30]]);
+    },
+    draw(ctx, d, cam, layer) {
+      const { s } = d;
+      const z = cam.zoom;
+      if (layer === 'back' && s.rope && s.foot) {
+        const a = S(cam, s.foot.x, s.foot.y), b = S(cam, s.foot.x, s.foot.y + 600);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.lineWidth = 3 * z; ctx.strokeStyle = '#c9a26a'; ctx.stroke();
+      }
+      if (layer !== 'front') return;
+      if (s.paper && s.vp) {
+        // crepe-paper frills over the victim
+        const cols = ['#ff3fd0', '#3fe6d0', '#ffd23f', '#ff8a3a', '#7fd36a'];
+        s.vp.forEach((j, i) => {
+          const p = S(cam, j.x, j.y);
+          ctx.beginPath();
+          for (let k = 0; k <= 8; k++) {
+            const x = p.x - 22 * z + k * 5.5 * z, y = p.y + (k % 2 ? -6 : 6) * z;
+            if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.lineWidth = 7 * z;
+          ctx.strokeStyle = cols[i % cols.length];
+          ctx.stroke();
+        });
+      }
+      if (s.blind && s.head) {
+        // blindfold
+        const h = S(cam, s.head.x, s.head.y + 4);
+        ctx.beginPath();
+        ctx.rect(h.x - 18 * z, h.y - 5 * z, 36 * z, 9 * z);
+        ink(ctx, '#1a1414', 2);
+        ctx.beginPath();
+        ctx.moveTo(h.x - s.dirA * 16 * z, h.y);
+        ctx.lineTo(h.x - s.dirA * 32 * z, h.y + 10 * z);
+        ctx.lineWidth = 4 * z; ctx.strokeStyle = '#1a1414'; ctx.stroke();
+      }
+    },
+  },
 };
 
 });
@@ -6007,6 +6531,17 @@ const { Arena } = __require("src/render/arena.js");
 const { drawHud } = __require("src/render/hud.js");
 const { drawDebug } = __require("src/render/debugDraw.js");
 const { rgba, mix } = __require("src/render/color.js");
+
+/** Sobby's spring glove: shoots out on the steps whose hitbox reaches past the fist. */
+function springExtension(mv, f) {
+  if (!mv || f.state !== 'attack' || mv.def.prop?.type !== 'glove' || !mv.step) return 0;
+  const st = mv.step;
+  if (!st.hit?.hitboxes?.some((h) => h.ext)) return 0;
+  const local = mv.frame - st.start + 1, hit = st.hitAt || 6;
+  if (local < hit - 3) return 0;
+  if (local <= hit + 6) return Math.min(1, (local - hit + 3) / 3);
+  return Math.max(0, 1 - (local - hit - 6) / 4);
+}
 
 /** Facial expression for the fighter's current state. */
 function faceFor(f) {
@@ -6171,9 +6706,10 @@ class FightRenderer {
       ctx.clip();
     }
     ctx.translate(s.x + jitter, s.y);
+    if (fx.rot) ctx.rotate(fx.rot);
     if (fx.sx !== undefined || fx.sy !== undefined) ctx.scale(fx.sx ?? 1, fx.sy ?? 1);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
-    const expression = faceFor(f);
+    const expression = fx.face || faceFor(f);
     const blink = blinkAt(now / 1000 + i * 1.37, i);
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
     const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
@@ -6191,6 +6727,8 @@ class FightRenderer {
       critical: f.critical,
       clawMarks: f.clawMarks || 0,
       marks: f.marks,
+      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite,
+      springExt: springExtension(mv, f),
       now,
       layers: f.anim.layers,
       tint: fx.tint ? fx.tint : f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
@@ -6319,6 +6857,70 @@ class FightRenderer {
         ctx.strokeStyle = '#fff2a8';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      } else if (p.kind === 'quake') {
+        // ground tremor: a cracking ridge of planks and dust rolling along the floor
+        const dir = Math.sign(p.vx) || 1, t = p.age;
+        for (let i = 0; i < 5; i++) {
+          const x = -dir * i * 12 * z, h = (18 - i * 3 + Math.sin(t * 0.9 + i) * 3) * z;
+          ctx.fillStyle = `rgba(216,200,232,${0.5 - i * 0.08})`;
+          ctx.beginPath();
+          ctx.ellipse(x, -h * 0.3, (14 - i) * z, h * 0.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#5a3a2a';
+        ctx.strokeStyle = '#140c10';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          const x = (dir * 6 - i * dir * 10) * z, up = (14 + Math.sin(t * 1.3 + i * 2) * 4) * z;
+          ctx.moveTo(x - 7 * z, 4 * z);
+          ctx.lineTo(x - 2 * z, -up);
+          ctx.lineTo(x + 6 * z, -up * 0.6);
+          ctx.lineTo(x + 8 * z, 4 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      } else if (p.kind === 'pie') {
+        // cream pie spinning flat through the air
+        const sp = Math.cos(p.age * 0.35);
+        const R = p.r * z;
+        ctx.rotate(p.age * 0.05 * (Math.sign(p.vx) || 1));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, R, Math.max(3, Math.abs(sp) * R), 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#c88a3a';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#3a200c';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, -Math.abs(sp) * R * 0.25, R * 0.85, Math.max(2, Math.abs(sp) * R * 0.7), 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff6e8';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -Math.abs(sp) * R * 0.4, R * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#e8203a';
+        ctx.fill();
+      } else if (p.kind === 'notes') {
+        // three bobbing music notes
+        const dir = Math.sign(p.vx) || 1;
+        const cols = ['#ff3fd0', '#3fe6d0', '#ffd23f'];
+        for (let i = 0; i < 3; i++) {
+          const x = -dir * i * 16 * z, y = Math.sin(p.age * 0.25 + i * 2) * 10 * z - i * 4 * z;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(p.age * 0.2 + i) * 0.3);
+          ctx.fillStyle = cols[i];
+          ctx.strokeStyle = '#140c10';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, 6 * z, 6 * z, 4.5 * z, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillRect(4.5 * z, -14 * z, 2.6 * z, 20 * z);
+          if (i !== 1) { ctx.beginPath(); ctx.moveTo(7 * z, -14 * z); ctx.quadraticCurveTo(14 * z, -8 * z, 12 * z, -2 * z); ctx.lineWidth = 3 * z; ctx.strokeStyle = cols[i]; ctx.stroke(); }
+          ctx.restore();
+        }
       } else {
         // sonic wave: pulsing concentric arcs
         const dir = Math.sign(p.vx);
@@ -6422,7 +7024,7 @@ __define("src/render/fighterPainter.js", function (__exports, __require) {
 const { limbPath, smoothClosed, smoothOpen, boxAlong, along } = __require("src/render/shapes.js");
 const { mix, lighten, darken, rgba } = __require("src/render/color.js");
 const { dirUp, dirFwd, DEG } = __require("src/core/math.js");
-const { PAN_COCK } = __require("src/data/signatures.js");
+const { PAN_COCK, GUITAR_COCK, SPRING_REACH } = __require("src/data/signatures.js");
 const { drawFireFist } = __require("src/render/fire.js");
 
 // Key light in WORLD space (upper left of the stage, unit vector pointing toward the light). The
@@ -6654,6 +7256,8 @@ class FighterPainter {
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
     this.clawMarks = opts.clawMarks || 0;
+    this.biting = !!opts.bite;
+    this.springExt = opts.springExt || 0;
     this.marks = opts.marks || {};
     this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
@@ -6668,6 +7272,7 @@ class FighterPainter {
     const push = (z, fn, pre = null) => groups.push({ z, fn, pre });
     // Back-most secondary elements.
     push(0, (p) => this.drawChains(ctx, p, opts.chains, 'back', J, A));
+    push(0.5, (p) => this.drawBackGuitar(ctx, p, J, A));
     // Seamless joints: limbs and body are separate outlined groups, so where a limb meets the body
     // the outline of whichever is drawn on top would cut across the joint. Around each shoulder and
     // hip (a circle at the joint):
@@ -6759,7 +7364,7 @@ class FighterPainter {
     const S = J['shoulder' + side], E = J['elbow' + side], Wr = J['wrist' + side], H = J['hand' + side];
     const top = lk.top || {};
     const shortCut = top.sleeves === 'short';
-    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi'].includes(top.type);
+    const fullSleeve = !shortCut && ['trench', 'jacket', 'longcoat', 'bodysuit', 'chefcoat', 'opencoat', 'onesie', 'gi', 'tunic'].includes(top.type);
     const shortSleeve = shortCut || ['tee', 'henley'].includes(top.type);
     const sleeveC = this.mat(darken(top.color || lk.skin, depth), t).base;
     const skin = this.mat(darken(lk.skin, depth), t).base;
@@ -6821,6 +7426,8 @@ class FighterPainter {
       for (const k of [0.7, 0.8, 0.9]) this.line(ctx, [along(E, Wr, k, rf1 + 1), along(E, Wr, k + 0.04, -(rf1 + 1))], 0.9, this.outline, 0.4);
     }
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
+    if (this.prop?.type === 'guitar' && this.prop.hand === side) this.drawGuitar(ctx, pass, E, H, depth);
+    if (this.prop?.type === 'glove' && this.prop.hand === side) this.drawSpringGlove(ctx, pass, E, H);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
     if (this.flurry && pass === 'fill') {
@@ -6898,6 +7505,116 @@ class FighterPainter {
     ctx.ellipse(c.x - dx * 3, c.y - dy * 3, 7, 3.5, ang + 0.6, 0, Math.PI * 2);
     ctx.fillStyle = rgba('#ffffff', 0.12);
     ctx.fill();
+  }
+
+  /** Chuy's guitar swung by the neck (same geometry as the GUITAR hitbox). */
+  drawGuitar(ctx, pass, E, H, depth) {
+    const g = this.look.guitar || { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' };
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + GUITAR_COCK;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    this.guitarShape(ctx, pass, at, Math.atan2(dy, dx), g, depth);
+  }
+
+  /** Guitar drawn along a local axis: `at(k, n)` maps distance along the neck / across it. */
+  guitarShape(ctx, pass, at, ang, g, depth = 0) {
+    const t = this.tint;
+    const body = () => {
+      ctx.beginPath();
+      const c1 = at(52), c2 = at(76, 2);
+      ctx.ellipse(c1.x, c1.y, 15, 17, ang, 0, Math.PI * 2);
+      ctx.moveTo(c2.x + 20, c2.y);
+      ctx.ellipse(c2.x, c2.y, 21, 22, ang, 0, Math.PI * 2);
+    };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-14), at(44), 4.2, 4.2);
+      this.outlineFill(ctx);
+      body();
+      return this.outlineFill(ctx);
+    }
+    // neck + head
+    ctx.beginPath();
+    limbPath(ctx, at(-6), at(44), 3.2, 3.2);
+    ctx.fillStyle = this.mat(darken(g.neck, depth), t).base;
+    ctx.fill();
+    ctx.beginPath();
+    limbPath(ctx, at(-16), at(-5), 4.4, 3.6);
+    ctx.fillStyle = this.mat(darken(g.head, depth), t).base;
+    ctx.fill();
+    // body
+    body();
+    ctx.fillStyle = this.mat(darken(g.color, depth), t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = rgba(this.outline, 0.6);
+    ctx.stroke();
+    const hole = at(56);
+    ctx.beginPath();
+    ctx.arc(hole.x, hole.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat(darken(g.dark, depth), t).base;
+    ctx.fill();
+    const br = at(82);
+    ctx.beginPath();
+    limbPath(ctx, at(80, -6), at(80, 6), 2, 2);
+    ctx.fillStyle = this.mat(g.neck, t).base;
+    ctx.fill();
+    void br;
+    // strings
+    for (const n of [-1.6, 0, 1.6]) this.line(ctx, [at(-10, n * 0.6), at(80, n)], 0.6, '#e8e8f0', 0.8);
+  }
+
+  /** Sobby's boxing glove on a spring: springExt (0..1) shoots it out past the fist. */
+  drawSpringGlove(ctx, pass, E, H) {
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x);
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const L = SPRING_REACH * this.springExt;
+    const c = { x: H.x + dx * (L + 6), y: H.y + dy * (L + 6) };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 15, 0, Math.PI * 2);
+      return this.outlineFill(ctx);
+    }
+    if (L > 2) {
+      // coiled spring
+      ctx.beginPath();
+      const n = 9;
+      for (let i = 0; i <= n * 4; i++) {
+        const k = i / (n * 4), w = Math.sin(k * n * Math.PI * 2) * 6;
+        const x = H.x + dx * L * k - dy * w, y = H.y + dy * L * k + dx * w;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#c9cbd6';
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 15, 0, Math.PI * 2);
+    ctx.fillStyle = this.mat('#e8203a', this.tint).base;
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(c.x - dx * 4 + dy * 5, c.y - dy * 4 - dx * 5, 6, 4, a0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fill();
+  }
+
+  /** Chuy's guitar slung on his back (hidden while it is in his hands). */
+  drawBackGuitar(ctx, pass, J, A) {
+    const g = this.look.guitar;
+    if (!g || this.prop?.type === 'guitar') return;
+    const F = this.torsoFrame(J, A);
+    const base = P2(F.W, F.fS, -F.ww * 1.1, F.uS, -6);
+    const top = P2(F.N, F.fC, -F.cw * 0.9, F.uC, 34);
+    const ang = Math.atan2(top.y - base.y, top.x - base.x) + Math.PI;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const at = (k, n = 0) => ({ x: top.x + dx * (k + 16) - dy * n, y: top.y + dy * (k + 16) + dx * n });
+    this.guitarShape(ctx, pass, at, ang, g, 0.15);
   }
 
   drawFist(ctx, pass, Wr, H, side, depth) {
@@ -7085,6 +7802,12 @@ class FighterPainter {
     ];
     ctx.beginPath();
     smoothClosed(ctx, pts, 0.35);
+    if (shoes.big) {
+      // clown shoes: a big round toe bulb
+      const toe = P2(Tt, fw, 7, up, h * 0.55);
+      ctx.moveTo(toe.x + 11, toe.y);
+      ctx.ellipse(toe.x, toe.y, 11, h * 0.95, Math.atan2(fw.y, fw.x), 0, Math.PI * 2);
+    }
     if (pass === 'outline') return this.outlineFill(ctx);
     const bare = shoes.type === 'wrapped';
     ctx.fillStyle = bare ? this.mat(darken(lk.skin, depth), t).base : this.mat(darken(shoes.color, depth), t).base;
@@ -7227,7 +7950,48 @@ class FighterPainter {
     smoothClosed(ctx, pts, 0.55);
     this.shadeAcross(ctx, P2(F.W, F.fS, F.cw * 1.1, F.uS, 10), P2(F.W, F.fS, -F.cw * 1.05, F.uS, -6));
     ctx.restore();
+    if (lk.chain) this.drawChainLock(ctx, F, lk.chain);
     if (this.marks.collar) this.drawCrookedCollar(ctx, F, top);
+  }
+
+  /** Heavy chain around the neck with a padlock hanging on the chest (Snapper). */
+  drawChainLock(ctx, F, ch) {
+    const { N, uC, fC, up, cw } = F;
+    const t = this.tint;
+    const lock = P2(N, fC, cw * 0.5, uC, -up * 0.55);
+    const pts = [];
+    for (let i = 0; i <= 10; i++) {
+      const k = i / 10;
+      const a = P2(N, fC, -cw * 0.3 + k * cw * 0.8, uC, -2 - Math.sin(k * Math.PI) * up * 0.55);
+      pts.push(a);
+    }
+    const c = this.mat(ch.color, t).base;
+    for (let i = 0; i < pts.length; i++) {
+      ctx.beginPath();
+      ctx.ellipse(pts[i].x, pts[i].y, 3.2, 2.2, i % 2 ? 0.6 : -0.6, 0, Math.PI * 2);
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = c;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(lock.x, lock.y + 5, 4.5, Math.PI * 0.1, Math.PI * 0.9, true);
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = c;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.rect(lock.x - 7, lock.y - 9, 14, 12);
+    ctx.fillStyle = this.mat(ch.lock, t).base;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(lock.x, lock.y - 2, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = this.outline;
+    ctx.fill();
   }
 
   /**
@@ -7605,12 +8369,36 @@ class FighterPainter {
           ctx.fillStyle = this.mat(top.color2, t).base;
           ctx.fill();
         }
+        if (this.look.tie) this.drawTie(ctx, F, this.look.tie);
+        if (this.look.guitar) {
+          // guitar strap across the chest
+          this.line(ctx, [P2(N, fC, -cw * 0.6, uC, -2), P2(N, fC, cw * 0.1, uC, -up * 0.5), P2(W, fS, ww * 0.85, uS, 4)], 5, outl);
+          this.line(ctx, [P2(N, fC, -cw * 0.6, uC, -2), P2(N, fC, cw * 0.1, uC, -up * 0.5), P2(W, fS, ww * 0.85, uS, 4)], 3, this.mat(top.color2, t).base);
+        }
+        if (top.patches?.length === 3 && this.look.guitar) {
+          // charro embroidery: gold scrolls along the jacket front
+          for (let i = 0; i < 3; i++) {
+            const a = P2(N, uC, -up * (0.25 + i * 0.22), fC, cw * 0.2), b = P2(N, uC, -up * (0.33 + i * 0.22), fC, -cw * 0.35);
+            this.line(ctx, [a, P2(a, uC, 5, fC, -cw * 0.2), b], 1.6, this.mat(top.color2, t).base, 0.9);
+          }
+        }
         // studs
         const st = P2(N, fC, cw * 0.4, uC, -up * 0.16);
         ctx.beginPath();
         ctx.arc(st.x, st.y, 2.4, 0, Math.PI * 2);
         ctx.fillStyle = '#cfcfd6';
         ctx.fill();
+        break;
+      }
+      case 'tunic': {
+        // mandarin-collar tunic: stand-up collar band, a front seam with knot buttons, a cross-over flap
+        this.line(ctx, [P2(N, fC, -cw * 0.55, uC, 2), P2(N, fC, cw * 0.15, uC, 6), P2(N, fC, cw * 0.75, uC, 1)], 7, outl);
+        this.line(ctx, [P2(N, fC, -cw * 0.55, uC, 2), P2(N, fC, cw * 0.15, uC, 6), P2(N, fC, cw * 0.75, uC, 1)], 4.5, this.mat(top.color2, t).base);
+        this.line(ctx, [P2(N, fC, cw * 0.55, uC, -2), P2(N, fC, cw * 0.8, uC, -up * 0.35), P2(W, fS, ww * 0.75, uS, 0)], 1.6, outl, 0.8);
+        for (let i = 0; i < 4; i++) {
+          const b = P2(N, uC, -up * (0.15 + i * 0.2), fC, cw * (0.66 + i * 0.04));
+          this.line(ctx, [P2(b, fC, -4, uC, 0), P2(b, fC, 4, uC, 0)], 2.4, this.mat(top.trim, t).base);
+        }
         break;
       }
       case 'trench': {
@@ -7638,6 +8426,12 @@ class FighterPainter {
         ctx.fillStyle = this.mat(top.color2, t).base;
         ctx.fill();
         this.line(ctx, [P2(N, fC, cw * 0.2, uC, 6), P2(N, fC, cw * 0.25, uC, -up * 0.6), P2(Pv, fS, ww * 0.25, uS, -8)], 1.6, outl, 0.8);
+        if (top.plaid) {
+          for (let i = 0; i < 4; i++) {
+            this.line(ctx, [P2(N, uC, -up * (0.2 + i * 0.25), fC, -cw * 1.5), P2(N, uC, -up * (0.2 + i * 0.25), fC, cw * 0.15)], 1.3, this.mat(top.plaid, t).base, 0.6);
+            this.line(ctx, [P2(N, fC, -cw * (0.2 + i * 0.35), uC, 4), P2(Pv, fS, -ww * (0.2 + i * 0.4), uS, -8)], 1.3, this.mat(top.plaid, t).base, 0.6);
+          }
+        }
         break;
       }
       case 'longcoat': {
@@ -7840,6 +8634,33 @@ class FighterPainter {
     if (!tie) return;
     const { N, uC, fC, up, cw } = F;
     const t = this.tint;
+    if (tie.bow) {
+      // big floppy bow tie with a plaid check
+      const k = P2(N, fC, cw * 0.62, uC, -4);
+      const wing = (sx) => [k, P2(k, fC, cw * 0.12, uC, sx * 14), P2(k, fC, -cw * 0.12, uC, sx * 17), P2(k, fC, -cw * 0.02, uC, sx * 4)];
+      for (const sx of [1, -1]) {
+        ctx.beginPath();
+        smoothClosed(ctx, wing(sx), 0.35);
+        ctx.fillStyle = this.mat(tie.color, t).base;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        for (let i = -3; i <= 3; i++) {
+          this.line(ctx, [P2(k, uC, sx * 30, fC, i * 4), P2(k, uC, -sx * 2, fC, i * 4)], 1.2, this.mat(tie.check || darken(tie.color, 0.3), t).base, 0.7);
+        }
+        ctx.restore();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = this.outline;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(k.x, k.y, 4.2, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(darken(tie.color, 0.15), t).base;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      return;
+    }
     const knot = P2(N, fC, cw * 0.62, uC, -3);
     const pts = [knot, P2(N, fC, cw * 0.78, uC, -up * 0.35), P2(N, fC, cw * 0.86, uC, -up * 0.75), P2(N, fC, cw * 0.66, uC, -up * 0.82), P2(N, fC, cw * 0.55, uC, -up * 0.3)];
     ctx.beginPath();
@@ -7969,6 +8790,7 @@ class FighterPainter {
     const masked = !!lk.mask;
     // Back-of-head items (hat brim back half, collars) are drawn with the head.
     if (lk.hair?.style === 'pompadour' || lk.hair?.style === 'swept' || lk.hair?.style === 'spiky') this.drawHairBack(ctx, pass, R);
+    if (lk.hat?.type === 'sombrero') this.drawSombrero(ctx, pass, R, 'back');
     if (lk.hood) {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: 0.75 * R, y: 1.25 * R }, { x: -0.2 * R, y: 1.45 * R }, { x: -1.3 * R, y: 0.6 * R }, { x: -1.4 * R, y: -1.1 * R }, { x: -0.4 * R, y: -1.5 * R }, { x: 0.1 * R, y: -0.4 * R }], 0.4);
@@ -7982,7 +8804,12 @@ class FighterPainter {
     }
 
     // Skull + face as one silhouette: both sub-paths share the same winding so the union fills cleanly.
-    const facePts = weasel
+    const croc = lk.species === 'croc';
+    const facePts = croc
+      // long flat upper snout, eye bump on top
+      ? [{ x: -0.35, y: -0.3 }, { x: 0.5, y: -0.26 }, { x: 1.3, y: -0.22 }, { x: 2.15, y: -0.2 }, { x: 2.38, y: -0.08 }, { x: 2.3, y: 0.1 },
+        { x: 1.6, y: 0.2 }, { x: 1.0, y: 0.36 }, { x: 0.85, y: 0.72 }, { x: 0.45, y: 0.86 }, { x: 0.1, y: 0.62 }]
+      : weasel
       ? [{ x: 0.0, y: 0.35 }, { x: 0.95, y: 0.18 }, { x: 1.55, y: -0.08 }, { x: 1.66, y: -0.3 }, { x: 1.25, y: -0.55 }, { x: 0.6, y: -0.8 }, { x: -0.1, y: -0.6 }]
       : [{ x: -0.4, y: -0.45 }, { x: 0.15, y: -0.95 }, { x: 0.6, y: -1.0 }, { x: 0.88, y: -0.72 }, { x: 1.0, y: -0.36 }, { x: 1.06, y: -0.12 },
         { x: 1.18, y: 0.04 }, { x: 1.02, y: 0.26 }, { x: 0.96, y: 0.52 }, { x: 0.6, y: 0.85 }, { x: -0.2, y: 0.5 }];
@@ -7994,9 +8821,11 @@ class FighterPainter {
     const pts = (area < 0 ? facePts.slice().reverse() : facePts).map((p) => ({ x: p.x * R, y: p.y * R }));
     const head = () => {
       ctx.beginPath();
-      ctx.ellipse(-0.06 * R, 0.08 * R, 0.98 * R, 1.04 * R, 0, 0, Math.PI * 2);
-      smoothClosed(ctx, pts, weasel ? 0.5 : 0.45);
+      if (croc) ctx.ellipse(-0.1 * R, 0.12 * R, 0.92 * R, 0.82 * R, 0, 0, Math.PI * 2);
+      else ctx.ellipse(-0.06 * R, 0.08 * R, 0.98 * R, 1.04 * R, 0, 0, Math.PI * 2);
+      smoothClosed(ctx, pts, weasel || croc ? 0.5 : 0.45);
     };
+    if (croc) this.drawCrocJaw(ctx, pass, R, opts);
     head();
     if (pass === 'outline') {
       this.outlineFill(ctx);
@@ -8022,22 +8851,270 @@ class FighterPainter {
       ctx.fillStyle = rgba(this.mat(lk.facepaint, t).base, 0.85);
       ctx.fill();
     }
+    if (lk.clown) {
+      // white greasepaint over the face
+      ctx.beginPath();
+      ctx.ellipse(0.62 * R, -0.12 * R, 0.78 * R, 0.98 * R, -0.1, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(lk.clown.paint, t).base;
+      ctx.fill();
+    }
+    if (croc) {
+      // pale throat and scales
+      ctx.beginPath();
+      ctx.ellipse(-0.2 * R, -0.55 * R, 0.6 * R, 0.4 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = this.mat(lk.fur2, t).base;
+      ctx.fill();
+      for (const [x, y] of [[0.4, 0.45], [0.05, 0.35], [-0.3, 0.55], [-0.55, 0.25], [1.2, 0.1], [1.6, 0.02], [-0.2, -0.05]]) {
+        ctx.beginPath();
+        ctx.ellipse(x * R, y * R, 0.1 * R, 0.07 * R, 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = rgba(darken(lk.skin, 0.25), 0.55);
+        ctx.fill();
+      }
+    }
     this.headShade(ctx, R);
     ctx.restore();
-    this.drawEars(ctx, 'fill', R, weasel);
+    this.drawEars(ctx, 'fill', R, weasel || croc);
     if (masked) this.drawMask(ctx, R);
     else this.drawFace(ctx, R, opts, weasel);
     if (masked && this.marks.shiner) this.drawShiner(ctx, R, 0.6 * R, 0.17 * R, 0.27 * R);
+    if (croc) this.drawCrocUpperTeeth(ctx, R);
     this.drawHair(ctx, R);
+    if (this.marks.pie > 0) this.drawPieFace(ctx, R, Math.min(1, this.marks.pie / 30));
     if (this.marks.bump) {
       // Bruno's pan: a cartoon bump on the crown; hats and hoods sit on top of it
       this.drawBump(ctx, R);
       ctx.translate(0, 0.34 * R);
     }
-    if (lk.hat) this.drawHat(ctx, R);
+    if (lk.hat?.type === 'sombrero') this.drawSombrero(ctx, 'fill', R, 'front');
+    else if (lk.hat) this.drawHat(ctx, R);
     if (lk.hood?.bear) this.drawBearHood(ctx, R);
     ctx.restore();
     if (lk.headphones) this.drawHeadphones(ctx, J, A);
+  }
+
+  // --- new heads: crocodile, clown, pie --------------------------------------------------------
+  /** How far the crocodile's jaw hangs open for the current expression (radians). */
+  jawOpen(opts) {
+    const xp = opts.expression;
+    if (this.biting) return 0.55 + 0.25 * Math.abs(Math.sin(this.time * 18));
+    return { shout: 0.5, attack: 0.32, hurt: 0.3, ko: 0.55, dizzy: 0.22, happy: 0.12, strain: 0.06 }[xp] ?? 0.04;
+  }
+
+  /** Lower jaw (with its teeth) hinged under the skull, and the dark mouth between the jaws. */
+  drawCrocJaw(ctx, pass, R, opts) {
+    const lk = this.look, t = this.tint;
+    const th = -this.jawOpen(opts);
+    const hx = 0.0, hy = -0.3 * R;
+    const rot = (x, y) => {
+      const dx = x * R - hx, dy = y * R - hy;
+      return { x: hx + dx * Math.cos(th) - dy * Math.sin(th), y: hy + dx * Math.sin(th) + dy * Math.cos(th) };
+    };
+    const jaw = [rot(-0.35, -0.3), rot(0.5, -0.32), rot(1.4, -0.3), rot(2.12, -0.27), rot(2.18, -0.42), rot(1.5, -0.55), rot(0.6, -0.66), rot(-0.15, -0.8)];
+    ctx.beginPath();
+    smoothClosed(ctx, jaw, 0.4);
+    if (pass === 'outline') return this.outlineFill(ctx);
+    // mouth inside (only shows when the jaw drops)
+    ctx.save();
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -0.2 * R, y: -0.2 * R }, { x: 2.2 * R, y: -0.2 * R }, rot(2.15, -0.3), rot(-0.2, -0.3)], 0.2);
+    ctx.fillStyle = '#5a1020';
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    smoothClosed(ctx, jaw, 0.4);
+    ctx.fillStyle = this.skin.base;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.beginPath();
+    smoothClosed(ctx, [rot(-0.2, -0.5), rot(1.6, -0.45), rot(1.6, -0.75), rot(-0.2, -0.95)], 0.3);
+    ctx.fillStyle = this.mat(lk.fur2, t).base;
+    ctx.fill();
+    ctx.restore();
+    // lower teeth pointing up
+    ctx.fillStyle = '#f4efe2';
+    ctx.strokeStyle = this.outline;
+    ctx.lineWidth = 1;
+    for (let x = 0.45; x <= 2.0; x += 0.22) {
+      const a = rot(x - 0.06, -0.3), b = rot(x, -0.12), c = rot(x + 0.06, -0.3);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  drawCrocUpperTeeth(ctx, R) {
+    ctx.fillStyle = '#f4efe2';
+    ctx.strokeStyle = this.outline;
+    ctx.lineWidth = 1;
+    for (let x = 0.55; x <= 2.15; x += 0.22) {
+      const big = Math.abs(x - 1.43) < 0.05 || Math.abs(x - 0.77) < 0.05;
+      ctx.beginPath();
+      ctx.moveTo((x - 0.06) * R, -0.21 * R);
+      ctx.lineTo(x * R, (big ? -0.46 : -0.36) * R);
+      ctx.lineTo((x + 0.06) * R, -0.21 * R);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    // heavy brow ridge over the eye bump
+    this.line(ctx, [{ x: 0.25 * R, y: 0.86 * R }, { x: 0.6 * R, y: 0.9 * R }, { x: 0.95 * R, y: 0.66 * R }], 3, darken(this.look.skin, 0.3));
+  }
+
+  /** Clown greasepaint details around the eye: purple diamonds and a painted tear track. */
+  drawClownPaint(ctx, R, ex, ey) {
+    const c = this.look.clown, t = this.tint;
+    ctx.fillStyle = this.mat(c.mouth, t).base;
+    for (const [dy, h] of [[0.32, 0.2], [-0.3, 0.26]]) {
+      ctx.beginPath();
+      ctx.moveTo(ex, ey + dy * R + h * R);
+      ctx.lineTo(ex + 0.1 * R, ey + dy * R);
+      ctx.lineTo(ex, ey + dy * R - h * 0.4 * R);
+      ctx.lineTo(ex - 0.1 * R, ey + dy * R);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // painted tear track + a real tear rolling down every couple of seconds
+    this.line(ctx, [{ x: ex - 0.02 * R, y: ey - 0.12 * R }, { x: ex + 0.02 * R, y: ey - 0.4 * R }, { x: ex - 0.02 * R, y: ey - 0.62 * R }], 2.2, this.mat(c.tear, t).base, 0.8);
+    const k = (this.time * 0.6) % 1;
+    if (k < 0.6) {
+      const y = ey - 0.15 * R - k * 0.9 * R;
+      ctx.beginPath();
+      ctx.moveTo(ex, y + 0.09 * R);
+      ctx.quadraticCurveTo(ex + 0.06 * R, y - 0.02 * R, ex, y - 0.05 * R);
+      ctx.quadraticCurveTo(ex - 0.06 * R, y - 0.02 * R, ex, y + 0.09 * R);
+      ctx.fillStyle = rgba('#9ad8ff', 0.9 * (1 - k / 0.6));
+      ctx.fill();
+    }
+  }
+
+  drawClownMouthPaint(ctx, R) {
+    const c = this.look.clown;
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: 0.3 * R, y: -0.7 * R }, { x: 0.55 * R, y: -0.3 * R }, { x: 1.0 * R, y: -0.28 * R }, { x: 1.18 * R, y: -0.62 * R }, { x: 0.8 * R, y: -0.82 * R }], 0.4);
+    ctx.fillStyle = this.mat(c.mouth, this.tint).base;
+    ctx.fill();
+  }
+
+  drawClownNose(ctx, R) {
+    const c = this.look.clown;
+    ctx.beginPath();
+    ctx.arc(1.14 * R, -0.04 * R, 0.24 * R, 0, Math.PI * 2);
+    const g = ctx.createRadialGradient(1.08 * R, 0.04 * R, 0.02 * R, 1.14 * R, -0.04 * R, 0.26 * R);
+    g.addColorStop(0, lighten(c.nose, 0.4));
+    g.addColorStop(1, c.nose);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(1.07 * R, 0.07 * R, 0.07 * R, 0.04 * R, -0.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fill();
+  }
+
+  /** Sobby's cream pie stuck to the face (fades as it slides off). */
+  drawPieFace(ctx, R, a) {
+    ctx.save();
+    ctx.globalAlpha *= a;
+    const pts = [];
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * Math.PI * 2, r = (0.62 + (i % 2) * 0.12) * R;
+      pts.push({ x: 0.75 * R + Math.cos(ang) * r * 0.85, y: -0.05 * R + Math.sin(ang) * r });
+    }
+    ctx.beginPath();
+    smoothClosed(ctx, pts, 0.4);
+    ctx.fillStyle = '#fff6e8';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    // drips and a cherry
+    for (const [x, l] of [[0.5, 0.35], [0.85, 0.5], [1.1, 0.25]]) {
+      ctx.beginPath();
+      ctx.ellipse(x * R, (-0.6 - l * 0.5) * R, 0.07 * R, l * 0.5 * R, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff6e8';
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(0.8 * R, 0.55 * R, 0.13 * R, 0, Math.PI * 2);
+    ctx.fillStyle = '#e8203a';
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Sombrero: the back half of the brim is drawn behind the head, the crown and front half over it. */
+  drawSombrero(ctx, pass, R, part) {
+    const hat = this.look.hat, t = this.tint;
+    const c = this.mat(hat.color, t), band = this.mat(hat.band, t).base;
+    ctx.save();
+    ctx.translate(-0.05 * R, 0.62 * R);
+    ctx.rotate(-0.08);
+    const brim = (front) => {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2, front);
+      ctx.ellipse(0, 0.06 * R, 2.5 * R, 0.42 * R, 0, front ? Math.PI : Math.PI * 2, front ? 0 : Math.PI, !front);
+    };
+    if (part === 'back') {
+      // back half of the brim (the far side, above the head line)
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, 0, Math.PI);
+      ctx.closePath();
+      if (pass === 'outline') this.outlineFill(ctx);
+      else {
+        ctx.fillStyle = darken(c.base, 0.15);
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+    void brim;
+    // crown: a tall rounded cone
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: -0.85 * R, y: 0.05 * R }, { x: -0.7 * R, y: 0.9 * R }, { x: -0.25 * R, y: 1.55 * R }, { x: 0.3 * R, y: 1.5 * R }, { x: 0.7 * R, y: 0.9 * R }, { x: 0.85 * R, y: 0.05 * R }], 0.4);
+    ctx.lineWidth = this.ow * 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.fillStyle = c.base;
+    ctx.fill();
+    this.shadeAcross(ctx, { x: 0.8 * R, y: 1.2 * R }, { x: -0.8 * R, y: 0.3 * R });
+    // zig-zag band
+    ctx.beginPath();
+    ctx.moveTo(-0.84 * R, 0.12 * R);
+    for (let i = 0; i <= 8; i++) ctx.lineTo((-0.84 + i * 0.21) * R, (i % 2 ? 0.42 : 0.2) * R);
+    ctx.lineTo(0.84 * R, 0.12 * R);
+    ctx.closePath();
+    ctx.fillStyle = band;
+    ctx.fill();
+    // front half of the brim, with a zig-zag trim along the edge
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 2.5 * R, 0.5 * R, 0, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.lineWidth = this.ow * 2;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.fillStyle = c.base;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * Math.PI;
+      const r = i % 2 ? 0.84 : 0.94;
+      const p = { x: Math.cos(a) * 2.5 * R * r, y: -Math.sin(a) * 0.5 * R * r };
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = this.mat(hat.trim, t).base;
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
   }
 
   drawBump(ctx, R) {
@@ -8147,7 +9224,7 @@ class FighterPainter {
 
   drawEars(ctx, pass, R, weasel) {
     const lk = this.look, t = this.tint;
-    if (lk.mask) return;
+    if (lk.mask || lk.species === 'croc') return;
     if (weasel) {
       for (const [x, y, s] of [[-0.35, 0.9, 1], [0.15, 1.0, 0.85]]) {
         ctx.beginPath();
@@ -8190,6 +9267,10 @@ class FighterPainter {
       smoothClosed(ctx, [{ x: -0.3 * R, y: -0.2 * R }, { x: 0.5 * R, y: -0.35 * R }, { x: 1.0 * R, y: -0.3 * R }, { x: 0.8 * R, y: -1.0 * R }, { x: 0.1 * R, y: -0.9 * R }], 0.5);
       ctx.fillStyle = rgba(c, 0.35);
       ctx.fill();
+    } else if (beard.style === 'sideburns') {
+      smoothClosed(ctx, [{ x: -0.3 * R, y: 0.4 * R }, { x: -0.05 * R, y: 0.42 * R }, { x: 0.05 * R, y: -0.55 * R }, { x: -0.12 * R, y: -0.72 * R }, { x: -0.3 * R, y: -0.4 * R }], 0.4);
+      ctx.fillStyle = c;
+      ctx.fill();
     } else if (beard.style === 'goatee') {
       smoothClosed(ctx, [{ x: 0.35 * R, y: -0.62 * R }, { x: 0.9 * R, y: -0.6 * R }, { x: 0.82 * R, y: -1.15 * R }, { x: 0.45 * R, y: -1.1 * R }], 0.5);
       ctx.fillStyle = c;
@@ -8216,7 +9297,9 @@ class FighterPainter {
     if (xp === 'attack' || xp === 'strain') lid = Math.max(lid, 0.42);
     else if (xp === 'shout') lid = Math.max(lid, 0.22);
     const eyeMode = this.marks.shiner ? 'shiner' : lk.eyesClosed ? 'closed' : hurt ? 'squeeze' : xp === 'ko' ? 'x' : xp === 'dizzy' ? 'spiral' : xp === 'happy' ? 'happy' : lid > 0.85 ? 'closed' : 'open';
-    const ex = weasel ? 0.66 * R : 0.6 * R, ey = weasel ? 0.3 * R : 0.17 * R;
+    const croc = lk.species === 'croc';
+    const ex = croc ? 0.55 * R : weasel ? 0.66 * R : 0.6 * R, ey = croc ? 0.58 * R : weasel ? 0.3 * R : 0.17 * R;
+    if (lk.clown) this.drawClownPaint(ctx, R, ex, ey);
     const ew = 0.27 * R;
     // eye socket shadow
     ctx.beginPath();
@@ -8319,7 +9402,7 @@ class FighterPainter {
     // brows
     if (lk.brows !== 'none') {
       const th = lk.brows === 'thick' ? 0.16 * R : 0.1 * R;
-      let inner = angry || lk.brows === 'thick' ? -0.12 * R : 0.02 * R;
+      let inner = angry || lk.brows === 'thick' ? -0.12 * R : lk.brows === 'sad' ? 0.12 * R : 0.02 * R;
       let by = 0;
       if (xp === 'attack' || xp === 'strain' || xp === 'shout') { inner = -0.17 * R; by = -0.04 * R; }
       else if (hurt) { inner = 0.12 * R; by = 0.02 * R; }
@@ -8330,8 +9413,18 @@ class FighterPainter {
         { x: ex - 0.36 * R, y: ey + 0.28 * R + by }, { x: ex, y: ey + 0.36 * R + by }, { x: ex + 0.36 * R, y: ey + 0.26 * R + inner + by },
         { x: ex + 0.33 * R, y: ey + 0.26 * R + inner - th + by }, { x: ex, y: ey + 0.36 * R - th + by }, { x: ex - 0.36 * R, y: ey + 0.28 * R - th * 0.7 + by },
       ], 0.3);
-      ctx.fillStyle = this.mat(lk.hair?.color || lk.beard?.color || '#222', t).base;
+      ctx.fillStyle = this.mat(croc ? darken(lk.skin, 0.35) : lk.hair?.color || lk.beard?.color || '#222', t).base;
       ctx.fill();
+    }
+    if (croc) {
+      // nostrils on the snout tip; the jaw does the talking
+      for (const x of [2.12, 2.24]) {
+        ctx.beginPath();
+        ctx.ellipse(x * R, 0.08 * R, 0.05 * R, 0.03 * R, 0, 0, Math.PI * 2);
+        ctx.fillStyle = outl;
+        ctx.fill();
+      }
+      return;
     }
     if (lk.freckles) {
       for (const [x, y] of [[0.75, -0.08], [0.85, -0.12], [0.68, -0.15], [0.8, -0.2]]) {
@@ -8360,6 +9453,7 @@ class FighterPainter {
       return;
     }
     // mouth
+    if (lk.clown) this.drawClownMouthPaint(ctx, R);
     const mouth = { hurt: 'grimace', shout: 'shout', attack: 'grit', strain: 'grit', ko: 'slack', dizzy: 'wavy', happy: 'grin' }[xp] || lk.mouth;
     if (mouth === 'shout' || mouth === 'grimace' || mouth === 'slack') {
       // open mouth: dark inside, upper teeth, tongue
@@ -8404,6 +9498,22 @@ class FighterPainter {
       ctx.stroke();
       this.line(ctx, [{ x: 0.53 * R, y: -0.47 * R }, { x: 0.97 * R, y: -0.47 * R }], 0.9, outl, 0.7);
       for (const x of [0.64, 0.76, 0.88]) this.line(ctx, [{ x: x * R, y: -0.4 * R }, { x: x * R, y: -0.54 * R }], 0.8, outl, 0.5);
+    } else if (mouth === 'clown') {
+      // the painted-on sad grimace: wide, down-turned, all teeth
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: 0.42 * R, y: -0.62 * R }, { x: 0.62 * R, y: -0.4 * R }, { x: 0.95 * R, y: -0.38 * R }, { x: 1.08 * R, y: -0.6 * R }, { x: 0.8 * R, y: -0.66 * R }], 0.35);
+      ctx.fillStyle = '#3a0e1a';
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#f6f1e6';
+      ctx.fillRect(0.4 * R, -0.52 * R, 0.7 * R, 0.16 * R);
+      ctx.fillRect(0.4 * R, -0.72 * R, 0.7 * R, 0.09 * R);
+      for (const x of [0.58, 0.7, 0.82, 0.94]) this.line(ctx, [{ x: x * R, y: -0.36 * R }, { x: x * R, y: -0.52 * R }], 0.8, outl, 0.5);
+      ctx.restore();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = outl;
+      ctx.stroke();
     } else if (mouth === 'wavy') {
       this.line(ctx, [{ x: 0.55 * R, y: -0.44 * R }, { x: 0.66 * R, y: -0.4 * R }, { x: 0.78 * R, y: -0.48 * R }, { x: 0.9 * R, y: -0.42 * R }, { x: 0.98 * R, y: -0.46 * R }], 1.8, outl);
     } else if (mouth === 'grin' || mouth === 'teeth' || mouth === 'snarl') {
@@ -8442,6 +9552,7 @@ class FighterPainter {
     ctx.fillStyle = rgba(outl, 0.55);
     ctx.fill();
     this.line(ctx, [{ x: 0.86 * R, y: -0.18 * R }, { x: 0.74 * R, y: -0.3 * R }], 1.4, outl, 0.35);
+    if (lk.clown) this.drawClownNose(ctx, R, ex, ey);
   }
 
   drawMask(ctx, R) {
@@ -8620,6 +9731,32 @@ class FighterPainter {
         for (let i = 0; i < 3; i++) this.line(ctx, [{ x: (-0.55 + i * 0.12) * R, y: 0.15 * R }, { x: (-0.45 + i * 0.12) * R, y: 0.55 * R }], 1, this.outline, 0.6);
         break;
       }
+      case 'topknot': {
+        // sumo bowl cut: a flat fringe across the forehead, shaved line, topknot on the crown
+        ctx.beginPath();
+        smoothClosed(ctx, [{ x: 0.94 * R, y: 0.44 * R }, { x: 0.75 * R, y: 1.05 * R }, { x: -0.2 * R, y: 1.22 * R }, { x: -1.04 * R, y: 0.55 * R },
+          { x: -1.06 * R, y: -0.15 * R }, { x: -0.72 * R, y: -0.3 * R }, { x: -0.5 * R, y: 0.28 * R }, { x: 0.25 * R, y: 0.42 * R }], 0.35);
+        ctx.fillStyle = c;
+        ctx.fill();
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = this.outline;
+        ctx.stroke();
+        if (hair.sheen) this.line(ctx, [{ x: -0.6 * R, y: 0.95 * R }, { x: 0.0 * R, y: 1.12 * R }, { x: 0.55 * R, y: 0.98 * R }], 2.2, this.mat(hair.sheen, this.tint).base, 0.7);
+        for (let i = 0; i < 5; i++) this.line(ctx, [{ x: (-0.4 + i * 0.28) * R, y: 1.1 * R }, { x: (-0.35 + i * 0.3) * R, y: 0.5 * R }], 1, this.outline, 0.35);
+        if (hair.knot !== false) {
+          ctx.beginPath();
+          ctx.ellipse(-0.15 * R, 1.32 * R, 0.42 * R, 0.17 * R, 0.15, 0, Math.PI * 2);
+          ctx.fillStyle = c;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          this.line(ctx, [{ x: -0.42 * R, y: 1.2 * R }, { x: -0.4 * R, y: 1.44 * R }], 2.4, '#f2efe8');
+        } else {
+          // the knot came undone: a messy tuft
+          for (const [x, a] of [[-0.3, 0.4], [-0.1, 0.1], [0.1, -0.3]]) this.line(ctx, [{ x: x * R, y: 1.15 * R }, { x: (x + Math.sin(a) * 0.4) * R, y: 1.7 * R }], 3, c);
+        }
+        break;
+      }
       case 'crest': {
         ctx.beginPath();
         smoothClosed(ctx, [{ x: -0.7 * R, y: 0.7 * R }, { x: -0.2 * R, y: 1.35 * R }, { x: 0.5 * R, y: 1.25 * R }, { x: 0.6 * R, y: 0.9 * R }], 0.4);
@@ -8705,6 +9842,57 @@ class FighterPainter {
     const hat = this.look.hat, t = this.tint;
     const c = this.mat(hat.color, t);
     if (hat.type === 'feathers') return this.drawFeathers(ctx, R, hat);
+    if (hat.type === 'cap') {
+      // checkered newsboy cap, puffed up and tilted back, goggles on the front
+      const crown = [{ x: 1.05 * R, y: 0.55 * R }, { x: 0.8 * R, y: 1.25 * R }, { x: -0.1 * R, y: 1.55 * R }, { x: -1.15 * R, y: 1.2 * R }, { x: -1.2 * R, y: 0.55 * R }, { x: 0.1 * R, y: 0.62 * R }];
+      ctx.beginPath();
+      smoothClosed(ctx, crown, 0.45);
+      ctx.lineWidth = this.ow * 2;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      ctx.fillStyle = c.base;
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      const sq = 0.32 * R;
+      for (let i = -5; i < 5; i++) for (let j = 1; j < 6; j++) {
+        if ((i + j) % 2) continue;
+        ctx.save();
+        ctx.translate(i * sq, j * sq * 0.9);
+        ctx.rotate(0.35);
+        ctx.fillStyle = this.mat((i + j * 3) % 4 === 0 ? hat.check2 : hat.check, t).base;
+        ctx.fillRect(0, 0, sq, sq * 0.9);
+        ctx.restore();
+      }
+      this.shadeAcross(ctx, { x: 0.8 * R, y: 1.4 * R }, { x: -1 * R, y: 0.6 * R });
+      ctx.restore();
+      // short visor
+      ctx.beginPath();
+      smoothClosed(ctx, [{ x: 0.7 * R, y: 0.7 * R }, { x: 1.45 * R, y: 0.6 * R }, { x: 1.5 * R, y: 0.48 * R }, { x: 0.8 * R, y: 0.52 * R }], 0.3);
+      ctx.fillStyle = darken(c.base, 0.2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (hat.goggles) {
+        for (const x of [0.3, 0.72]) {
+          ctx.beginPath();
+          ctx.arc(x * R, 1.05 * R, 0.24 * R, 0, Math.PI * 2);
+          ctx.fillStyle = this.mat(hat.goggles, t).base;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x * R, 1.05 * R, 0.15 * R, 0, Math.PI * 2);
+          ctx.fillStyle = '#2a3a4a';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x * R - 0.05 * R, 1.1 * R, 0.05 * R, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
+          ctx.fill();
+        }
+      }
+      return;
+    }
     if (hat.type === 'chef') {
       ctx.beginPath();
       smoothClosed(ctx, [{ x: -0.85 * R, y: 0.55 * R }, { x: -1.15 * R, y: 1.5 * R }, { x: -0.6 * R, y: 2.2 * R }, { x: 0.1 * R, y: 2.05 * R }, { x: 0.7 * R, y: 2.25 * R }, { x: 1.2 * R, y: 1.55 * R }, { x: 0.85 * R, y: 0.6 * R }], 0.45);
@@ -9143,6 +10331,24 @@ class Effects {
           this.parts.push({ kind: 'tether', who: e.who, target: e.target, x: e.x, y: e.y, life: 36, max: 36 });
           this.labels.push({ text: 'HOOKED!', x: e.x, y: e.y + 70, life: 45, color: '#3fe6d0' });
         }
+        if (e.bite) this.parts.push({ kind: 'bite', x: e.x, y: e.y, dir: e.dir, life: 14, max: 14 });
+        if (e.pie) {
+          // cream splatters
+          for (let i = 0; i < 14; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 2 + this.rnd() * 5;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 2, life: 22, max: 22, color: i % 3 ? '#fff6e8' : '#f2a0c8', w: 5 });
+          }
+          this.labels.push({ text: 'SPLAT!', x: e.x, y: e.y + 60, life: 40, color: '#fff6e8' });
+        }
+        if (e.smash) {
+          // the guitar shatters: splinters, a few strings and a sour chord
+          for (let i = 0; i < 18; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 3 + this.rnd() * 8;
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 3, life: 26, max: 26, color: i % 3 ? '#2fb8a8' : '#7a4a28', w: 4 });
+          }
+          this.labels.push({ text: 'KRANG!', x: e.x, y: e.y + 70, life: 50, color: '#3fe6d0' });
+        }
+        if (e.prop === 'glove') this.labels.push({ text: 'BOING!', x: e.x, y: e.y + 60, life: 40, color: '#ff5fbf' });
         if (e.claw) this.parts.push({ kind: 'claw', x: e.x, y: e.y, dir: e.dir, life: 16, max: 16, flip: this.rnd() < 0.5 });
         for (let i = 0; i < n; i++) {
           const a = this.rnd() * Math.PI * 2;
@@ -9462,6 +10668,22 @@ class Effects {
           ctx.lineWidth = 2 * cam.zoom;
           ctx.stroke();
         }
+      } else if (p.kind === 'bite') {
+        // two rows of white teeth snapping shut on the spot
+        const shut = Math.min(1, (p.max - p.life) / 4), gap = (1 - shut) * 22 * cam.zoom + 2;
+        const w = 46 * cam.zoom;
+        ctx.fillStyle = rgba('#ffffff', Math.min(1, k * 1.5));
+        for (const sgn of [-1, 1]) {
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            const x0 = s.x - w / 2 + (i / 5) * w, x1 = x0 + w / 5;
+            const yb = s.y + sgn * (gap + 8 * cam.zoom);
+            ctx.moveTo(x0, yb);
+            ctx.lineTo((x0 + x1) / 2, s.y + sgn * gap);
+            ctx.lineTo(x1, yb);
+          }
+          ctx.fill();
+        }
       } else if (p.kind === 'ember') {
         const hot = k > 0.6 ? '#ffe08a' : k > 0.3 ? '#ff9a30' : '#d8401c';
         ctx.fillStyle = rgba(hot, Math.min(1, k * 1.6) * (0.75 + 0.25 * Math.sin(p.life * 1.7)));
@@ -9674,6 +10896,31 @@ const DRAW = {
     ctx.beginPath(); ctx.rect(20, -6, 12, 12); shape(ctx, '#2a1e18', 1.6);
     ctx.strokeStyle = '#d8d8e0'; ctx.lineWidth = 0.8;
     for (const y of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(20, y); ctx.stroke(); }
+  },
+  cap(ctx, lk) {
+    const h = lk.hat || { color: '#e0952e', check: '#2f9a7a' };
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 24, 13, 0, 0, Math.PI * 2);
+    shape(ctx, h.color);
+    ctx.fillStyle = h.check || '#2f9a7a';
+    for (let i = -2; i <= 2; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2) ctx.fillRect(i * 8 - 3, j * 8 - 3, 7, 7);
+    ctx.beginPath();
+    ctx.ellipse(18, -6, 12, 4, 0.2, 0, Math.PI * 2);
+    shape(ctx, darken(h.color, 0.2), 1.6);
+  },
+  padlock(ctx, lk) {
+    const c = lk.chain || { color: '#b8b8c0', lock: '#9a9aa4' };
+    ctx.beginPath(); ctx.arc(0, 6, 6, Math.PI, 0); ctx.lineWidth = 3; ctx.strokeStyle = c.color; ctx.stroke();
+    ctx.beginPath(); ctx.rect(-8, -8, 16, 14); shape(ctx, c.lock, 1.8);
+    ctx.beginPath(); ctx.arc(0, -1, 2, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-14, 10); for (let i = 0; i < 5; i++) ctx.lineTo(-14 - i * 6, 10 + (i % 2) * 4);
+    ctx.lineWidth = 3; ctx.strokeStyle = c.color; ctx.stroke();
+  },
+  sombrero(ctx, lk) {
+    const h = lk.hat || { color: '#e8d4a0', band: '#d4318f' };
+    ctx.beginPath(); ctx.ellipse(0, 0, 46, 9, 0, 0, Math.PI * 2); shape(ctx, h.color);
+    ctx.beginPath(); ctx.moveTo(-16, 2); ctx.quadraticCurveTo(-12, 30, 0, 32); ctx.quadraticCurveTo(12, 30, 16, 2); ctx.closePath(); shape(ctx, h.color);
+    ctx.fillStyle = h.band; ctx.fillRect(-15, 3, 30, 6);
   },
   tooth(ctx) {
     ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
@@ -10511,10 +11758,11 @@ const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
   vellaro: null, roxy: [90, 200], bruno: [60, 120], jaguar: [200, 360],
   cinder: [60, 170], grizz: [100, 190], hawk: [120, 280], tao: [30, 130],
+  goro: [90, 320], sobby: [170, 460], snapper: [60, 200], chuy: [150, 380],
 };
 /** Fighters whose signature needs distance (projectiles, Jaguar's pounce): chance per decision to back off when crowded. */
-const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22, hawk: 0.1 };
-const SHOOTER = { rattigan: true, jax: true }; // projectile users: also back off from a downed opponent
+const ZONER = { rattigan: 0.14, jax: 0.13, jaguar: 0.22, hawk: 0.1, sobby: 0.14, chuy: 0.1, goro: 0.05 };
+const SHOOTER = { rattigan: true, jax: true, sobby: true, chuy: true }; // projectile users: also back off from a downed opponent
 const BACK_DASH = [{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }];
 const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 

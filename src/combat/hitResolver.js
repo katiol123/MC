@@ -228,6 +228,7 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
     strength: spec.strength, move: spec.id, part: res.part, damage, counter, punish, trade,
     combo: hitN, ko: def.health <= 0, shake: spec.shake || 0, dir: projectile ? Math.sign(projectile.vx) : att.facing,
     super: !!spec.super, prop: spec.prop, fire: !!spec.fire, claw: !!spec.claw, heal, pull: !!spec.pull,
+    bite: !!spec.bite, smash: !!spec.smash, pie: !!spec.pie, quake: spec.id === 'proj:quake', notes: spec.id === 'proj:notes',
   };
 }
 

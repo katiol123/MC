@@ -45,6 +45,17 @@ const HEAL = { lifesteal: 0.5 };
 /** Flurry jabs (Tao): tiny hits that keep the opponent locked; afterimage fists are drawn. */
 const JAB = (damage) => H(damage, { hitstun: 22, blockstun: 12, hitstop: 3, push: { hit: 0.6, block: 1.0 } });
 
+/** Open-hand palm strikes (Goro): a big flat hand. */
+const PALM = { hitboxes: [{ a: 'elbowF', b: 'handF', r: 17 }, { a: 'elbowB', b: 'handB', r: 17 }] };
+/** Boxing glove on a spring (Sobby's super finisher): reaches far past the fist. */
+export const SPRING_REACH = 70;
+const SPRING = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 16 }, { a: 'elbowF', b: 'handF', r: 16 }, { a: 'handF', b: 'handF', dir: 'elbowF', ext: SPRING_REACH, r: 24 }] };
+/** Bites (Snapper's super): the head and the long snout are the hitbox. */
+const BITE = { bite: true, hitboxes: [{ a: 'neck', b: 'head', r: 18 }, { a: 'head', b: 'head', dir: 'neck', rot: -1.3, ext: 44, r: 18 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'elbowB', b: 'handB', r: 15 }] };
+/** Guitar swung by the neck (Chuy's super): forearm plus a big capsule over the guitar body. */
+export const GUITAR_COCK = 0.25;
+const GUITAR = { hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 15 }, { a: 'elbowF', b: 'handF', r: 15 }, { a: 'handF', b: 'handF', dir: 'elbowF', rot: GUITAR_COCK, ext: 64, r: 26 }], prop: 'guitar' };
+
 export const SIGNATURES = {
   brick: {
     s4: {
@@ -230,6 +241,70 @@ export const SIGNATURES = {
       steps: [step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)), step('jab', 7, H(26)), step('cross', 7, H(28)),
         step('lunge', 18, FINISH(95, 'knockback'), { vx: 6 })],
       recoveryAfter: 16,
+    },
+  },
+  goro: {
+    // a stomp that sends a ground tremor along the planks: must be blocked low (or jumped)
+    s4: {
+      name: 'Shiko Quake', anim: 'hammer', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 16, active: 2, recovery: 22, hitboxes: [],
+      projectile: { at: 17, kind: 'quake', speed: 7.5, y: 12, r: 24, life: 70, hits: 1,
+        hit: { damage: 62, hitstun: 24, blockstun: 14, hitstop: 9, reaction: 'light', push: { hit: 3, block: 4 }, stun: 60, height: 'low' } },
+      armor: { from: 2, to: 16, hits: 1 }, priority: 3, shake: 6,
+    },
+    su: {
+      ...SUPER, name: 'Yokozuna Crash', anim: 'sequence',
+      steps: [step('jab', 9, H(48, PALM)), step('cross', 10, H(52, PALM)), step('jab', 9, H(48, PALM)), step('cross', 10, H(52, PALM)), step('tackle', 18, FINISH(120, 'knockdown', { shake: 14, hitboxes: [{ a: 'shoulderF', b: 'elbowF', r: 24 }, { a: 'neck', b: 'shoulderF', r: 24 }, { a: 'neck', b: 'pelvis', r: 26 }] }), { vx: 7 })],
+      recoveryAfter: 18,
+    },
+  },
+  sobby: {
+    // a cream pie in the face: long hitstun to follow up, and the face stays covered for a while
+    s4: {
+      name: 'Cream Pie', anim: 'flick', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 2, recovery: 20, hitboxes: [],
+      projectile: { at: 13, kind: 'pie', speed: 8.5, y: 150, r: 16, life: 90, hits: 1,
+        hit: { damage: 52, hitstun: 30, blockstun: 14, hitstop: 8, reaction: 'light', push: { hit: 2.5, block: 3.5 }, stun: 55, height: 'mid', pie: 240 } },
+      priority: 2,
+    },
+    // slaps and kicks between sobs, then the boxing glove on a spring
+    su: {
+      ...SUPER, name: 'Tears of a Clown', anim: 'sequence', prop: { type: 'glove', hand: 'F' },
+      steps: [step('jab', 8, H(40)), step('cross', 10, H(48)), step('frontKick', 14, H(45)), step('cross', 10, H(48)), step('lunge', 18, FINISH(110, 'knockback', SPRING), { vx: 4 })],
+      recoveryAfter: 18,
+    },
+  },
+  snapper: {
+    // a rolling lunge: he spins his whole body (and tail) through the opponent and knocks them down
+    s4: {
+      name: 'Death Roll', anim: 'whirl', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 10, recovery: 18, motion: [{ from: 4, to: 18, vx: 8 }],
+      damage: 95, stun: 80, hitstun: 24, blockstun: 16, hitstop: 12,
+      height: 'mid', reaction: 'knockdown', push: { hit: 4, block: 6 }, launch: { vx: 5, vy: 7 },
+      hitboxes: [{ a: 'neck', b: 'pelvis', r: 22 }, { a: 'shoulderF', b: 'handF', r: 16 }, { a: 'hipB', b: 'ankleB', r: 16 }],
+      juggle: 2, priority: 3, shake: 7,
+    },
+    // four bites, then a full-body tail whip
+    su: {
+      ...SUPER, name: 'Swamp Jaws', anim: 'sequence', bite: true,
+      steps: [step('jab', 9, H(42, BITE)), step('cross', 10, H(48, BITE)), step('jab', 9, H(42, BITE)), step('cross', 10, H(48, BITE)), step('whirl', 18, FINISH(115, 'knockdown'))],
+      recoveryAfter: 18,
+    },
+  },
+  chuy: {
+    // a strummed chord: three notes drift across the screen
+    s4: {
+      name: 'Serenata', anim: 'pushWave', input: S4_INPUT, stance: 'stand', strength: 'special', isSpecial: true,
+      startup: 12, active: 2, recovery: 22, hitboxes: [],
+      projectile: { at: 13, kind: 'notes', speed: 6, y: 140, r: 24, life: 100, hits: 3, interval: 8,
+        hit: { damage: 24, hitstun: 16, blockstun: 11, hitstop: 5, reaction: 'light', push: { hit: 2, block: 2.5 }, stun: 28, height: 'mid' } },
+      priority: 2,
+    },
+    // the guitar comes off his back
+    su: {
+      ...SUPER, name: 'Mariachi Fury', anim: 'sequence', prop: { type: 'guitar', hand: 'F' },
+      steps: [step('panSwing', 14, H(50, GUITAR)), step('chop', 19, H(55, GUITAR)), step('panSwing', 14, H(50, GUITAR)), step('chop', 19, FINISH(125, 'knockdown', { ...GUITAR, smash: true }))],
+      recoveryAfter: 18,
     },
   },
 };

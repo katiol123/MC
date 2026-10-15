@@ -1,7 +1,7 @@
 // Fighter roster. Everything here is data: proportions, palette, outfit, physical stats and per-move
 // overrides. The combat, physics and render systems read it without fighter-specific code paths.
 //
-// All twelve are procedural interpretations of the user's concept portraits (hair, outfit, palette).
+// All sixteen are procedural interpretations of the user's concept portraits (hair, outfit, palette).
 // The portraits themselves are only shown on the character-select / versus screens.
 import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
@@ -47,7 +47,7 @@ export const ROSTER = [
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0, speed: 0.55, mobility: 0.6, health: 0.1, toughness: 0.15, reaction: 0.45, aggression: 0.25, combo: 0.3, antiAir: 0.35, cunning: 1 },
+    profile: { power: 0, speed: 0.6, mobility: 0.65, health: 0.2, toughness: 0.25, reaction: 0.5, aggression: 0.35, combo: 0.4, antiAir: 0.4, cunning: 1 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -78,7 +78,7 @@ export const ROSTER = [
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.5, speed: 0.35, mobility: 0.45, health: 0.5, toughness: 0.45, reaction: 0.4, aggression: 0.45, combo: 0.65, antiAir: 0.85, cunning: 0.35 },
+    profile: { power: 0.45, speed: 0.3, mobility: 0.4, health: 0.45, toughness: 0.4, reaction: 0.35, aggression: 0.4, combo: 0.55, antiAir: 0.75, cunning: 0.3 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -261,7 +261,7 @@ export const ROSTER = [
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
     stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.45, speed: 0.4, mobility: 0.35, health: 0.1, toughness: 0.15, reaction: 0.25, aggression: 0.55, combo: 0.45, antiAir: 0.25, cunning: 0.15 },
+    profile: { power: 0.45, speed: 0.45, mobility: 0.4, health: 0.15, toughness: 0.2, reaction: 0.3, aggression: 0.55, combo: 0.45, antiAir: 0.3, cunning: 0.2 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -289,7 +289,7 @@ export const ROSTER = [
     body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
     stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.65, speed: 0.2, mobility: 0.1, health: 0.75, toughness: 0.8, reaction: 0.25, aggression: 0.55, combo: 0, antiAir: 0.5, cunning: 0.5 },
+    profile: { power: 0.7, speed: 0.3, mobility: 0.2, health: 0.75, toughness: 0.8, reaction: 0.3, aggression: 0.6, combo: 0, antiAir: 0.55, cunning: 0.55 },
     look: {
       skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
       eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
@@ -363,6 +363,122 @@ export const ROSTER = [
     moves: {
       lp: { startup: 3 },
       s1: { name: 'Stone Fist' },
+    },
+  },
+  {
+    id: 'goro',
+    name: 'GORO "BOULDER" TAKEDA',
+    title: 'The Unmovable Mountain',
+    blurb: 'A retired sumo who never learned how to step back. Slow to start, impossible to shove, and every stomp shakes the pier.',
+    body: { height: 1.02, bulk: 1.5, arms: 0.98, legs: 0.9, head: 1.06, torso: 1.08, shoulders: 1.3, armBulk: 1.3, legBulk: 1.3, waist: 1.5, hands: 1.15 },
+    stats: { health: 1200, walkF: 2.4, walkB: 2.0, run: 5.4, dash: 7.8, jumpVY: 14.2, jumpVX: 3.3, mass: 1.55, stunMax: 820, pushW: 44 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.6, speed: 0.1, mobility: 0.05, health: 0.65, toughness: 0.6, reaction: 0.3, aggression: 0.4, combo: 0.2, antiAir: 0.3, cunning: 0.3 },
+    look: {
+      skin: '#d8a07a', outline: '#160e0e', rim: '#ff4fd8',
+      eyes: '#3a2a20', brows: 'thick', mouth: 'flat',
+      hair: { style: 'topknot', color: '#1a1416', sheen: '#3fd2c2', streak: '#f2efe8', knot: true },
+      beard: { style: 'sideburns', color: '#1a1416' },
+      top: { type: 'tunic', color: '#e0952e', color2: '#b8691c', trim: '#2a1c14' },
+      pants: { type: 'pants', color: '#2a2430' },
+      belt: { color: '#4a2a6a', buckle: '#4a2a6a' },
+      gloves: { type: 'none' },
+      shoes: { type: 'wrapped', color: '#e8dcc0' },
+      victory: 3,
+    },
+    // low-health look: the topknot comes undone, the hair tie flies off
+    damaged: { look: { hair: { knot: false } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 10, spin: 0.3 }] },
+    moves: {
+      hp: { armor: { from: 1, to: 12, hits: 1 } },
+      hk: { armor: { from: 1, to: 14, hits: 1 } },
+      s1: { name: 'Harite Palm', armor: { from: 1, to: 20, hits: 1 } },
+    },
+  },
+  {
+    id: 'sobby',
+    name: 'SOBBY PAGLIACCI',
+    title: 'The Weeping Jester',
+    blurb: 'The saddest clown on the boardwalk. He cries through every fight, and nobody laughs at the pie he throws.',
+    body: { height: 1.04, bulk: 0.9, arms: 1.06, legs: 1.06, head: 1.08, torso: 0.98, shoulders: 0.96 },
+    stats: { health: 940, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10, jumpVY: 16.8, jumpVX: 4.3, mass: 0.92, stunMax: 580, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.6, mobility: 0.65, health: 0.4, toughness: 0.35, reaction: 0.75, aggression: 0.15, combo: 0.5, antiAir: 0.6, cunning: 0.85 },
+    look: {
+      skin: '#c99a78', outline: '#160c14', rim: '#ff3fd0',
+      eyes: '#7a3ab0', brows: 'sad', mouth: 'clown',
+      clown: { paint: '#eeece6', mouth: '#7a2aa0', tear: '#3a8ae8', nose: '#e8203a' },
+      hair: { style: 'spiky', color: '#e83ab8', root: '#a0207a' },
+      earrings: '#e2b440',
+      hat: { type: 'cap', color: '#e0952e', check: '#2f9a7a', check2: '#d4318f', goggles: '#c99b4a' },
+      top: { type: 'jacket', color: '#d03aa8', color2: '#8a2a78', inner: '#c88a2a', patches: [] },
+      tie: { color: '#3a5a2a', bow: true, check: '#1e3016' },
+      pants: { type: 'pants', color: '#b87a26' },
+      gloves: { type: 'gloves', color: '#f2efe8' },
+      shoes: { type: 'shoes', color: '#d4318f', sole: '#3a1030', big: true },
+      victory: 2,
+    },
+    // low-health look: the checkered cap flies off (the red nose stays: it is his real nose)
+    damaged: { look: { hat: null }, props: [{ type: 'cap', from: 'head', vx: -3, vy: 11, spin: 0.25 }] },
+    moves: {
+      s1: { name: 'Seltzer Sneak' },
+    },
+  },
+  {
+    id: 'snapper',
+    name: 'SNAPPER LOCKJAW',
+    title: 'The Swamp Loan Shark',
+    blurb: 'Lends you money with a smile full of teeth. Pay late and he collects with a death roll.',
+    body: { height: 1.05, bulk: 1.12, arms: 1.0, legs: 0.96, head: 1.15, torso: 1.05, shoulders: 1.15, armBulk: 1.1 },
+    stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.4, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.15, stunMax: 700, pushW: 37 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.75, speed: 0.45, mobility: 0.35, health: 0.7, toughness: 0.6, reaction: 0.4, aggression: 0.8, combo: 0.55, antiAir: 0.3, cunning: 0.5 },
+    look: {
+      species: 'croc',
+      skin: '#6f8a2c', fur2: '#cfc58a', outline: '#10140a', rim: '#ff3fd0',
+      eyes: '#ff3fd0', brows: 'angry', mouth: 'fangs',
+      top: { type: 'trench', color: '#c8a878', color2: '#d4318f', vest: '#2a2a30', buttons: '#7a6a5a', plaid: '#8a6a48' },
+      tie: { color: '#d4318f' },
+      chain: { color: '#b8b8c0', lock: '#9a9aa4' },
+      pants: { type: 'pants', color: '#2a2a30' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#3a2a1a', sole: '#140c08' },
+      tail: '#6f8a2c',
+      victory: 1,
+    },
+    // low-health look: the padlock chain snaps off, and a tooth goes flying
+    damaged: { look: { chain: null }, props: [{ type: 'padlock', from: 'chest', vx: 2.5, vy: 7, spin: 0.4 }, { type: 'tooth', from: 'mouth', vx: 3, vy: 9, spin: 0.5 }] },
+    moves: {
+      s1: { name: 'Tail Lash' },
+    },
+  },
+  {
+    id: 'chuy',
+    name: 'CHUY "EL TROVADOR" VALDEZ',
+    title: 'Serenade of Fists',
+    blurb: 'Plays every bar on the pier and fights in most of them. His guitar has more dents than strings.',
+    body: { height: 1.0, bulk: 0.95, arms: 1.02, legs: 1.02, head: 1.0, torso: 1.0, shoulders: 1.0 },
+    stats: { health: 960, walkF: 3.5, walkB: 3.0, run: 7.2, dash: 10.4, jumpVY: 16.8, jumpVX: 4.4, mass: 0.96, stunMax: 600, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.6, mobility: 0.55, health: 0.3, toughness: 0.3, reaction: 0.5, aggression: 0.45, combo: 0.6, antiAir: 0.35, cunning: 0.4 },
+    look: {
+      skin: '#b47a52', outline: '#140c0c', rim: '#ff3fd0',
+      eyes: '#5a3a20', brows: 'sharp', mouth: 'grin',
+      hair: { style: 'ponytail', color: '#2a1a14', tie: '#d4318f' },
+      beard: { style: 'goatee', color: '#2a1a14' },
+      hat: { type: 'sombrero', color: '#e8d4a0', band: '#d4318f', trim: '#d4318f' },
+      scarf: '#d4318f',
+      top: { type: 'jacket', color: '#2a2422', color2: '#d4a03a', inner: '#c03aa0', patches: ['#e0952e', '#3fd2c2', '#d4318f'] },
+      guitar: { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' },
+      pants: { type: 'pants', color: '#2a2422', color2: '#d4a03a' },
+      belt: { color: '#1a1414', buckle: '#d4a03a' },
+      gloves: { type: 'none' },
+      shoes: { type: 'boots', color: '#3a2418', sole: '#140c08' },
+      victory: 0,
+    },
+    // low-health look: the sombrero flies off
+    damaged: { look: { hat: null }, props: [{ type: 'sombrero', from: 'head', vx: -3.5, vy: 9, spin: 0.15 }] },
+    moves: {
+      s1: { name: 'Boot Stomp' },
     },
   },
 ];

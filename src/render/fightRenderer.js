@@ -15,6 +15,17 @@ import { drawHud } from './hud.js';
 import { drawDebug } from './debugDraw.js';
 import { rgba, mix } from './color.js';
 
+/** Sobby's spring glove: shoots out on the steps whose hitbox reaches past the fist. */
+function springExtension(mv, f) {
+  if (!mv || f.state !== 'attack' || mv.def.prop?.type !== 'glove' || !mv.step) return 0;
+  const st = mv.step;
+  if (!st.hit?.hitboxes?.some((h) => h.ext)) return 0;
+  const local = mv.frame - st.start + 1, hit = st.hitAt || 6;
+  if (local < hit - 3) return 0;
+  if (local <= hit + 6) return Math.min(1, (local - hit + 3) / 3);
+  return Math.max(0, 1 - (local - hit - 6) / 4);
+}
+
 /** Facial expression for the fighter's current state. */
 function faceFor(f) {
   switch (f.state) {
@@ -178,9 +189,10 @@ export class FightRenderer {
       ctx.clip();
     }
     ctx.translate(s.x + jitter, s.y);
+    if (fx.rot) ctx.rotate(fx.rot);
     if (fx.sx !== undefined || fx.sy !== undefined) ctx.scale(fx.sx ?? 1, fx.sy ?? 1);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
-    const expression = faceFor(f);
+    const expression = fx.face || faceFor(f);
     const blink = blinkAt(now / 1000 + i * 1.37, i);
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
     const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
@@ -198,6 +210,8 @@ export class FightRenderer {
       critical: f.critical,
       clawMarks: f.clawMarks || 0,
       marks: f.marks,
+      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite,
+      springExt: springExtension(mv, f),
       now,
       layers: f.anim.layers,
       tint: fx.tint ? fx.tint : f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
@@ -326,6 +340,70 @@ export class FightRenderer {
         ctx.strokeStyle = '#fff2a8';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      } else if (p.kind === 'quake') {
+        // ground tremor: a cracking ridge of planks and dust rolling along the floor
+        const dir = Math.sign(p.vx) || 1, t = p.age;
+        for (let i = 0; i < 5; i++) {
+          const x = -dir * i * 12 * z, h = (18 - i * 3 + Math.sin(t * 0.9 + i) * 3) * z;
+          ctx.fillStyle = `rgba(216,200,232,${0.5 - i * 0.08})`;
+          ctx.beginPath();
+          ctx.ellipse(x, -h * 0.3, (14 - i) * z, h * 0.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#5a3a2a';
+        ctx.strokeStyle = '#140c10';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          const x = (dir * 6 - i * dir * 10) * z, up = (14 + Math.sin(t * 1.3 + i * 2) * 4) * z;
+          ctx.moveTo(x - 7 * z, 4 * z);
+          ctx.lineTo(x - 2 * z, -up);
+          ctx.lineTo(x + 6 * z, -up * 0.6);
+          ctx.lineTo(x + 8 * z, 4 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      } else if (p.kind === 'pie') {
+        // cream pie spinning flat through the air
+        const sp = Math.cos(p.age * 0.35);
+        const R = p.r * z;
+        ctx.rotate(p.age * 0.05 * (Math.sign(p.vx) || 1));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, R, Math.max(3, Math.abs(sp) * R), 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#c88a3a';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#3a200c';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, -Math.abs(sp) * R * 0.25, R * 0.85, Math.max(2, Math.abs(sp) * R * 0.7), 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff6e8';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -Math.abs(sp) * R * 0.4, R * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#e8203a';
+        ctx.fill();
+      } else if (p.kind === 'notes') {
+        // three bobbing music notes
+        const dir = Math.sign(p.vx) || 1;
+        const cols = ['#ff3fd0', '#3fe6d0', '#ffd23f'];
+        for (let i = 0; i < 3; i++) {
+          const x = -dir * i * 16 * z, y = Math.sin(p.age * 0.25 + i * 2) * 10 * z - i * 4 * z;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.sin(p.age * 0.2 + i) * 0.3);
+          ctx.fillStyle = cols[i];
+          ctx.strokeStyle = '#140c10';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, 6 * z, 6 * z, 4.5 * z, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillRect(4.5 * z, -14 * z, 2.6 * z, 20 * z);
+          if (i !== 1) { ctx.beginPath(); ctx.moveTo(7 * z, -14 * z); ctx.quadraticCurveTo(14 * z, -8 * z, 12 * z, -2 * z); ctx.lineWidth = 3 * z; ctx.strokeStyle = cols[i]; ctx.stroke(); }
+          ctx.restore();
+        }
       } else {
         // sonic wave: pulsing concentric arcs
         const dir = Math.sign(p.vx);
