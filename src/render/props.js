@@ -113,6 +113,26 @@ const DRAW = {
     ctx.lineWidth = 6; ctx.strokeStyle = lk.belt?.color || '#1a1a1e'; ctx.stroke();
     ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); shape(ctx, lk.belt?.color || '#1a1a1e', 1.6);
   },
+  boot(ctx, lk) {
+    ctx.beginPath();
+    ctx.moveTo(-8, 14); ctx.lineTo(-8, -4); ctx.quadraticCurveTo(-8, -10, 2, -10); ctx.lineTo(16, -10); ctx.quadraticCurveTo(20, -4, 14, 0); ctx.lineTo(4, 0); ctx.lineTo(4, 14); ctx.closePath();
+    shape(ctx, lk.shoes?.color || '#2a2224');
+    ctx.fillStyle = lk.shoes?.sole || '#100c0b'; ctx.fillRect(-8, -12, 26, 3);
+  },
+  bill(ctx) {
+    ctx.beginPath(); ctx.rect(-12, -6, 24, 12); shape(ctx, '#7fd36a', 1.4);
+    ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, Math.PI * 2); ctx.strokeStyle = '#3a7a2a'; ctx.lineWidth = 1.4; ctx.stroke();
+  },
+  mic(ctx) {
+    ctx.beginPath(); ctx.rect(-3, -18, 6, 20); shape(ctx, '#2a2630', 1.6);
+    ctx.beginPath(); ctx.arc(0, 6, 7, 0, Math.PI * 2); shape(ctx, '#b6b6c0', 1.6);
+  },
+  guitarneck(ctx) {
+    ctx.beginPath(); ctx.rect(-30, -3.5, 50, 7); shape(ctx, '#3a2a20', 1.6);
+    ctx.beginPath(); ctx.rect(20, -6, 12, 12); shape(ctx, '#2a1e18', 1.6);
+    ctx.strokeStyle = '#d8d8e0'; ctx.lineWidth = 0.8;
+    for (const y of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(20, y); ctx.stroke(); }
+  },
   tooth(ctx) {
     ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(4, 5); ctx.lineTo(3, -2); ctx.lineTo(1, -5); ctx.lineTo(-1, -2); ctx.lineTo(-3, -5); ctx.closePath();
     shape(ctx, '#f6f1e6', 1.4);

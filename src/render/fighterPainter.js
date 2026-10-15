@@ -41,10 +41,11 @@ export class FighterPainter {
 
   /** Material colours, optionally tinted (hit flash). */
   mat(base, tint = 0) {
-    const key = base + '|' + tint;
+    const tc = this.tintColor || '#ffffff';
+    const key = base + '|' + tint + '|' + tc;
     let m = this.matCache.get(key);
     if (!m) {
-      const b = tint ? mix(base, '#ffffff', tint) : base;
+      const b = tint ? mix(base, tc, tint) : base;
       m = { base: b, light: lighten(b, 0.18), dark: darken(mix(b, SHADOW_TINT, 0.3), 0.18), rim: mix(b, this.look.rim || '#ff4fd8', 0.7) };
       this.matCache.set(key, m);
     }
@@ -115,11 +116,20 @@ export class FighterPainter {
    */
   draw(ctx, skel, opts = {}) {
     this.look = opts.critical ? this.lookHurt : this.lookBase;
+    if (opts.lookOverride) {
+      // fatality gags (pants dropped...): cached merge of the current look with the override
+      if (this.ovSrc !== opts.lookOverride || this.ovBase !== this.look) {
+        this.ovSrc = opts.lookOverride;
+        this.ovBase = this.look;
+        this.ovLook = mergeLook(this.look, opts.lookOverride);
+      }
+      this.look = this.ovLook;
+    }
+    this.tintColor = opts.tintColor || '#ffffff';
     const lk = this.look;
-    this.outline = opts.tint ? mix(lk.outline || '#141014', '#ffffff', opts.tint * 0.4) : lk.outline || '#141014';
+    this.outline = opts.tint ? mix(lk.outline || '#141014', this.tintColor, opts.tint * (opts.tintColor ? 0.8 : 0.4)) : lk.outline || '#141014';
     this.tint = opts.tint || 0;
     this.battered = !!opts.critical;
-    this.look = this.battered ? this.lookHurt : this.lookBase;
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;

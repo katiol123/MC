@@ -11,13 +11,14 @@ export class Camera {
     this.sy = 0;
     this.t = 0;
   }
-  update(fighters, alpha, shake = 0) {
+  update(fighters, alpha, shake = 0, focus = null) {
     this.t++;
     const xs = fighters.map((f) => lerp(f.prev.x, f.body.x, alpha));
-    const ys = fighters.map((f) => lerp(f.prev.y, f.body.y, alpha));
-    const mid = (xs[0] + xs[1]) / 2;
+    const ys = focus ? [0, 0] : fighters.map((f) => lerp(f.prev.y, f.body.y, alpha));
+    // a fixed framing (fatality scenes) instead of following the fighters
+    const mid = focus ? focus.x : (xs[0] + xs[1]) / 2;
     const dist = Math.abs(xs[0] - xs[1]);
-    const tz = clamp(1.42 - (dist - 160) / 1300, 1.2, 1.42);
+    const tz = focus ? focus.zoom : clamp(1.42 - (dist - 160) / 1300, 1.2, 1.42);
     this.zoom = lerp(this.zoom, tz, 0.08);
     const half = VIEW.width / 2 / this.zoom;
     const tx = clamp(mid, STAGE.left + half, STAGE.right - half);

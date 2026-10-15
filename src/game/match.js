@@ -7,6 +7,7 @@ import { buildFighterDef } from '../data/fighters.js';
 import { resolvePushboxes, enforceSeparation } from '../physics/world.js';
 import { resolveExchange, resolveThrows, updateProjectiles } from '../combat/hitResolver.js';
 import { emptyRaw } from '../input/inputBuffer.js';
+import { FatalityDirector } from '../fatality/director.js';
 
 const START_GAP = 170;
 const INTRO_TICKS = 110;
@@ -62,10 +63,15 @@ export class Match {
     this.posed = false;
     this.projectiles = [];
     this.freeze = null;
+    this.fatality = null;
+    this.finishWho = null;
     const [a, b] = this.fighters;
     a.reset(STAGE_CENTER - START_GAP, 1);
     b.reset(STAGE_CENTER + START_GAP, -1);
     for (const f of this.fighters) f.setState('intro', {}, 'neutral', { blend: 0 });
+    // losing this round would lose the match: a lethal blow leaves the fighter dazed (FINISH HIM)
+    const need = this.opts.roundsToWin;
+    for (const f of this.fighters) f.finishable = !this.opts.training && this.wins[1 - f.index] >= need - 1;
     this.events.push({ type: 'roundIntro', round: this.round });
   }
 
@@ -79,7 +85,11 @@ export class Match {
     for (const f of this.fighters) f.emit = (e) => this.events.push(e);
     this.frame++;
     this.phaseTick++;
-    const fighting = this.phase === 'fight';
+    if (this.phase === 'fatality') {
+      this.updateFatality();
+      return this.events;
+    }
+    const fighting = this.phase === 'fight' || this.phase === 'finish';
     const raws = fighting ? inputs : [emptyRaw(), emptyRaw()];
 
     if (this.phase === 'intro') {
@@ -98,6 +108,7 @@ export class Match {
     else for (const f of this.fighters) f.snapshot();
 
     if (this.phase === 'fight') this.updateFight();
+    else if (this.phase === 'finish') this.updateFinish();
     else if (this.phase === 'ko' || this.phase === 'timeup') this.updateRoundEnd();
     else if (this.phase === 'result' && this.phaseTick >= 150) this.nextRound();
     return this.events;
@@ -119,8 +130,9 @@ export class Match {
     const movedA = a.update(b);
     const movedB = b.update(a);
     const throwing = [a, b].some((f) => f.state === 'thrown' || f.state === 'throwing');
-    if (!throwing) resolvePushboxes(a.body, b.body, a.facing);
-    enforceSeparation(a.body, b.body);
+    const scripted = [a, b].some((f) => f.state === 'scripted');
+    if (!throwing && !scripted) resolvePushboxes(a.body, b.body, a.facing);
+    if (!scripted) enforceSeparation(a.body, b.body);
     for (const [f, o] of [[a, b], [b, a]]) {
       if (f.canTurn && f.body.onGround) {
         const want = Math.sign(o.body.x - f.body.x);
@@ -191,6 +203,8 @@ export class Match {
       return;
     }
     this.timer--;
+    const dazed = this.fighters.find((f) => f.state === 'dazed');
+    if (dazed && this.fighters[1 - dazed.index].health > 0) return this.startFinish(dazed);
     const koA = a.health <= 0, koB = b.health <= 0;
     if (koA || koB) {
       this.phase = 'ko';
@@ -208,6 +222,65 @@ export class Match {
       this.roundResult = Math.abs(ra - rb) < 1e-6 ? 'draw' : ra > rb ? 0 : 1;
       this.events.push({ type: 'announce', text: 'TIME' });
     }
+  }
+
+  // --- FINISH HIM / FATALITY ------------------------------------------------------------------
+  startFinish(dazed) {
+    this.phase = 'finish';
+    this.phaseTick = 0;
+    this.finishWho = 1 - dazed.index;
+    const w = this.fighters[this.finishWho];
+    w.fatalityReady = true;
+    // the rest of the winning combo must not turn FINISH HIM into a plain KO
+    if (w.state === 'attack') { w.move = null; w.recoverToNeutral(); }
+    dazed.burn = 0;
+    this.projectiles = [];
+    this.events.push({ type: 'finishHim', who: this.finishWho });
+    this.events.push({ type: 'announce', text: `FINISH ${dazed.def.look.female ? 'HER' : 'HIM'}!`, style: 'finish' });
+  }
+
+  /** The winner may walk up and perform the fatality; otherwise the dazed loser collapses. */
+  updateFinish() {
+    const w = this.fighters[this.finishWho], v = this.fighters[1 - this.finishWho];
+    if (this.events.some((e) => e.type === 'fatalityRequest' && e.who === this.finishWho)) {
+      const gap = Math.abs(v.body.x - w.body.x) - w.body.pushW - v.body.pushW;
+      if (gap <= TUNING.fatalityRange && w.body.onGround && v.state === 'dazed') return this.startFatality();
+    }
+    if (v.state !== 'dazed' || this.phaseTick > TUNING.finishWindow) {
+      w.fatalityReady = false;
+      if (v.state === 'dazed') v.setState('ko', { landed: true }, 'knockdown', { blend: 12 });
+      this.phase = 'ko';
+      this.phaseTick = 0;
+      this.roundResult = this.finishWho;
+      this.events.push({ type: 'ko', winner: this.finishWho, double: false });
+      this.events.push({ type: 'announce', text: 'K.O.' });
+    }
+  }
+
+  startFatality() {
+    const w = this.fighters[this.finishWho];
+    w.fatalityReady = false;
+    this.fatality = new FatalityDirector(this, this.finishWho);
+    this.phase = 'fatality';
+    this.phaseTick = 0;
+    this.projectiles = [];
+    this.events.push({ type: 'fatalityStart', who: this.finishWho, name: this.fatality.name });
+  }
+
+  updateFatality() {
+    const done = this.fatality.tick();
+    for (const e of this.fatality.events) this.events.push(e);
+    if (!done) return;
+    const res = this.finishWho;
+    this.wins[res]++;
+    this.roundResult = res;
+    this.posed = true;
+    this.winner = res;
+    this.events.push({ type: 'announce', text: 'FATALITY', style: 'fatality', sub: this.fatality.name });
+    this.events.push({ type: 'roundEnd', result: res, wins: this.wins.slice() });
+    this.events.push({ type: 'matchEnd', winner: res, fatality: true });
+    this.phase = 'result';
+    this.phaseTick = -60; // a longer beat on the final tableau before the results screen
   }
 
   /** Waits for the action to settle after KO / time-out, then plays victory poses. */

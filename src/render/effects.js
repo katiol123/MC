@@ -98,6 +98,43 @@ export class Effects {
           this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, life: 10, max: 10, color: e.kind === 'coin' ? '#ffd23f' : e.kind === 'flame' ? '#ff9a30' : '#3fe6d0', w: 2 });
         }
         break;
+      case 'fx': {
+        // generic one-shot effects requested by fatality scenes
+        const n = e.n ?? 10;
+        if (e.kind === 'dust') {
+          for (let i = 0; i < n; i++) {
+            const sgn = this.rnd() < 0.5 ? -1 : 1;
+            this.parts.push({ kind: 'dust', x: e.x + sgn * this.rnd() * (e.spread ?? 30), y: (e.y ?? 4) + this.rnd() * 20, vx: sgn * (1 + this.rnd() * 4), vy: this.rnd() * 2.5, r: 8 + this.rnd() * 14, life: 40, max: 40 });
+          }
+        } else if (e.kind === 'sparks' || e.kind === 'shards') {
+          for (let i = 0; i < n; i++) {
+            const a = this.rnd() * Math.PI * 2, sp = 3 + this.rnd() * (e.speed ?? 7);
+            this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + (e.kind === 'shards' ? 3 : 0), life: 18 + this.rnd() * 10, max: 28, color: e.color || '#ffffff', w: e.kind === 'shards' ? 4 : 2.5 });
+          }
+        } else if (e.kind === 'embers') {
+          for (let i = 0; i < n; i++) this.ember(e.x + (this.rnd() - 0.5) * (e.spread ?? 40), e.y + this.rnd() * (e.h ?? 20), (this.rnd() - 0.5));
+        } else if (e.kind === 'smoke') {
+          for (let i = 0; i < n; i++) this.parts.push({ kind: 'smoke', x: e.x + (this.rnd() - 0.5) * (e.spread ?? 30), y: e.y + this.rnd() * 10, vx: (this.rnd() - 0.5) * 0.8, vy: 1 + this.rnd() * 1.5, r: 8 + this.rnd() * 8, life: 50, max: 50 });
+        } else if (e.kind === 'ring') {
+          this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: e.r ?? 10, vr: e.vr ?? 9, life: e.life ?? 18, max: e.life ?? 18, color: e.color || '#ffffff' });
+        } else if (e.kind === 'burst') {
+          this.parts.push({ kind: 'burst', x: e.x, y: e.y, r: e.r ?? 40, life: 8, max: 8, color: '#ffffff', dir: 1 });
+        } else if (e.kind === 'flash') {
+          this.flash = Math.max(this.flash, e.amount ?? 0.4);
+        } else if (e.kind === 'shake') {
+          this.shake = Math.max(this.shake, e.amount ?? 8);
+        } else if (e.kind === 'label') {
+          this.labels.push({ text: e.text, x: e.x, y: e.y, life: e.life ?? 60, color: e.color || '#ffffff' });
+        } else if (e.kind === 'prop') {
+          this.parts.push(spawnProp(e.prop, e.x, e.y, e.dir ?? 1, { vx: e.vx, vy: e.vy, spin: e.spin }, e.look || {}));
+        } else if (e.kind === 'drops') {
+          for (let i = 0; i < n; i++) {
+            const a = Math.PI / 2 + (this.rnd() - 0.5) * (e.cone ?? 1.4), sp = 4 + this.rnd() * (e.speed ?? 8);
+            this.parts.push({ kind: 'sweat', x: e.x + (this.rnd() - 0.5) * 20, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 40, max: 40, color: e.color });
+          }
+        }
+        break;
+      }
       case 'critical': {
         // battered: the fighter's signature item flies off with a pop
         const f = fighters?.[e.who];
@@ -289,7 +326,7 @@ export class Effects {
       } else if (p.kind === 'prop') {
         drawProp(ctx, p, s, cam.zoom);
       } else if (p.kind === 'sweat') {
-        ctx.fillStyle = rgba('#bfefff', 0.85 * Math.min(1, k * 2));
+        ctx.fillStyle = rgba(p.color || '#bfefff', 0.85 * Math.min(1, k * 2));
         ctx.beginPath();
         ctx.ellipse(s.x, s.y, 2.6 * cam.zoom, 4 * cam.zoom, 0, 0, Math.PI * 2);
         ctx.fill();

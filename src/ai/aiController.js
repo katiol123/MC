@@ -17,7 +17,11 @@ const M = {
   s4: [{ d: 'd', n: 2 }, { d: 'db', n: 2 }, { d: 'b', b: ['hp'], n: 2 }],
   su: [{ d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['hp'], n: 2 }],
   throw: [{ d: '', b: ['lp', 'lk'], n: 2 }, { d: '', n: 2 }],
+  fatality: [{ d: '', n: 6 }, { d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', n: 2 }, { d: 'd', n: 2 }, { d: 'df', n: 2 }, { d: 'f', b: ['hk'], n: 2 }, { d: '', n: 10 }],
 };
+
+/** Share of won matches the CPU finishes with a fatality (1 = always; lower it after play-testing). */
+export const AI_FATALITY_CHANCE = 1;
 
 /** How each fighter likes to use its signature move: [min distance, max distance]. */
 const SIGNATURE_RANGE = {
@@ -77,6 +81,7 @@ export class AIController {
   input(match) {
     const me = match.fighters[this.index];
     const seen = this.perceive(match);
+    if (match.phase === 'finish') return this.finishInput(match, me);
     if (match.phase !== 'fight') return emptyRaw();
     // Throw escape: mash LP+LK right after being grabbed (with a reaction chance).
     if (me.state === 'thrown') {
@@ -104,6 +109,25 @@ export class AIController {
     if (this.step < this.macro.length) return this.input(match);
     if (this.hold && this.hold.n-- > 0) return this.toRaw(this.hold.d, null, me.facing);
     return emptyRaw();
+  }
+
+  /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
+  finishInput(match, me) {
+    if (match.finishWho !== this.index) return emptyRaw();
+    if (this.fatalityChoice === undefined) this.fatalityChoice = this.rng.chance(AI_FATALITY_CHANCE);
+    if (!this.fatalityChoice) return emptyRaw();
+    if (this.step < this.macro.length) {
+      const s = this.macro[this.step];
+      const raw = this.toRaw(s.d || '', s.b, me.facing);
+      if (--this.stepLeft <= 0) { this.step++; this.stepLeft = this.macro[this.step]?.n || 0; }
+      return raw;
+    }
+    const op = match.fighters[1 - this.index];
+    const gap = Math.abs(op.body.x - me.body.x) - me.body.pushW - op.body.pushW;
+    if (gap > 70) return this.toRaw('f', null, me.facing);
+    if (!me.actionable) return emptyRaw();
+    this.queue(M.fatality);
+    return this.input(match);
   }
 
   decideCombo(me) {

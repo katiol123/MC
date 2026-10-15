@@ -52,6 +52,7 @@ for (let rep = 0; rep < perPair; rep++) {
           if (e.type === 'announce') inc(`announce: ${e.text.replace(/\d+/, 'N')}`);
           if (e.type === 'ko' && e.double) inc('double KO');
           if (e.type === 'superStart') pinc(who, 'superStart');
+          if (e.type === 'fatalityStart') pinc(who, 'fatality');
         }
         fs.forEach((f, i) => {
           if (f.state !== prevState[i]) { inc(`state:${f.state}`); pinc(f.def.id, `state:${f.state}`); }
@@ -85,6 +86,7 @@ const want = [
   ['Throws', ['event:grab', 'state:throwing', 'state:thrown', 'hit: throw damage', 'event:tech', 'reason: throw whiff']],
   ['Specials', ['projectile spawned: coin', 'projectile spawned: wave', 'projectile spawned: flame', 'hit: projectile coin', 'hit: projectile wave', 'hit: projectile flame', 'event:projectileEnd', 'event:teleport', 'reason: invulnerable', 'event:armor', 'hit: pull (Old Hawk)', 'block: guard break (Tao)']],
   ['Supers', ['event:superStart', 'super freeze (cinematic)', 'hit: super hit', 'hit: frying pan (Bruno)', 'hit: fire hit (Cinder)', 'burning (ticks)', 'event:burn', 'hit: claws (Grizz)', 'hit: heal (Old Hawk)', 'focus (ticks)']],
+  ['Finishers', ['event:dazed', 'event:finishHim', 'event:fatalityStart']],
   ['Misc', ['event:critical', 'event:stance', 'stance: switched (ticks)', 'announce: TIME', 'announce: K.O.', 'event:roundEnd', 'event:matchEnd']],
 ];
 // safety nets that well-played CPU fights rarely reach; each has its own unit test
@@ -101,7 +103,7 @@ for (const [group, keys] of want) {
   }
 }
 // per fighter: every move of the moveset and its super must be used
-const MOVES = ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk', 'jp', 'jk', 's1', 's2', 's3', 's4', 'su', 'throw'];
+const MOVES = ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk', 'jp', 'jk', 's1', 's2', 's3', 's4', 'su', 'throw', 'fatality'];
 console.log('\nPer fighter (attacks started):');
 console.log('  ' + 'fighter'.padEnd(10) + MOVES.map((m) => m.padStart(6)).join(''));
 for (const r of ROSTER) {

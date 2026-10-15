@@ -50,6 +50,8 @@ export const TUNING = {
   criticalHealth: 0.3, // below this share of health a fighter looks battered (props fly off, heavy breathing)
   focusDamage: 1.3, // damage multiplier while in Focus (Tao's super)
   guardBreakStagger: 36, // ticks of stagger after a guard-breaking blocked strike
+  finishWindow: 300, // FINISH HIM: ticks the winner has to perform the fatality
+  fatalityRange: 150, // max gap to the dazed opponent for the fatality input
   burnInterval: 30,
   armorDamage: 0.5, // share of a strike's damage taken through armour
   burnDamage: 5,

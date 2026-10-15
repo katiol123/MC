@@ -149,6 +149,12 @@ export class FightScene {
       ['Rematch', () => this.app.startFight(this.p1, this.p2, this.mode)],
       ['Character select', () => this.app.goSelect(this.mode)],
       ['Main menu', () => this.app.goTitle()],
-    ], { portrait: winner ? this.app.portraitURL(winner.def.id) : null, subtitle: winner ? `"${winner.def.title}"  ·  ${m.wins[0]} - ${m.wins[1]}` : `${m.wins[0]} - ${m.wins[1]}`, result: true });
+    ], {
+      portrait: winner ? this.app.portraitURL(winner.def.id) : null,
+      subtitle: winner
+        ? `"${winner.def.title}"  ·  ${m.wins[0]} - ${m.wins[1]}${m.fatality ? `  ·  FATALITY: ${m.fatality.name}` : ''}`
+        : `${m.wins[0]} - ${m.wins[1]}`,
+      result: true,
+    });
   }
 }

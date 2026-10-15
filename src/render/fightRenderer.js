@@ -42,7 +42,7 @@ export class FightRenderer {
         // the attacker is drawn on top
         this.drawOrder = [e.target, e.who];
       }
-      if (e.type === 'announce') this.hud.announce = { text: e.text, t: 0 };
+      if (e.type === 'announce') this.hud.announce = { text: e.text, t: 0, style: e.style, sub: e.sub };
       if (e.type === 'roundIntro') this.hud.trail = fs.map((f) => f.maxHealth);
     }
     fs.forEach((f, i) => {
@@ -60,9 +60,17 @@ export class FightRenderer {
 
   render(ctx, alpha, { debug = null, now = 0 } = {}) {
     const fs = this.match.fighters;
-    this.cam.update(fs, alpha, this.effects.shake);
+    const fat = this.match.fatality;
+    this.cam.update(fs, alpha, this.effects.shake, fat ? { x: (fat.ax + fat.vx) / 2, zoom: fat.camZoom || 1.34 } : null);
     ctx.save();
     this.arena.drawBack(ctx, this.cam);
+    if (fat) {
+      // the world dims around the finishing scene
+      const k = Math.min(1, fat.t / 20) * (this.match.phase === 'fatality' ? 1 : 0.8);
+      ctx.fillStyle = `rgba(16,0,8,${0.5 * k})`;
+      ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+      fat.script.draw?.(ctx, fat, this.cam, 'back', alpha, now);
+    }
     if (this.match.freeze) {
       // super flash: darken the stage behind the fighters
       const k = Math.min(1, (this.match.freeze.total - this.match.freeze.ticks) / 6);
@@ -70,7 +78,8 @@ export class FightRenderer {
       ctx.fillRect(0, 0, VIEW.width, VIEW.height);
     }
     for (const f of fs) this.drawShadow(ctx, f, alpha);
-    for (const i of this.drawOrder) this.drawFighter(ctx, fs[i], i, alpha, now);
+    for (const i of fat ? fat.order : this.drawOrder) this.drawFighter(ctx, fs[i], i, alpha, now);
+    if (fat) fat.script.draw?.(ctx, fat, this.cam, 'front', alpha, now);
     this.trails.draw(ctx, this.cam, fs.map((f) => f.def.look.rim));
     this.drawProjectiles(ctx, now);
     this.effects.draw(ctx, this.cam);
@@ -97,6 +106,7 @@ export class FightRenderer {
   }
 
   drawShadow(ctx, f, alpha) {
+    if (f.fx?.hidden || f.fx?.noShadow) return;
     const x = lerp(f.prev.x, f.body.x, alpha), y = lerp(f.prev.y, f.body.y, alpha);
     const s = this.cam.toScreen(x, 0);
     const k = Math.max(0.35, 1 - y / 300);
@@ -122,18 +132,28 @@ export class FightRenderer {
     }
     const z = this.cam.zoom;
     const sq = sec.squash;
+    const fx = f.fx || {};
+    if (fx.hidden) return;
     if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s);
     ctx.save();
+    if (fx.alpha !== undefined) ctx.globalAlpha = Math.max(0, Math.min(1, fx.alpha));
+    if (fx.clipFloor) {
+      // sinking through the floor: only what is above the boards is drawn
+      ctx.beginPath();
+      ctx.rect(0, 0, VIEW.width, this.cam.toScreen(0, 0).y);
+      ctx.clip();
+    }
     ctx.translate(s.x + jitter, s.y);
+    if (fx.sx !== undefined || fx.sy !== undefined) ctx.scale(fx.sx ?? 1, fx.sy ?? 1);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
     const expression = ['hitstun', 'juggle', 'stagger', 'knockdown', 'ko', 'dizzy', 'defeat'].includes(f.state) ? 'hurt' : null;
     const blink = (Math.floor((now + i * 1700) / 100) % 38) === 0;
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
-    const prop = mv?.def.prop && f.state === 'attack'
+    const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
-      : null;
+      : null);
     // flaming fists only on fire moves (specials / super), never on normal attacks
-    const fire = !!(mv?.def.fire && f.state === 'attack');
+    const fire = !!(mv?.def.fire && f.state === 'attack') || !!fx.fire;
     const claws = !!(mv?.def.claws && f.state === 'attack');
     const flurry = !!(mv?.def.flurry && f.state === 'attack');
     this.painters[i].draw(ctx, skel, {
@@ -144,7 +164,9 @@ export class FightRenderer {
       critical: f.critical,
       now,
       layers: f.anim.layers,
-      tint: f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
+      tint: fx.tint ? fx.tint : f.flash > 0 ? 0.6 * (f.flash / 6) : 0,
+      tintColor: fx.tint ? fx.tintColor : null,
+      lookOverride: fx.look || null,
       chains: sec.localChains(alpha, x, y, f.facing),
       expression,
       blink,
@@ -152,7 +174,7 @@ export class FightRenderer {
     if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
     if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
-    if (f.state === 'dizzy') this.drawDizzyStars(ctx, f, skel, x, y, now);
+    if (f.state === 'dizzy' || f.state === 'dazed' || fx.stars) this.drawDizzyStars(ctx, f, skel, x, y, now);
   }
 
   /** Focus (Tao's super buff): a pulsing golden aura behind the fighter (screen space). */

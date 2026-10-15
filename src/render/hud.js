@@ -193,12 +193,14 @@ export function drawHud(ctx, match, hud, portraits) {
   }
   // announcement
   const an = hud.announce;
-  if (an && an.t < 90) {
+  const life = an?.style === 'fatality' ? 400 : an?.style === 'finish' ? 120 : 90;
+  if (an && an.t < life) {
     const k = an.t < 8 ? an.t / 8 : 1;
-    const a = an.t > 70 ? 1 - (an.t - 70) / 20 : 1;
+    const a = an.t > life - 20 ? 1 - (an.t - (life - 20)) / 20 : 1;
+    const red = an.style === 'fatality' || an.style === 'finish';
     const sc = 1.6 - 0.6 * k;
     ctx.save();
-    ctx.translate(W / 2, VIEW.height * 0.42);
+    ctx.translate(W / 2, VIEW.height * (an.style === 'fatality' ? 0.24 : 0.42));
     ctx.scale(sc, sc);
     ctx.rotate(-0.04);
     ctx.font = `900 92px ${FONT}`;
@@ -206,11 +208,18 @@ export function drawHud(ctx, match, hud, portraits) {
     ctx.strokeStyle = rgba('#120816', a);
     ctx.strokeText(an.text, 0, 0);
     const g = ctx.createLinearGradient(0, -70, 0, 10);
-    g.addColorStop(0, rgba('#fff6c8', a));
-    g.addColorStop(0.5, rgba('#ffd23f', a));
-    g.addColorStop(1, rgba('#ff3fd0', a));
+    g.addColorStop(0, rgba(red ? '#ffd0c0' : '#fff6c8', a));
+    g.addColorStop(0.5, rgba(red ? '#ff3a2a' : '#ffd23f', a));
+    g.addColorStop(1, rgba(red ? '#7a0010' : '#ff3fd0', a));
     ctx.fillStyle = g;
     ctx.fillText(an.text, 0, 0);
+    if (an.sub) {
+      ctx.font = `900 34px ${FONT}`;
+      ctx.lineWidth = 8;
+      ctx.strokeText(an.sub, 0, 50);
+      ctx.fillStyle = rgba('#ffd23f', a);
+      ctx.fillText(an.sub, 0, 50);
+    }
     ctx.restore();
   }
   ctx.restore();

@@ -53,6 +53,10 @@ export class Fighter {
     this.burn = 0; // ticks left on fire
     this.pulled = null; // being reeled in by a pull
     this.focus = 0; // ticks of Focus left (+damage)
+    this.finishable = false; // losing this round loses the match: a lethal hit leaves them dazed (FINISH HIM)
+    this.fatalityReady = false; // winner during the finish window: 236236 + K performs the fatality
+    this.scriptPose = null; // fatality cutscene: pose set by the director
+    this.fx = null; // fatality cutscene: render-only effects (tint, scale, alpha...)
     this.critical = false; // battered look + heavy breathing (health below TUNING.criticalHealth)
     this.move = null;
     this.combo = { hits: 0, damage: 0, juggle: 0, moves: {} }; // combo being taken
@@ -138,6 +142,11 @@ export class Fighter {
 
   update(opp) {
     if (this.flash > 0) this.flash--;
+    if (this.state === 'scripted') {
+      // fatality cutscene: the director drives position and pose
+      this.stateFrame++;
+      return false;
+    }
     if (this.superLock > 0) this.superLock--;
     if (this.state === 'thrown') {
       // position is driven by the thrower (see resolveThrows); no own physics
@@ -155,7 +164,7 @@ export class Fighter {
     this.sinceHit++;
     if (this.sinceHit > TUNING.stunRecoverDelay && this.state !== 'dizzy') this.stun = Math.max(0, this.stun - TUNING.stunDecayPerTick);
     this.think(opp);
-    const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat'].includes(this.state);
+    const sliding = ['hitstun', 'blockstun', 'stagger', 'knockdown', 'ko', 'dizzy', 'getup', 'victory', 'defeat', 'dazed'].includes(this.state);
     if (this.pulled) {
       // hooked (Old Hawk's Talon Pull): reeled in to just in front of the puller
       const p = this.pulled, target = opp.body.x + opp.facing * (opp.body.pushW + this.body.pushW + p.gap);
@@ -177,6 +186,7 @@ export class Fighter {
       case 'intro':
       case 'victory':
       case 'defeat':
+      case 'dazed':
         b.steer(0, 1);
         return;
       case 'idle':
@@ -341,6 +351,17 @@ export class Fighter {
     const moves = this.def.moves;
     const cur = mode === 'cancel' ? this.move.def : null;
     const air = mode === 'air' || (mode === 'cancel' && !this.body.onGround);
+    if (this.fatalityReady && !air && !cur) {
+      // FATALITY: the super motion with a kick (↓↘→↓↘→ + K), close to the dazed opponent
+      for (const btn of ['lk', 'hk']) {
+        const t = inp.pressedTick(btn);
+        if (t >= 0 && inp.motion('236236', t, TUNING.superMotionWindow)) {
+          inp.consume(btn);
+          this.emit({ type: 'fatalityRequest', who: this.index });
+          return true;
+        }
+      }
+    }
     if (!air && (!cur || cur.special)) {
       for (const id of SPECIAL_ORDER) {
         const m = moves[id];
@@ -562,6 +583,16 @@ export class Fighter {
 
     const b = this.body;
     const L = m.launch || { vx: 3, vy: 6 };
+    if (this.health <= 0 && this.finishable && this.state !== 'dazed') {
+      // deciding round: the loser is left standing, dazed - FINISH HIM!
+      this.health = 0;
+      this.finishable = false;
+      b.vx = (dir * Math.min(m.push.hit, 3)) / b.mass;
+      this.dizzyPending = false;
+      this.setState('dazed', {}, 'dizzy', { blend: 10 });
+      this.emit({ type: 'dazed', who: this.index });
+      return;
+    }
     if (this.health <= 0) {
       b.onGround = false;
       b.vy = Math.max(L.vy, 9);
@@ -617,10 +648,11 @@ export class Fighter {
     if (advance && (this.state === 'walkF' || this.state === 'walkB' || this.state === 'run')) {
       this.walkDist += (this.body.x - this.body.prevX) * this.facing;
     }
-    if (advance) this.anim.update(this.animContext());
+    if (this.state === 'scripted' && this.scriptPose) this.anim.pose = this.scriptPose;
+    else if (advance) this.anim.update(this.animContext());
     let skel = computeSkeleton(this.anim.pose, this.props);
     const low = lowestPoint(skel) + this.body.y;
-    if (low < 0) {
+    if (low < 0 && this.state !== 'scripted') {
       // Never let any body part sink below the floor (lying poses, landings, deep crouches).
       this.anim.pose.y -= low;
       skel = computeSkeleton(this.anim.pose, this.props);

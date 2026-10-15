@@ -82,6 +82,7 @@ export class TitleScene {
           ['Whirl Kick', '↓ ↙ ← + kick', ''],
           ['Signature special (unique per fighter)', '↓ ↙ ← + punch', ''],
           ['SUPER (needs a full bar)', '↓ ↘ → ↓ ↘ → + punch', ''],
+          ['FATALITY (at FINISH HIM!, close)', '↓ ↘ → ↓ ↘ → + kick', ''],
           ['Throw / escape a throw (tech)', 'LP + LK together (F + V)', 'I + K'],
           ['Uppercut / Sweep', '↓ + HP  /  ↓ + HK', ''],
           ['Debug', 'F1 overlay · F2 slow-mo · F3 pause · F4 frame step', ''],

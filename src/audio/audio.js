@@ -106,6 +106,35 @@ export class AudioSystem {
     else if (kind === 'slam') { this.tone(0.5, { freq: 90, to: 30, gain: 0.6 }); this.noise(0.4, { freq: 600, gain: 0.5, type: 'lowpass' }); }
   }
 
+  /** Short procedural sound effects used by fatality scenes. */
+  sfx(kind) {
+    switch (kind) {
+      case 'clang': this.tone(0.8, { freq: 480, to: 470, type: 'triangle', gain: 0.3 }); this.tone(0.6, { freq: 1290, to: 1270, gain: 0.14 }); this.noise(0.1, { freq: 3000, gain: 0.3 }); break;
+      case 'thud': this.tone(0.35, { freq: 90, to: 35, gain: 0.7 }); this.noise(0.2, { freq: 400, gain: 0.4, type: 'lowpass' }); break;
+      case 'boom': this.tone(1.0, { freq: 60, to: 25, gain: 0.9 }); this.noise(0.8, { freq: 600, gain: 0.7, type: 'lowpass', sweep: 0.5 }); break;
+      case 'whoosh': this.noise(0.3, { freq: 1200, q: 1.2, gain: 0.25, sweep: 0.6, attack: 0.08 }); break;
+      case 'crash': this.noise(0.6, { freq: 2200, q: 0.6, gain: 0.55, sweep: 0.4 }); this.tone(0.4, { freq: 140, to: 50, gain: 0.5 }); break;
+      case 'splash': this.noise(0.9, { freq: 900, q: 0.5, gain: 0.5, sweep: 0.3, attack: 0.02 }); break;
+      case 'fire': this.noise(1.2, { freq: 500, gain: 0.6, type: 'lowpass', sweep: 0.4, attack: 0.1 }); break;
+      case 'boing': this.tone(0.5, { freq: 180, to: 520, type: 'triangle', gain: 0.25 }); break;
+      case 'pop': this.tone(0.12, { freq: 900, to: 300, type: 'square', gain: 0.12 }); break;
+      case 'ding': this.tone(1.2, { freq: 1760, to: 1750, type: 'sine', gain: 0.18 }); this.tone(1, { freq: 2640, to: 2630, type: 'sine', gain: 0.08 }); break;
+      case 'twang': this.tone(0.9, { freq: 330, to: 160, type: 'sawtooth', gain: 0.25 }); this.tone(0.7, { freq: 495, to: 240, type: 'sawtooth', gain: 0.12 }); break;
+      case 'heartbeat': this.tone(0.18, { freq: 60, to: 40, gain: 0.8 }); break;
+      case 'squeeze': this.tone(0.4, { freq: 300, to: 700, type: 'square', gain: 0.08 }); break;
+      case 'steam': this.noise(1.4, { freq: 5000, q: 0.8, gain: 0.18, attack: 0.2 }); break;
+      case 'snap': this.noise(0.05, { freq: 3500, q: 4, gain: 0.5 }); break;
+      case 'crumble': this.noise(1.2, { freq: 700, q: 0.4, gain: 0.35, sweep: 0.2 }); break;
+      case 'zap': this.tone(0.25, { freq: 1600, to: 300, type: 'sawtooth', gain: 0.12 }); break;
+      case 'cash': this.tone(0.15, { freq: 1800, to: 1800, type: 'square', gain: 0.1 }); this.tone(0.4, { freq: 2400, to: 2400, type: 'triangle', gain: 0.1 }); break;
+      case 'chord': for (const f of [110, 138.6, 164.8]) this.tone(1.4, { freq: f, to: f * 0.98, type: 'sawtooth', gain: 0.16 }); this.noise(0.6, { freq: 1500, gain: 0.2 }); break;
+      case 'snore': this.tone(0.9, { freq: 90, to: 140, type: 'sawtooth', gain: 0.1 }); break;
+      case 'kiss': this.tone(0.1, { freq: 1400, to: 2600, type: 'sine', gain: 0.15 }); break;
+      case 'laugh': for (let i = 0; i < 4; i++) setTimeout(() => this.tone(0.12, { freq: 520 - i * 30, to: 420 - i * 30, type: 'triangle', gain: 0.12 }), i * 140); break;
+      default: this.tone(0.2, { freq: 300, to: 200, gain: 0.2 });
+    }
+  }
+
   onEvent(e) {
     if (!this.ctx || !this.enabled) return;
     switch (e.type) {
@@ -162,6 +191,18 @@ export class AudioSystem {
         break;
       case 'grab':
         this.noise(0.12, { freq: 700, q: 1, gain: 0.35 });
+        break;
+      case 'finishHim':
+        this.tone(1.2, { freq: 70, to: 40, type: 'sawtooth', gain: 0.35 });
+        this.tone(1.2, { freq: 105, to: 60, type: 'sawtooth', gain: 0.2 });
+        break;
+      case 'fatalityStart':
+        this.tone(2.2, { freq: 55, to: 45, gain: 0.6 }); // gong
+        this.tone(1.8, { freq: 220, to: 210, type: 'triangle', gain: 0.12 });
+        this.noise(1.2, { freq: 300, gain: 0.25, type: 'lowpass' });
+        break;
+      case 'sfx':
+        this.sfx(e.kind);
         break;
       case 'critical':
         this.tone(0.16, { freq: 900, to: 300, type: 'square', gain: 0.12 }); // comic "pop"
