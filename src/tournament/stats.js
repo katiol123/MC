@@ -28,7 +28,7 @@ const QUICK_KO_TICKS = 20 * 60;
 
 const side = () => ({
   hits: 0, damageDealt: 0, damageTaken: 0,
-  combos: 0, longestCombo: 0, comboPoints: 0,
+  combos: 0, longestCombo: 0, biggestCombo: 0, comboPoints: 0,
   moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
   fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, injuredWith: null,
   koTimes: [], // seconds of fighting before each K.O. this fighter scored
@@ -78,6 +78,7 @@ export class MatchStats {
         if (e.hits >= 2) {
           a.combos++;
           a.longestCombo = Math.max(a.longestCombo, e.hits);
+          a.biggestCombo = Math.max(a.biggestCombo, e.damage);
           a.comboPoints += (e.hits - 1) * 2 + (e.hits >= 5 ? 5 : 0);
         }
         break;
@@ -135,7 +136,7 @@ export class MatchStats {
       const total = items.reduce((a, b) => a + b.points, 0);
       return {
         hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
-        combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
+        combos: st.combos, longestCombo: st.longestCombo, biggestCombo: st.biggestCombo, koTimes: st.koTimes,
         perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i], injuredWith: st.injuredWith,
         spectacle: { total, items },
       };

@@ -12739,7 +12739,7 @@ function standings(t) {
 }
 
 /**
- * Awards over a set of matches: fastest K.O., most combos, longest combo, least damage taken (per
+ * Awards over a set of matches: fastest K.O., most combos, biggest combo (damage), least damage taken (per
  * match) and most spectacular (spectacle points earned). Each: { key, title, id, value, note }.
  * awards(t, ri) = one round (tour); tournamentAwards(t) = the whole tournament.
  */
@@ -12750,11 +12750,11 @@ function awardsOver(matches) {
     if (!r) continue;
     [m.a, m.b].forEach((id, i) => {
       const s = r.sides[i];
-      const p = (per[id] ||= { played: 0, combos: 0, longest: 0, longestVs: null, taken: 0, sp: 0, fastest: Infinity, fastestVs: null });
+      const p = (per[id] ||= { played: 0, combos: 0, biggest: 0, biggestVs: null, taken: 0, sp: 0, fastest: Infinity, fastestVs: null });
       const vs = [m.a, m.b][1 - i];
       p.played++;
       p.combos += s.combos;
-      if (s.longestCombo > p.longest) { p.longest = s.longestCombo; p.longestVs = vs; }
+      if ((s.biggestCombo || 0) > p.biggest) { p.biggest = s.biggestCombo; p.biggestVs = vs; }
       p.taken += s.damageTaken;
       p.sp += s.spectacle.total;
       for (const k of s.koTimes) if (k < p.fastest) { p.fastest = k; p.fastestVs = vs; }
@@ -12772,13 +12772,14 @@ function awardsOver(matches) {
   const one = matches.length <= ids.length / 2; // a single round: every fighter played once
   const fastest = best((x) => per[x].fastest, true, (x) => per[x].fastest < Infinity);
   const combos = best((x) => per[x].combos, false, (x) => per[x].combos > 0);
-  const longest = best((x) => per[x].longest, false, (x) => per[x].longest > 0);
+  // biggest combo by damage: long flurries of light hits (Tao) no longer win it every time
+  const biggest = best((x) => per[x].biggest, false, (x) => per[x].biggest > 0);
   const iron = best((x) => per[x].taken / per[x].played, true);
   const star = best((x) => per[x].sp);
   return [
     { key: 'fastest', title: 'Fastest K.O.', id: fastest, value: fastest ? `${per[fastest].fastest.toFixed(1)} s` : '—', note: fastest ? `vs ${per[fastest].fastestVs}` : '' },
     { key: 'combos', title: 'Most combos', id: combos, value: combos ? String(per[combos].combos) : '—' },
-    { key: 'longest', title: 'Longest combo', id: longest, value: longest ? `${per[longest].longest} hits` : '—', note: longest ? `vs ${per[longest].longestVs}` : '' },
+    { key: 'biggest', title: 'Biggest combo', id: biggest, value: biggest ? `${per[biggest].biggest} dmg` : '—', note: biggest ? `vs ${per[biggest].biggestVs}` : '' },
     { key: 'iron', title: 'Least damage taken', id: iron, value: iron ? (one ? String(per[iron].taken) : `${Math.round(per[iron].taken / per[iron].played)} / match`) : '—' },
     { key: 'star', title: 'Most spectacular', id: star, value: star ? `${per[star].sp} SP` : '—' },
   ];
@@ -12849,7 +12850,7 @@ const QUICK_KO_TICKS = 20 * 60;
 
 const side = () => ({
   hits: 0, damageDealt: 0, damageTaken: 0,
-  combos: 0, longestCombo: 0, comboPoints: 0,
+  combos: 0, longestCombo: 0, biggestCombo: 0, comboPoints: 0,
   moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
   fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, injuredWith: null,
   koTimes: [], // seconds of fighting before each K.O. this fighter scored
@@ -12899,6 +12900,7 @@ class MatchStats {
         if (e.hits >= 2) {
           a.combos++;
           a.longestCombo = Math.max(a.longestCombo, e.hits);
+          a.biggestCombo = Math.max(a.biggestCombo, e.damage);
           a.comboPoints += (e.hits - 1) * 2 + (e.hits >= 5 ? 5 : 0);
         }
         break;
@@ -12956,7 +12958,7 @@ class MatchStats {
       const total = items.reduce((a, b) => a + b.points, 0);
       return {
         hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
-        combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
+        combos: st.combos, longestCombo: st.longestCombo, biggestCombo: st.biggestCombo, koTimes: st.koTimes,
         perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i], injuredWith: st.injuredWith,
         spectacle: { total, items },
       };

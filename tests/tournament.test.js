@@ -40,7 +40,7 @@ test('results feed the table, spectacle points become fame, completed rounds han
   assert.ok(table[0].pts >= table[3].pts);
   const list = t.roundAwards[0];
   assert.equal(list.length, 5);
-  assert.deepEqual(list.map((a) => a.key), ['fastest', 'combos', 'longest', 'iron', 'star']);
+  assert.deepEqual(list.map((a) => a.key), ['fastest', 'combos', 'biggest', 'iron', 'star']);
   // fame = spectacle (with underdog / fired-up bonuses) + award bonuses
   for (const id of t.ids) {
     const earned = allMatches(t).filter((x) => x.m.result).reduce((s, { m }) => s + ([m.a, m.b].includes(id) ? m.result.sides[[m.a, m.b].indexOf(id)].fame : 0), 0);
