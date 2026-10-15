@@ -1182,7 +1182,7 @@ export const FATALITIES = {
           d.fxEvent('drops', { x: h.x + d.dir * 10, y: h.y, n: t > 234 ? 4 : 2, color: '#9ad8ff', cone: 2.4, speed: 6 });
         }
       }
-      if (t === 236) { d.sfx('laugh'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
+      if (t === 236) { d.sfx('sob'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
       d.camZoom = d.num(t, [[0, 1.34], [60, 1.3], [180, 1.45], [230, 1.3]]);
     },
     draw(ctx, d, cam, layer) {

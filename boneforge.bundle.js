@@ -423,6 +423,22 @@ __define("src/audio/audio.js", function (__exports, __require) {
   Object.defineProperty(__exports, "AudioSystem", { enumerable: true, get: () => AudioSystem });
 // Audio: procedurally synthesised sound effects (WebAudio) + the fight music track.
 // Reacts to simulation events; never influences the simulation.
+/**
+ * Recorded sound effects (assets/sfx). They play through <audio> elements, which also work when the
+ * game is opened from file://; until a file has loaded (or if it fails) the synthesised sound plays.
+ * `gap` = seconds before the same sample may start again (scenes that spam a sound get one take).
+ */
+const SAMPLES = {
+  roar: { src: 'roar.mp3', gain: 0.6, gap: 0.8 },
+  sob: { src: 'sobs.mp3', gain: 0.75, gap: 1.2 },
+  laugh: { src: 'laugh.mp3', gain: 0.9, gap: 1.2 },
+  chord: { src: 'guitar-chord.mp3', gain: 0.9, gap: 0.35 },
+  cheer: { src: 'crowd-cheer.mp3', gain: 0.6, gap: 1.0 },
+  crowdLaugh: { src: 'crowd-laugh.mp3', gain: 0.95, gap: 1.0 },
+  chomp: { src: 'chomp.mp3', gain: 0.9, gap: 0.25 },
+  shing: { src: 'knife.mp3', gain: 0.9, gap: 0.3 },
+};
+
 class AudioSystem {
   constructor() {
     this.ctx = null;
@@ -447,6 +463,7 @@ class AudioSystem {
     this.master.connect(this.ctx.destination);
     const len = this.ctx.sampleRate;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    this.loadSamples();
     const d = this.noiseBuf.getChannelData(0);
     let s = 12345;
     for (let i = 0; i < len; i++) {
@@ -529,8 +546,35 @@ class AudioSystem {
     else if (kind === 'slam') { this.tone(0.5, { freq: 90, to: 30, gain: 0.6 }); this.noise(0.4, { freq: 600, gain: 0.5, type: 'lowpass' }); }
   }
 
-  /** Short procedural sound effects used by fatality scenes. */
+  loadSamples() {
+    if (this.samples || typeof Audio === 'undefined') return;
+    this.samples = {};
+    for (const [kind, s] of Object.entries(SAMPLES)) {
+      const a = new Audio(`assets/sfx/${s.src}`);
+      a.preload = 'auto';
+      const rec = { el: a, ready: false, last: -1e9, ...s };
+      a.addEventListener('canplaythrough', () => { rec.ready = true; }, { once: true });
+      a.addEventListener('error', () => { rec.ready = false; }, { once: true });
+      this.samples[kind] = rec;
+    }
+  }
+
+  /** Plays a recorded sample; false when there is none (ready) for this kind. */
+  playSample(kind) {
+    const s = this.samples?.[kind];
+    if (!s?.ready) return false;
+    const now = performance.now() / 1000;
+    if (now - s.last < s.gap) return true; // still ringing: one take is enough
+    s.last = now;
+    const a = s.el.cloneNode();
+    a.volume = Math.max(0, Math.min(1, s.gain * this.sfxVolume));
+    a.play().catch(() => {});
+    return true;
+  }
+
+  /** Short sound effects used by fatality scenes and showboats (recorded where available). */
   sfx(kind) {
+    if (this.playSample(kind)) return;
     switch (kind) {
       case 'clang': this.tone(0.8, { freq: 480, to: 470, type: 'triangle', gain: 0.3 }); this.tone(0.6, { freq: 1290, to: 1270, gain: 0.14 }); this.noise(0.1, { freq: 3000, gain: 0.3 }); break;
       case 'thud': this.tone(0.35, { freq: 90, to: 35, gain: 0.7 }); this.noise(0.2, { freq: 400, gain: 0.4, type: 'lowpass' }); break;
@@ -556,6 +600,9 @@ class AudioSystem {
       case 'shing': this.noise(0.22, { freq: 4000, q: 3, gain: 0.25, sweep: 1.8, attack: 0.03 }); this.tone(0.3, { freq: 2600, to: 3200, type: 'triangle', gain: 0.05 }); break;
       case 'roar': this.noise(1.1, { freq: 260, q: 0.9, gain: 0.8, sweep: 0.3, attack: 0.08 }); this.tone(1.0, { freq: 95, to: 60, type: 'sawtooth', gain: 0.35 }); break;
       case 'cheer': this.noise(1.8, { freq: 1100, q: 0.4, gain: 0.45, sweep: 0.8, attack: 0.25 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.2 }); break;
+      case 'sob': this.tone(0.4, { freq: 300, to: 700, type: 'square', gain: 0.08 }); break;
+      case 'crowdLaugh': this.sfx('laugh'); break;
+      case 'chomp': this.noise(0.05, { freq: 3500, q: 4, gain: 0.5 }); this.tone(0.12, { freq: 160, to: 60, gain: 0.4 }); break;
       case 'boo': this.noise(1.3, { freq: 380, q: 0.6, gain: 0.45, sweep: 0.7, attack: 0.2 }); this.tone(1.1, { freq: 140, to: 110, type: 'sawtooth', gain: 0.1 }); break;
       case 'laugh': for (let i = 0; i < 4; i++) setTimeout(() => this.tone(0.12, { freq: 520 - i * 30, to: 420 - i * 30, type: 'triangle', gain: 0.12 }), i * 140); break;
       default: this.tone(0.2, { freq: 300, to: 200, gain: 0.2 });
@@ -668,7 +715,7 @@ class AudioSystem {
         this.sfx('cheer');
         break;
       case 'tauntBroken':
-        this.sfx('boo');
+        if (!this.playSample('crowdLaugh')) this.sfx('boo');
         break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });
@@ -4697,7 +4744,7 @@ const TAUNTS = {
   smiles: {
     name: 'Belly Laugh',
     keys: [[0, S], ...alt(10, 74, 8, P(S, { fa: [24, 110, 0], ba: [20, 110, 0], lean: -14, chest: -10, neck: -20, head: -26, y: 116 }), P(S, { fa: [26, 100, 0], ba: [22, 100, 0], lean: 10, chest: 6, neck: 6, head: 2, y: 112 })), [90, S]],
-    cues: [{ at: 10, sfx: 'laugh' }, { at: 42, sfx: 'laugh' }, label(20, 'HA HA HA!', '#ffe08a')],
+    cues: [{ at: 10, sfx: 'laugh' }, label(20, 'HA HA HA!', '#ffe08a')],
     face: [[8, 80, 'shout']],
   },
   // windmill air guitar and a headbang
@@ -4731,7 +4778,7 @@ const TAUNTS = {
     keys: [[0, S], [10, P(S, { fa: [60, 80, 0], ba: [66, 70, 0], lean: -4, head: 10, y: 118 })],
       ...alt(16, 58, 6, P(S, { fa: [86, 40, 0], ba: [66, 70, 0], lean: -4, head: 12, y: 118 }), P(S, { fa: [52, 92, 0], ba: [68, 68, 0], lean: -2, head: 14, y: 118 })),
       [68, P(S, { fa: [150, 30, 0], ba: [10, 20, 0], head: -10, y: 120 })], [78, P(S, { fa: [62, 154, 0], ba: [10, 20, 0], head: -14, y: 120 })], [90, S]],
-    cues: [16, 28, 40, 52].map((at) => ({ at, sfx: 'shing' })).concat([{ at: 30, fx: { kind: 'sparks', dx: 40, y: 150, n: 6, color: '#ffe08a' } }, { at: 80, sfx: 'kiss' }, label(80, 'PERFETTO!', '#ffe08a')]),
+    cues: [16, 46].map((at) => ({ at, sfx: 'shing' })).concat([{ at: 30, fx: { kind: 'sparks', dx: 40, y: 150, n: 6, color: '#ffe08a' } }, { at: 80, sfx: 'kiss' }, label(80, 'PERFETTO!', '#ffe08a')]),
     prop: [[8, 70, { type: 'knife', hand: 'F' }]],
   },
   // salutes the sun: low crouch, then rises with both arms to the sky
@@ -4788,14 +4835,14 @@ const TAUNTS = {
     name: 'Crocodile Tears',
     keys: [[0, S], ...alt(8, 50, 6, P(S, { fa: [48, 124, 0], ba: [54, 118, 0], lean: 22, neck: 14, head: 18, y: 112 }), P(S, { fa: [50, 120, 0], ba: [56, 114, 0], lean: 27, neck: 16, head: 20, y: 109 })),
       [62, P(S, { fa: [130, 20, 0], ba: [-60, 20, 0], lean: -10, head: -14, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [80, P(S, { fa: [134, 16, 0], ba: [-64, 16, 0], lean: -12, head: -16, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [90, S]],
-    cues: [{ at: 10, sfx: 'squeeze' }, { at: 20, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 34, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 62, sfx: 'boing' }, label(64, 'TA-DA!', '#ffe08a')],
+    cues: [{ at: 10, sfx: 'sob' }, { at: 20, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 34, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 62, sfx: 'boing' }, label(64, 'TA-DA!', '#ffe08a')],
     face: [[8, 56, 'hurt']],
   },
   // arms become the jaws: three big snaps over his head
   snapper: {
     name: 'Jaw Snap',
     keys: [[0, S], ...alt(10, 70, 10, P(S, { fa: [150, 20, 0], ba: [60, 20, 0], lean: -6, y: 116 }), P(S, { fa: [108, 10, 0], ba: [96, 10, 0], lean: 8, y: 114 })), [82, CROSSED], [90, S]],
-    cues: [20, 40, 60].map((at) => ({ at, sfx: 'snap' })).concat([label(42, 'SNAP!', '#9be36b')]),
+    cues: [20, 40, 60].map((at) => ({ at, sfx: 'chomp' })).concat([label(42, 'SNAP!', '#9be36b')]),
     bite: [[18, 24], [38, 44], [58, 64]],
   },
   // a flourish on the guitar and a grito
@@ -6628,7 +6675,7 @@ const FATALITIES = {
           d.fxEvent('drops', { x: h.x + d.dir * 10, y: h.y, n: t > 234 ? 4 : 2, color: '#9ad8ff', cone: 2.4, speed: 6 });
         }
       }
-      if (t === 236) { d.sfx('laugh'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
+      if (t === 236) { d.sfx('sob'); d.fxEvent('label', { text: 'WAAAAH!', x: d.ax, y: 320, color: '#9ad8ff', life: 60 }); }
       d.camZoom = d.num(t, [[0, 1.34], [60, 1.3], [180, 1.45], [230, 1.3]]);
     },
     draw(ctx, d, cam, layer) {

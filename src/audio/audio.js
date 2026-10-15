@@ -1,5 +1,21 @@
 // Audio: procedurally synthesised sound effects (WebAudio) + the fight music track.
 // Reacts to simulation events; never influences the simulation.
+/**
+ * Recorded sound effects (assets/sfx). They play through <audio> elements, which also work when the
+ * game is opened from file://; until a file has loaded (or if it fails) the synthesised sound plays.
+ * `gap` = seconds before the same sample may start again (scenes that spam a sound get one take).
+ */
+const SAMPLES = {
+  roar: { src: 'roar.mp3', gain: 0.6, gap: 0.8 },
+  sob: { src: 'sobs.mp3', gain: 0.75, gap: 1.2 },
+  laugh: { src: 'laugh.mp3', gain: 0.9, gap: 1.2 },
+  chord: { src: 'guitar-chord.mp3', gain: 0.9, gap: 0.35 },
+  cheer: { src: 'crowd-cheer.mp3', gain: 0.6, gap: 1.0 },
+  crowdLaugh: { src: 'crowd-laugh.mp3', gain: 0.95, gap: 1.0 },
+  chomp: { src: 'chomp.mp3', gain: 0.9, gap: 0.25 },
+  shing: { src: 'knife.mp3', gain: 0.9, gap: 0.3 },
+};
+
 export class AudioSystem {
   constructor() {
     this.ctx = null;
@@ -24,6 +40,7 @@ export class AudioSystem {
     this.master.connect(this.ctx.destination);
     const len = this.ctx.sampleRate;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    this.loadSamples();
     const d = this.noiseBuf.getChannelData(0);
     let s = 12345;
     for (let i = 0; i < len; i++) {
@@ -106,8 +123,35 @@ export class AudioSystem {
     else if (kind === 'slam') { this.tone(0.5, { freq: 90, to: 30, gain: 0.6 }); this.noise(0.4, { freq: 600, gain: 0.5, type: 'lowpass' }); }
   }
 
-  /** Short procedural sound effects used by fatality scenes. */
+  loadSamples() {
+    if (this.samples || typeof Audio === 'undefined') return;
+    this.samples = {};
+    for (const [kind, s] of Object.entries(SAMPLES)) {
+      const a = new Audio(`assets/sfx/${s.src}`);
+      a.preload = 'auto';
+      const rec = { el: a, ready: false, last: -1e9, ...s };
+      a.addEventListener('canplaythrough', () => { rec.ready = true; }, { once: true });
+      a.addEventListener('error', () => { rec.ready = false; }, { once: true });
+      this.samples[kind] = rec;
+    }
+  }
+
+  /** Plays a recorded sample; false when there is none (ready) for this kind. */
+  playSample(kind) {
+    const s = this.samples?.[kind];
+    if (!s?.ready) return false;
+    const now = performance.now() / 1000;
+    if (now - s.last < s.gap) return true; // still ringing: one take is enough
+    s.last = now;
+    const a = s.el.cloneNode();
+    a.volume = Math.max(0, Math.min(1, s.gain * this.sfxVolume));
+    a.play().catch(() => {});
+    return true;
+  }
+
+  /** Short sound effects used by fatality scenes and showboats (recorded where available). */
   sfx(kind) {
+    if (this.playSample(kind)) return;
     switch (kind) {
       case 'clang': this.tone(0.8, { freq: 480, to: 470, type: 'triangle', gain: 0.3 }); this.tone(0.6, { freq: 1290, to: 1270, gain: 0.14 }); this.noise(0.1, { freq: 3000, gain: 0.3 }); break;
       case 'thud': this.tone(0.35, { freq: 90, to: 35, gain: 0.7 }); this.noise(0.2, { freq: 400, gain: 0.4, type: 'lowpass' }); break;
@@ -133,6 +177,9 @@ export class AudioSystem {
       case 'shing': this.noise(0.22, { freq: 4000, q: 3, gain: 0.25, sweep: 1.8, attack: 0.03 }); this.tone(0.3, { freq: 2600, to: 3200, type: 'triangle', gain: 0.05 }); break;
       case 'roar': this.noise(1.1, { freq: 260, q: 0.9, gain: 0.8, sweep: 0.3, attack: 0.08 }); this.tone(1.0, { freq: 95, to: 60, type: 'sawtooth', gain: 0.35 }); break;
       case 'cheer': this.noise(1.8, { freq: 1100, q: 0.4, gain: 0.45, sweep: 0.8, attack: 0.25 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.2 }); break;
+      case 'sob': this.tone(0.4, { freq: 300, to: 700, type: 'square', gain: 0.08 }); break;
+      case 'crowdLaugh': this.sfx('laugh'); break;
+      case 'chomp': this.noise(0.05, { freq: 3500, q: 4, gain: 0.5 }); this.tone(0.12, { freq: 160, to: 60, gain: 0.4 }); break;
       case 'boo': this.noise(1.3, { freq: 380, q: 0.6, gain: 0.45, sweep: 0.7, attack: 0.2 }); this.tone(1.1, { freq: 140, to: 110, type: 'sawtooth', gain: 0.1 }); break;
       case 'laugh': for (let i = 0; i < 4; i++) setTimeout(() => this.tone(0.12, { freq: 520 - i * 30, to: 420 - i * 30, type: 'triangle', gain: 0.12 }), i * 140); break;
       default: this.tone(0.2, { freq: 300, to: 200, gain: 0.2 });
@@ -245,7 +292,7 @@ export class AudioSystem {
         this.sfx('cheer');
         break;
       case 'tauntBroken':
-        this.sfx('boo');
+        if (!this.playSample('crowdLaugh')) this.sfx('boo');
         break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });

@@ -48,7 +48,7 @@ export const TAUNTS = {
   smiles: {
     name: 'Belly Laugh',
     keys: [[0, S], ...alt(10, 74, 8, P(S, { fa: [24, 110, 0], ba: [20, 110, 0], lean: -14, chest: -10, neck: -20, head: -26, y: 116 }), P(S, { fa: [26, 100, 0], ba: [22, 100, 0], lean: 10, chest: 6, neck: 6, head: 2, y: 112 })), [90, S]],
-    cues: [{ at: 10, sfx: 'laugh' }, { at: 42, sfx: 'laugh' }, label(20, 'HA HA HA!', '#ffe08a')],
+    cues: [{ at: 10, sfx: 'laugh' }, label(20, 'HA HA HA!', '#ffe08a')],
     face: [[8, 80, 'shout']],
   },
   // windmill air guitar and a headbang
@@ -82,7 +82,7 @@ export const TAUNTS = {
     keys: [[0, S], [10, P(S, { fa: [60, 80, 0], ba: [66, 70, 0], lean: -4, head: 10, y: 118 })],
       ...alt(16, 58, 6, P(S, { fa: [86, 40, 0], ba: [66, 70, 0], lean: -4, head: 12, y: 118 }), P(S, { fa: [52, 92, 0], ba: [68, 68, 0], lean: -2, head: 14, y: 118 })),
       [68, P(S, { fa: [150, 30, 0], ba: [10, 20, 0], head: -10, y: 120 })], [78, P(S, { fa: [62, 154, 0], ba: [10, 20, 0], head: -14, y: 120 })], [90, S]],
-    cues: [16, 28, 40, 52].map((at) => ({ at, sfx: 'shing' })).concat([{ at: 30, fx: { kind: 'sparks', dx: 40, y: 150, n: 6, color: '#ffe08a' } }, { at: 80, sfx: 'kiss' }, label(80, 'PERFETTO!', '#ffe08a')]),
+    cues: [16, 46].map((at) => ({ at, sfx: 'shing' })).concat([{ at: 30, fx: { kind: 'sparks', dx: 40, y: 150, n: 6, color: '#ffe08a' } }, { at: 80, sfx: 'kiss' }, label(80, 'PERFETTO!', '#ffe08a')]),
     prop: [[8, 70, { type: 'knife', hand: 'F' }]],
   },
   // salutes the sun: low crouch, then rises with both arms to the sky
@@ -139,14 +139,14 @@ export const TAUNTS = {
     name: 'Crocodile Tears',
     keys: [[0, S], ...alt(8, 50, 6, P(S, { fa: [48, 124, 0], ba: [54, 118, 0], lean: 22, neck: 14, head: 18, y: 112 }), P(S, { fa: [50, 120, 0], ba: [56, 114, 0], lean: 27, neck: 16, head: 20, y: 109 })),
       [62, P(S, { fa: [130, 20, 0], ba: [-60, 20, 0], lean: -10, head: -14, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [80, P(S, { fa: [134, 16, 0], ba: [-64, 16, 0], lean: -12, head: -16, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [90, S]],
-    cues: [{ at: 10, sfx: 'squeeze' }, { at: 20, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 34, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 62, sfx: 'boing' }, label(64, 'TA-DA!', '#ffe08a')],
+    cues: [{ at: 10, sfx: 'sob' }, { at: 20, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 34, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 62, sfx: 'boing' }, label(64, 'TA-DA!', '#ffe08a')],
     face: [[8, 56, 'hurt']],
   },
   // arms become the jaws: three big snaps over his head
   snapper: {
     name: 'Jaw Snap',
     keys: [[0, S], ...alt(10, 70, 10, P(S, { fa: [150, 20, 0], ba: [60, 20, 0], lean: -6, y: 116 }), P(S, { fa: [108, 10, 0], ba: [96, 10, 0], lean: 8, y: 114 })), [82, CROSSED], [90, S]],
-    cues: [20, 40, 60].map((at) => ({ at, sfx: 'snap' })).concat([label(42, 'SNAP!', '#9be36b')]),
+    cues: [20, 40, 60].map((at) => ({ at, sfx: 'chomp' })).concat([label(42, 'SNAP!', '#9be36b')]),
     bite: [[18, 24], [38, 44], [58, 64]],
   },
   // a flourish on the guitar and a grito
