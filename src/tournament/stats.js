@@ -129,9 +129,9 @@ export class MatchStats {
       }
       const total = items.reduce((a, b) => a + b.points, 0);
       return {
-        hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken,
+        hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
         combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
-        perfect: st.perfect, roundsWon: match.wins[i],
+        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i],
         spectacle: { total, items },
       };
     });

@@ -189,7 +189,8 @@ export class AIController {
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
   finishInput(match, me) {
     if (match.finishWho !== this.index) return emptyRaw();
-    if (this.fatalityChoice === undefined) this.fatalityChoice = this.rng.chance(AI_FATALITY_CHANCE);
+    // tournaments decide it from the fighter's condition and the fight (see tournament/condition.js)
+    if (this.fatalityChoice === undefined) this.fatalityChoice = this.rng.chance(this.fatalityChance ? this.fatalityChance(match, this.index) : AI_FATALITY_CHANCE);
     if (!this.fatalityChoice) return emptyRaw();
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];

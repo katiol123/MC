@@ -8,6 +8,7 @@ import {
   currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME,
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
+import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
 import { FightScene } from './fightScene.js';
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -105,6 +106,7 @@ export class TournamentScene {
       el('span', { class: 'tnum' }, [String(r.lost)]),
       el('span', { class: 'tnum' }, [`${r.rf - r.ra >= 0 ? '+' : ''}${r.rf - r.ra}`]),
       el('span', { class: 'tform' }, r.form.map((x) => el('i', { class: `f${x}` }, [x]))),
+      condBars(r.stamina, r.morale),
       el('span', { class: 'tsp', title: `${r.sp} spectacle points earned` }, [`★${r.fame}`]),
       el('span', { class: 'tpts' }, [String(r.pts)]),
     ]));
@@ -133,7 +135,7 @@ export class TournamentScene {
         ]),
       ]),
       el('div', { class: 'tour-table' }, [
-        el('div', { class: 'trow thead' }, ['#', '', 'FIGHTER', 'P', 'W', 'L', 'R±', 'FORM', 'FAME', 'PTS'].map((h) => el('span', {}, [h]))),
+        el('div', { class: 'trow thead' }, ['#', '', 'FIGHTER', 'P', 'W', 'L', 'R±', 'FORM', 'S/M', 'FAME', 'PTS'].map((h) => el('span', {}, [h]))),
         ...rows,
       ]),
       el('div', { class: 'tour-side' }, [
@@ -150,6 +152,7 @@ export class TournamentScene {
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE ALL', () => this.simulate('all')), btn('RESULTS GRID', () => this.showGrid())]),
+            btn('🏕 TRAINING CAMP · spend fame', () => this.showCamp(), 'camp'),
             el('div', { class: 'tour-actions' }, [btn('NEW', () => this.confirmNew(), 'mini wide'), btn('MAIN MENU', () => this.app.goTitle(), 'mini wide')]),
           ]),
         el('div', { class: 'tour-help' }, ['Enter watch · Space simulate · ◀ ▶ rounds · G grid · click a result to replay']),
@@ -310,6 +313,57 @@ export class TournamentScene {
     document.getElementById('ui').appendChild(wrap);
   }
 
+  // --- training camp (condition shop) -------------------------------------------------------------
+  showCamp() {
+    const t = this.t;
+    const order = standings(t).map((r) => r.id);
+    const lastCamp = t.camp?.[t.camp.length - 1] || {};
+    const card = (id) => {
+      const f = t.fighters[id];
+      const fx = (v, kind) => {
+        const s = conditionShift(v, kind);
+        return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
+      };
+      const bought = lastCamp[id] || [];
+      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
+        el('div', { class: 'camp-top' }, [
+          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'camp-name' }, [short(id)]),
+          el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
+        ]),
+        meter('STAMINA', f.stamina, 'sta', `body ${fx(f.stamina, 'stamina')}`),
+        meter('MORALE', f.morale, 'mor', `mind ${fx(f.morale, 'morale')}`),
+        el('div', { class: 'camp-shop' }, SHOP.map((it) => el('button', {
+          class: 'camp-item', disabled: f.fame < it.cost ? '' : null, title: `${it.label}: ${it.desc}`,
+          onclick: () => { if (buy(t, id, it.id)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
+        }, [it.icon, el('small', {}, [String(it.cost)])]))),
+        el('label', { class: 'camp-auto' }, [
+          el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }),
+          'auto manager',
+          bought.length ? el('span', { class: 'camp-bought' }, [`bought: ${bought.map((b) => SHOP.find((x) => x.id === b).icon).join('')}`]) : null,
+        ]),
+      ]);
+    };
+    const close = () => { wrap.remove(); this.modal = null; unsub(); this.render(); };
+    this.campEl?.remove();
+    const wrap = el('div', { class: 'menu-overlay camp' }, [
+      el('div', { class: 'camp-panel' }, [
+        el('div', { class: 'camp-head' }, [
+          el('div', { class: 'awards-title small' }, ['TRAINING CAMP']),
+          el('div', { class: 'camp-legend' }, SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} — ${it.desc} · ★${it.cost}`]))),
+        ]),
+        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers show the bar shift ×10). Both also decide how often a winner goes for the fatality. Managers on "auto" buy after every round.`]),
+        el('div', { class: 'camp-grid' }, order.map(card)),
+        btn('DONE', close, 'big'),
+      ]),
+    ]);
+    this.campEl = wrap;
+    this.modal = true;
+    this.unsubCamp?.();
+    const unsub = this.unsubCamp = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'Enter') close(); });
+    document.getElementById('ui').appendChild(wrap);
+  }
+
   // --- awards ---------------------------------------------------------------------------------------
   /** After results come in: newly completed rounds get their awards screen, then the final. */
   afterResults() {
@@ -382,6 +436,21 @@ export class TournamentScene {
 /** Fame balance of both fighters before a match (for the "before → after" bar). */
 function spSnapshot(t, m) {
   return m ? [t.fighters[m.a].fame, t.fighters[m.b].fame] : [0, 0];
+}
+
+/** Two tiny stacked bars: stamina (top) and morale. */
+function condBars(st, mo) {
+  const bar = (v, c) => el('i', { class: `cb ${c} ${v < COND.exhausted ? 'low' : ''}` }, [el('b', { style: { width: `${v}%` } })]);
+  return el('span', { class: 'tcond', title: `stamina ${Math.round(st)} · morale ${Math.round(mo)}` }, [bar(st, 'sta'), bar(mo, 'mor')]);
+}
+
+function meter(label, v, cls, effect) {
+  return el('div', { class: `meter ${cls}` }, [
+    el('span', { class: 'meter-label' }, [label]),
+    el('span', { class: 'meter-bar' }, [el('b', { style: { width: `${v}%` } }), el('i', { style: { left: `${COND.fit}%` } })]),
+    el('span', { class: 'meter-num' }, [String(Math.round(v))]),
+    el('span', { class: `meter-fx ${effect.includes('−') ? 'neg' : 'pos'}` }, [effect]),
+  ]);
 }
 
 function btn(label, fn, cls = '') {

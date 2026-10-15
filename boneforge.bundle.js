@@ -716,7 +716,7 @@ const ROSTER = [
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0, speed: 0.6, mobility: 0.65, health: 0.2, toughness: 0.25, reaction: 0.5, aggression: 0.35, combo: 0.4, antiAir: 0.4, cunning: 1 },
+    profile: { power: 0, speed: 0.65, mobility: 0.65, health: 0.25, toughness: 0.3, reaction: 0.55, aggression: 0.4, combo: 0.45, antiAir: 0.45, cunning: 1 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -747,7 +747,7 @@ const ROSTER = [
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.45, speed: 0.3, mobility: 0.4, health: 0.45, toughness: 0.4, reaction: 0.35, aggression: 0.4, combo: 0.55, antiAir: 0.75, cunning: 0.3 },
+    profile: { power: 0.4, speed: 0.3, mobility: 0.4, health: 0.4, toughness: 0.4, reaction: 0.35, aggression: 0.4, combo: 0.5, antiAir: 0.7, cunning: 0.3 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -777,7 +777,7 @@ const ROSTER = [
     body: { height: 0.98, bulk: 1.0, arms: 1.0, legs: 1.0, head: 1.08, torso: 0.98, shoulders: 1.04 },
     stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 590, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.35, speed: 0.6, mobility: 0.65, health: 0.35, toughness: 0.3, reaction: 0.45, aggression: 0.85, combo: 0.5, antiAir: 0.2, cunning: 0.45 },
+    profile: { power: 0.4, speed: 0.65, mobility: 0.7, health: 0.4, toughness: 0.35, reaction: 0.5, aggression: 0.85, combo: 0.55, antiAir: 0.25, cunning: 0.5 },
     look: {
       skin: '#e3a27e', outline: '#1d1216', rim: '#2ee6d6',
       eyes: '#b04fd6', brows: 'angry', mouth: 'teeth', freckles: true,
@@ -901,7 +901,7 @@ const ROSTER = [
     body: { height: 1.0, bulk: 0.94, arms: 1.03, legs: 1.03, head: 1.0, torso: 1.0, shoulders: 1.0 },
     stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 610, pushW: 33 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.7, speed: 0.75, mobility: 0.85, health: 0.65, toughness: 0.6, reaction: 0.7, aggression: 0.85, combo: 0.6, antiAir: 0.75, cunning: 0.65 },
+    profile: { power: 0.75, speed: 0.8, mobility: 0.85, health: 0.7, toughness: 0.65, reaction: 0.75, aggression: 0.85, combo: 0.65, antiAir: 0.8, cunning: 0.7 },
     look: {
       skin: '#6a4430', outline: '#120c10', rim: '#ff3fd0',
       eyes: '#e6e23a', brows: 'none', mouth: 'none',
@@ -986,7 +986,7 @@ const ROSTER = [
     body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
     stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.3, speed: 0.3, mobility: 0.25, health: 0.65, toughness: 0.65, reaction: 0.5, aggression: 0, combo: 0.4, antiAir: 1, cunning: 0.65 },
+    profile: { power: 0.35, speed: 0.35, mobility: 0.35, health: 0.7, toughness: 0.7, reaction: 0.55, aggression: 0, combo: 0.45, antiAir: 1, cunning: 0.7 },
     look: {
       skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
       eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
@@ -1015,7 +1015,7 @@ const ROSTER = [
     body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
     stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.25, speed: 0.45, mobility: 0.3, health: 0.15, toughness: 0.15, reaction: 1, aggression: 0.3, combo: 1, antiAir: 0.25, cunning: 0.25 },
+    profile: { power: 0.2, speed: 0.4, mobility: 0.25, health: 0.15, toughness: 0.15, reaction: 1, aggression: 0.25, combo: 1, antiAir: 0.2, cunning: 0.2 },
     look: {
       skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
       eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
@@ -1069,7 +1069,7 @@ const ROSTER = [
     body: { height: 1.04, bulk: 0.9, arms: 1.06, legs: 1.06, head: 1.08, torso: 0.98, shoulders: 0.96 },
     stats: { health: 940, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10, jumpVY: 16.8, jumpVX: 4.3, mass: 0.92, stunMax: 580, pushW: 33 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.35, speed: 0.6, mobility: 0.65, health: 0.4, toughness: 0.35, reaction: 0.75, aggression: 0.15, combo: 0.5, antiAir: 0.6, cunning: 0.85 },
+    profile: { power: 0.35, speed: 0.55, mobility: 0.6, health: 0.4, toughness: 0.35, reaction: 0.7, aggression: 0.15, combo: 0.5, antiAir: 0.55, cunning: 0.8 },
     look: {
       skin: '#c99a78', outline: '#160c14', rim: '#ff3fd0',
       eyes: '#7a3ab0', brows: 'sad', mouth: 'clown',
@@ -2358,6 +2358,7 @@ __define("src/ui/dom.js", function (__exports, __require) {
 function el(tag, attrs = {}, children = []) {
   const e = document.createElement(tag);
   for (const k in attrs) {
+    if (attrs[k] == null) continue;
     if (k === 'class') e.className = attrs[k];
     else if (k === 'style' && typeof attrs[k] === 'object') {
       for (const sk in attrs[k]) {
@@ -12204,7 +12205,8 @@ class AIController {
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
   finishInput(match, me) {
     if (match.finishWho !== this.index) return emptyRaw();
-    if (this.fatalityChoice === undefined) this.fatalityChoice = this.rng.chance(AI_FATALITY_CHANCE);
+    // tournaments decide it from the fighter's condition and the fight (see tournament/condition.js)
+    if (this.fatalityChoice === undefined) this.fatalityChoice = this.rng.chance(this.fatalityChance ? this.fatalityChance(match, this.index) : AI_FATALITY_CHANCE);
     if (!this.fatalityChoice) return emptyRaw();
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];
@@ -12400,6 +12402,7 @@ const { AIController } = __require("src/ai/aiController.js");
 const { ROSTER } = __require("src/data/fighters.js");
 const { Rng } = __require("src/core/rng.js");
 const { MatchStats } = __require("src/tournament/stats.js");
+const { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } = __require("src/tournament/condition.js");
 
 const TOURNAMENT_RULES = { roundsToWin: 2, roundTime: 99 };
 /**
@@ -12412,7 +12415,7 @@ const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 2;
+const VERSION = 3;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 function roundRobin(ids) {
@@ -12442,7 +12445,12 @@ function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', see
   return {
     version: VERSION, created: Date.now(), seed, level, ids: ids.slice(), rounds,
     // per-fighter state that will grow (level-ups, injuries, upgrades); empty overrides for now
-    fighters: Object.fromEntries(ids.map((id) => [id, { overrides: {}, sp: 0, fame: 0, fameEarned: 0 }])),
+    fighters: Object.fromEntries(ids.map((id) => {
+      const f = { overrides: {}, sp: 0, fame: 0, fameEarned: 0 };
+      initCondition(f);
+      return [id, f];
+    })),
+    camp: [], // per round: what each manager bought after it
     roundAwards: [], // per round: the awards list, filled in when the round completes
     finalAwards: null,
   };
@@ -12462,16 +12470,22 @@ function currentRound(t) {
   return n ? n.ri : t.rounds.length - 1;
 }
 
-/** Definition overrides for both fighters of a match, as they are right now (snapshot). */
+/**
+ * Definition overrides for both fighters of a match, as they are right now (snapshot): their own
+ * overrides plus the current stamina / morale applied to the bars.
+ */
 function snapshotOverrides(t, m) {
-  const clone = (o) => JSON.parse(JSON.stringify(o || {}));
-  return [clone(t.fighters[m.a]?.overrides), clone(t.fighters[m.b]?.overrides)];
+  return [m.a, m.b].map((id) => {
+    const f = t.fighters[id];
+    return conditionOverrides(id, f?.overrides || {}, f || COND.start);
+  });
 }
 
 /** A fresh Match + AI pair for a scheduled match (used for live viewing, simulation and replays). */
 function setupMatch(t, m, overrides = m.result?.overrides || snapshotOverrides(t, m)) {
   const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], ...TOURNAMENT_RULES });
   const ai = [new AIController(0, { level: t.level, seed: m.seed }), new AIController(1, { level: t.level, seed: m.seed * 7 + 3 })];
+  for (const a of ai) a.fatalityChance = fatalityChance;
   return { match, ai, overrides };
 }
 
@@ -12510,17 +12524,30 @@ class MatchRunner {
 /** Stores a finished match (winner, score, stats, spectacle points, the overrides used). */
 function recordResult(t, m, match, stats, overrides) {
   const rep = stats.report(match);
+  const tableBefore = standings(t);
+  const played = tableBefore.some((r) => r.played > 0);
+  const underdog = new Set(played ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : []);
   m.result = { ...rep, overrides, playedAt: Date.now() };
+  m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
   rep.sides.forEach((s, i) => {
-    const fame = Math.round(s.spectacle.total * FAME_PER_SP);
+    const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
+    const under = underdog.has(ids[i]);
+    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + (firedUp ? COND.firedUpFame : 0) + (under ? COND.underdogFame : 0)));
     s.fame = fame;
+    s.firedUp = firedUp;
+    s.underdog = under;
     t.fighters[ids[i]].sp += s.spectacle.total;
     addFame(t, ids[i], fame);
   });
   // a round (tour) that just completed hands out its awards; the last match closes the tournament
   t.rounds.forEach((r, ri) => {
-    if (!t.roundAwards[ri] && roundComplete(t, ri)) t.roundAwards[ri] = grantAwards(t, awards(t, ri));
+    if (!t.roundAwards[ri] && roundComplete(t, ri)) {
+      t.roundAwards[ri] = grantAwards(t, awards(t, ri));
+      // the camp between rounds: everyone rests, then the managers spend fame on recovery
+      restRound(t);
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, autoManage(t, id)]));
+    }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
   save(t);
@@ -12536,14 +12563,17 @@ function addFame(t, id, n) {
 /** Each award winner gets AWARD_FAME bonus fame; returns the list with the bonus noted. */
 function grantAwards(t, list) {
   return list.map((a) => {
-    if (a.id) addFame(t, a.id, AWARD_FAME);
+    if (a.id) {
+      addFame(t, a.id, AWARD_FAME);
+      t.fighters[a.id].morale = Math.min(100, t.fighters[a.id].morale + COND.award);
+    }
     return { ...a, fame: a.id ? AWARD_FAME : 0 };
   });
 }
 
 /** League table with tie-breaks: points, head-to-head, round difference, damage dealt, perfects. */
 function standings(t) {
-  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame });
+  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale });
   const rows = Object.fromEntries(t.ids.map((id) => [id, row(id)]));
   const h2h = {};
   for (const { m } of allMatches(t)) {
@@ -12794,14 +12824,200 @@ class MatchStats {
       }
       const total = items.reduce((a, b) => a + b.points, 0);
       return {
-        hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken,
+        hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
         combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
-        perfect: st.perfect, roundsWon: match.wins[i],
+        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i],
         spectacle: { total, items },
       };
     });
     return { winner, wins: match.wins.slice(), sides };
   }
+}
+
+});
+__define("src/tournament/condition.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "BODY", { enumerable: true, get: () => BODY });
+  Object.defineProperty(__exports, "MIND", { enumerable: true, get: () => MIND });
+  Object.defineProperty(__exports, "COND", { enumerable: true, get: () => COND });
+  Object.defineProperty(__exports, "SHOP", { enumerable: true, get: () => SHOP });
+  Object.defineProperty(__exports, "conditionShift", { enumerable: true, get: () => conditionShift });
+  Object.defineProperty(__exports, "conditionOverrides", { enumerable: true, get: () => conditionOverrides });
+  Object.defineProperty(__exports, "fatalityChance", { enumerable: true, get: () => fatalityChance });
+  Object.defineProperty(__exports, "initCondition", { enumerable: true, get: () => initCondition });
+  Object.defineProperty(__exports, "applyMatch", { enumerable: true, get: () => applyMatch });
+  Object.defineProperty(__exports, "restRound", { enumerable: true, get: () => restRound });
+  Object.defineProperty(__exports, "canBuy", { enumerable: true, get: () => canBuy });
+  Object.defineProperty(__exports, "buy", { enumerable: true, get: () => buy });
+  Object.defineProperty(__exports, "autoManage", { enumerable: true, get: () => autoManage });
+// Tournament CONDITION: stamina and morale.
+//   STAMINA (0..100) shifts every BODY bar (power, attack speed, mobility, health, toughness).
+//   MORALE  (0..100) shifts every CHARACTER bar (reaction, aggression, combo, anti-air, cunning).
+// 75 is "match fit": below it the bars drop hard (at 0 every bar of the group loses 0.6 of the
+// roster range, more than the gap between the strongest and weakest fighter), above it they gain a
+// little. Calibrated with tools/condition.mjs.
+//
+// Matches drain stamina (more for long, punishing fights) and move morale (results, fatalities,
+// streaks, upsets, awards, crowd love). Between rounds everyone rests a little and morale drifts
+// back toward calm. Fame buys recovery: every fighter has a manager (automatic by default) that
+// decides what to buy; the player can take over and buy by hand.
+const { ROSTER } = __require("src/data/fighters.js");
+
+const BODY = ['power', 'speed', 'mobility', 'health', 'toughness'];
+const MIND = ['reaction', 'aggression', 'combo', 'antiAir', 'cunning'];
+
+const COND = {
+  start: { stamina: 100, morale: 70 },
+  fit: 75, // no effect at this level
+  lowShift: { stamina: 1.1, morale: 1.0 }, // bars lost at 0
+  highShift: { stamina: 0.4, morale: 0.15 }, // bars gained at 100
+  // stamina cost of a match
+  drainBase: 9, drainPerHealth: 6, drainPerRound: 3, drainFatality: 6, // per match; drainPerHealth per full health bar lost
+  restPerRound: 12, // free recovery after every round
+  moraleDrift: 0.15, moraleCalm: 60, // between rounds morale moves 15 % toward 60
+  // morale changes
+  win: 9, flawlessWin: 4, loss: -9, flawlessLoss: -4, perfectRound: 3, comebackRound: 4,
+  fatalityDone: 6, fatalitySuffered: -12, upset: 6, award: 4, crowdPerSp: 1 / 40, crowdCap: 5,
+  streak: 3, // a streak of this many results amplifies morale changes by 50 %
+  exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
+  firedUp: 90, firedUpFame: 0.1, // confident fighters get 10 % more fame (the crowd loves them)
+  underdogs: 4, underdogFame: 0.2, // the bottom 4 of the table get 20 % more fame (fans back the underdog)
+  redemption: 35, redemptionMorale: 6, // a win from a low ebb lifts morale extra
+};
+
+/** Fame shop: recovery items with their trade-offs. */
+const SHOP = [
+  { id: 'rest', label: 'Rest day', icon: '🛏', cost: 75, stamina: 25, desc: '+25 stamina' },
+  { id: 'physio', label: 'Physio session', icon: '💆', cost: 170, stamina: 60, desc: '+60 stamina' },
+  { id: 'pep', label: 'Pep talk', icon: '📣', cost: 70, morale: 20, desc: '+20 morale' },
+  { id: 'party', label: 'Party with fans', icon: '🎉', cost: 110, morale: 45, stamina: -10, desc: '+45 morale, −10 stamina' },
+];
+
+const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/** Bars gained (+) or lost (−) at a condition value. */
+function conditionShift(v, kind = 'stamina') {
+  return v >= COND.fit ? ((v - COND.fit) / (100 - COND.fit)) * COND.highShift[kind] : -((COND.fit - v) / COND.fit) * COND.lowShift[kind];
+}
+
+// how far a bar may be pushed outside the roster range (toughness must stay a positive stun meter)
+const FLOOR = { toughness: -0.25 };
+
+/** Fighter definition overrides with the condition applied (plus whatever else the fighter has). */
+function conditionOverrides(id, extra = {}, cond = COND.start) {
+  const base = { ...BASE_PROFILE[id], ...(extra.profile || {}) };
+  const sb = conditionShift(cond.stamina, 'stamina'), sm = conditionShift(cond.morale, 'morale');
+  const profile = { ...base };
+  for (const k of BODY) profile[k] = clamp((base[k] ?? 0.5) + sb, FLOOR[k] ?? -0.7, 1.4);
+  for (const k of MIND) profile[k] = clamp((base[k] ?? 0.5) + sm, -0.7, 1.4);
+  return { ...JSON.parse(JSON.stringify(extra)), profile, cond: { stamina: Math.round(cond.stamina), morale: Math.round(cond.morale) } };
+}
+
+/**
+ * Chance that the winner performs the fatality: their morale and stamina, plus how dominant the
+ * current fight was (health left when FINISH HIM starts, and a 2:0 sweep).
+ */
+function fatalityChance(match, winnerIndex) {
+  const f = match.fighters[winnerIndex];
+  const c = f.def.cond || COND.start;
+  const dominance = f.health / f.maxHealth;
+  const sweep = match.wins[1 - winnerIndex] === 0 ? 0.08 : 0;
+  return clamp(0.05 + 0.45 * (c.morale / 100) + 0.2 * (c.stamina / 100) + 0.3 * dominance + sweep - 0.15, 0.03, 0.95);
+}
+
+function initCondition(rec) {
+  Object.assign(rec, { stamina: COND.start.stamina, morale: COND.start.morale, auto: true, streak: 0, spentFame: 0 });
+}
+
+/**
+ * Applies a finished match to both fighters' condition. Returns per side
+ * { stamina: [before, after], morale: [before, after], notes: [{label, stamina?, morale?}] }.
+ */
+function applyMatch(t, m, result, table) {
+  const ids = [m.a, m.b];
+  const rank = Object.fromEntries((table || []).map((r, i) => [r.id, i]));
+  return ids.map((id, i) => {
+    const f = t.fighters[id], s = result.sides[i], o = result.sides[1 - i];
+    const before = { stamina: f.stamina, morale: f.morale };
+    const notes = [];
+    const won = result.winner === i, lost = result.winner === 1 - i;
+    // stamina: the fight's toll
+    const rounds = result.wins[0] + result.wins[1];
+    const bars = s.damageTaken / (s.maxHealth || 1000);
+    let ds = -(COND.drainBase + bars * COND.drainPerHealth + Math.max(0, rounds - 2) * COND.drainPerRound);
+    notes.push({ label: `Fight toll (${s.damageTaken} damage taken)`, stamina: Math.round(ds) });
+    if (o.fatality) { ds -= COND.drainFatality; notes.push({ label: 'Fatality suffered', stamina: -COND.drainFatality }); }
+    // morale
+    let dm = 0;
+    const add = (label, v) => { if (v) { dm += v; notes.push({ label, morale: v }); } };
+    if (won) add(result.wins[1 - i] === 0 ? 'Won 2:0' : 'Won', COND.win + (result.wins[1 - i] === 0 ? COND.flawlessWin : 0));
+    else if (lost) add(result.wins[i] === 0 ? 'Lost 0:2' : 'Lost', COND.loss + (result.wins[i] === 0 ? COND.flawlessLoss : 0));
+    add('Perfect rounds', s.perfect * COND.perfectRound);
+    add('Comeback round', (s.spectacle.items.find((x) => x.key === 'comeback')?.count || 0) * COND.comebackRound);
+    if (s.fatality) add('Performed a fatality', COND.fatalityDone);
+    if (o.fatality) add('Humiliated by a fatality', COND.fatalitySuffered);
+    if (won && rank[ids[1 - i]] !== undefined && rank[ids[1 - i]] + 3 <= rank[id]) add('Upset win', COND.upset);
+    if (won && before.morale <= COND.redemption) add('Redemption', COND.redemptionMorale);
+    add('Crowd love', Math.min(COND.crowdCap, Math.floor(s.spectacle.total * COND.crowdPerSp)));
+    // streaks amplify morale swings
+    f.streak = won ? Math.max(1, f.streak + 1) : lost ? Math.min(-1, f.streak - 1) : 0;
+    if (Math.abs(f.streak) >= COND.streak && Math.sign(dm) === Math.sign(f.streak)) {
+      const bonus = Math.round(dm * 0.5);
+      add(f.streak > 0 ? `On fire (${f.streak} wins)` : `Slump (${-f.streak} losses)`, bonus);
+    }
+    if (before.stamina < COND.exhausted) add('Exhausted', COND.exhaustedMorale);
+    f.stamina = clamp(f.stamina + ds, 0, 100);
+    f.morale = clamp(f.morale + dm, 0, 100);
+    return { stamina: [before.stamina, f.stamina], morale: [before.morale, f.morale], notes };
+  });
+}
+
+/** Between rounds: free rest, morale settles toward calm. */
+function restRound(t) {
+  for (const id of t.ids) {
+    const f = t.fighters[id];
+    f.stamina = clamp(f.stamina + COND.restPerRound, 0, 100);
+    f.morale += (COND.moraleCalm - f.morale) * COND.moraleDrift;
+  }
+}
+
+function canBuy(t, id, itemId) {
+  const it = SHOP.find((x) => x.id === itemId), f = t.fighters[id];
+  return !!it && f.fame >= it.cost;
+}
+
+function buy(t, id, itemId) {
+  const it = SHOP.find((x) => x.id === itemId), f = t.fighters[id];
+  if (!it || f.fame < it.cost) return false;
+  f.fame -= it.cost;
+  f.spentFame += it.cost;
+  if (it.stamina) f.stamina = clamp(f.stamina + it.stamina, 0, 100);
+  if (it.morale) f.morale = clamp(f.morale + it.morale, 0, 100);
+  return true;
+}
+
+/**
+ * Automatic manager: keeps the fighter match fit without blowing all the fame. Personality matters:
+ * cunning managers keep a bigger reserve (fame will buy upgrades), aggressive ones spend on morale.
+ */
+function autoManage(t, id) {
+  const f = t.fighters[id];
+  if (!f.auto) return [];
+  const p = BASE_PROFILE[id] || {};
+  const reserve = 30 + 40 * (p.cunning ?? 0.5);
+  const bought = [];
+  for (let guard = 0; guard < 6; guard++) {
+    const spare = f.fame - reserve;
+    let pick = null;
+    const cost = (id2) => SHOP.find((x) => x.id === id2).cost;
+    if (f.stamina < 45 && spare >= cost('physio')) pick = 'physio';
+    else if (f.stamina < 65 && spare >= cost('rest')) pick = 'rest';
+    else if (f.morale < 40 && f.stamina >= 60 && spare >= cost('party') && (p.aggression ?? 0.5) > 0.5) pick = 'party';
+    else if (f.morale < 55 && spare >= cost('pep')) pick = 'pep';
+    if (!pick || !buy(t, id, pick)) break;
+    bought.push(pick);
+  }
+  return bought;
 }
 
 });
@@ -13291,6 +13507,7 @@ const { ROSTER } = __require("src/data/fighters.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 const { createTournament, load, save, clearSaved, standings, awards, tournamentAwards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
 const { showSpectacle } = __require("src/ui/spectacle.js");
+const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
 const { FightScene } = __require("src/ui/fightScene.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -13388,6 +13605,7 @@ class TournamentScene {
       el('span', { class: 'tnum' }, [String(r.lost)]),
       el('span', { class: 'tnum' }, [`${r.rf - r.ra >= 0 ? '+' : ''}${r.rf - r.ra}`]),
       el('span', { class: 'tform' }, r.form.map((x) => el('i', { class: `f${x}` }, [x]))),
+      condBars(r.stamina, r.morale),
       el('span', { class: 'tsp', title: `${r.sp} spectacle points earned` }, [`★${r.fame}`]),
       el('span', { class: 'tpts' }, [String(r.pts)]),
     ]));
@@ -13416,7 +13634,7 @@ class TournamentScene {
         ]),
       ]),
       el('div', { class: 'tour-table' }, [
-        el('div', { class: 'trow thead' }, ['#', '', 'FIGHTER', 'P', 'W', 'L', 'R±', 'FORM', 'FAME', 'PTS'].map((h) => el('span', {}, [h]))),
+        el('div', { class: 'trow thead' }, ['#', '', 'FIGHTER', 'P', 'W', 'L', 'R±', 'FORM', 'S/M', 'FAME', 'PTS'].map((h) => el('span', {}, [h]))),
         ...rows,
       ]),
       el('div', { class: 'tour-side' }, [
@@ -13433,6 +13651,7 @@ class TournamentScene {
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE ALL', () => this.simulate('all')), btn('RESULTS GRID', () => this.showGrid())]),
+            btn('🏕 TRAINING CAMP · spend fame', () => this.showCamp(), 'camp'),
             el('div', { class: 'tour-actions' }, [btn('NEW', () => this.confirmNew(), 'mini wide'), btn('MAIN MENU', () => this.app.goTitle(), 'mini wide')]),
           ]),
         el('div', { class: 'tour-help' }, ['Enter watch · Space simulate · ◀ ▶ rounds · G grid · click a result to replay']),
@@ -13593,6 +13812,57 @@ class TournamentScene {
     document.getElementById('ui').appendChild(wrap);
   }
 
+  // --- training camp (condition shop) -------------------------------------------------------------
+  showCamp() {
+    const t = this.t;
+    const order = standings(t).map((r) => r.id);
+    const lastCamp = t.camp?.[t.camp.length - 1] || {};
+    const card = (id) => {
+      const f = t.fighters[id];
+      const fx = (v, kind) => {
+        const s = conditionShift(v, kind);
+        return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
+      };
+      const bought = lastCamp[id] || [];
+      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
+        el('div', { class: 'camp-top' }, [
+          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'camp-name' }, [short(id)]),
+          el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
+        ]),
+        meter('STAMINA', f.stamina, 'sta', `body ${fx(f.stamina, 'stamina')}`),
+        meter('MORALE', f.morale, 'mor', `mind ${fx(f.morale, 'morale')}`),
+        el('div', { class: 'camp-shop' }, SHOP.map((it) => el('button', {
+          class: 'camp-item', disabled: f.fame < it.cost ? '' : null, title: `${it.label}: ${it.desc}`,
+          onclick: () => { if (buy(t, id, it.id)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
+        }, [it.icon, el('small', {}, [String(it.cost)])]))),
+        el('label', { class: 'camp-auto' }, [
+          el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }),
+          'auto manager',
+          bought.length ? el('span', { class: 'camp-bought' }, [`bought: ${bought.map((b) => SHOP.find((x) => x.id === b).icon).join('')}`]) : null,
+        ]),
+      ]);
+    };
+    const close = () => { wrap.remove(); this.modal = null; unsub(); this.render(); };
+    this.campEl?.remove();
+    const wrap = el('div', { class: 'menu-overlay camp' }, [
+      el('div', { class: 'camp-panel' }, [
+        el('div', { class: 'camp-head' }, [
+          el('div', { class: 'awards-title small' }, ['TRAINING CAMP']),
+          el('div', { class: 'camp-legend' }, SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} — ${it.desc} · ★${it.cost}`]))),
+        ]),
+        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers show the bar shift ×10). Both also decide how often a winner goes for the fatality. Managers on "auto" buy after every round.`]),
+        el('div', { class: 'camp-grid' }, order.map(card)),
+        btn('DONE', close, 'big'),
+      ]),
+    ]);
+    this.campEl = wrap;
+    this.modal = true;
+    this.unsubCamp?.();
+    const unsub = this.unsubCamp = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'Enter') close(); });
+    document.getElementById('ui').appendChild(wrap);
+  }
+
   // --- awards ---------------------------------------------------------------------------------------
   /** After results come in: newly completed rounds get their awards screen, then the final. */
   afterResults() {
@@ -13667,6 +13937,21 @@ function spSnapshot(t, m) {
   return m ? [t.fighters[m.a].fame, t.fighters[m.b].fame] : [0, 0];
 }
 
+/** Two tiny stacked bars: stamina (top) and morale. */
+function condBars(st, mo) {
+  const bar = (v, c) => el('i', { class: `cb ${c} ${v < COND.exhausted ? 'low' : ''}` }, [el('b', { style: { width: `${v}%` } })]);
+  return el('span', { class: 'tcond', title: `stamina ${Math.round(st)} · morale ${Math.round(mo)}` }, [bar(st, 'sta'), bar(mo, 'mor')]);
+}
+
+function meter(label, v, cls, effect) {
+  return el('div', { class: `meter ${cls}` }, [
+    el('span', { class: 'meter-label' }, [label]),
+    el('span', { class: 'meter-bar' }, [el('b', { style: { width: `${v}%` } }), el('i', { style: { left: `${COND.fit}%` } })]),
+    el('span', { class: 'meter-num' }, [String(Math.round(v))]),
+    el('span', { class: `meter-fx ${effect.includes('−') ? 'neg' : 'pos'}` }, [effect]),
+  ]);
+}
+
 function btn(label, fn, cls = '') {
   return el('button', { class: `tbtn ${cls}`, onclick: (e) => { e.stopPropagation(); fn(); } }, [label]);
 }
@@ -13686,6 +13971,26 @@ const { el } = __require("src/ui/dom.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const HINT = Object.fromEntries(SPECTACLE_RULES.map((r) => [r.key, r.hint || (r.per ? `${r.per} pts each` : '')]));
+
+/** Stamina and morale before → after the match, with the reasons (revealed in step 5). */
+function condBlock(c) {
+  if (!c) return null;
+  const row = (label, [a, b], cls) => {
+    const d = Math.round(b - a);
+    return el('div', { class: `sp-cond ${cls}` }, [
+      el('span', { class: 'sp-cond-label' }, [label]),
+      el('span', { class: 'sp-cond-bar' }, [
+        el('b', { class: 'from', style: { width: `${a}%` } }),
+        el('b', { class: `to ${d < 0 ? 'down' : 'up'}`, style: { '--a': `${Math.min(a, b)}%`, '--w': `${Math.abs(b - a)}%` } }),
+      ]),
+      el('span', { class: 'sp-cond-num' }, [`${Math.round(a)} → ${Math.round(b)}`]),
+      el('span', { class: `sp-cond-d ${d < 0 ? 'neg' : 'pos'}` }, [`${d >= 0 ? '+' : ''}${d}`]),
+    ]);
+  };
+  const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
+    .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
+  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+}
 
 function showSpectacle(app, m, before, onClose) {
   const r = m.result;
@@ -13727,7 +14032,8 @@ function showSpectacle(app, m, before, onClose) {
     });
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
-    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`]);
+    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
+    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`, bonus ? el('small', {}, [` ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const balNum = el('span', { class: 'sp-bal-num' }, [String(balFrom)]);
@@ -13743,6 +14049,7 @@ function showSpectacle(app, m, before, onClose) {
         el('div', { class: 'sp-bal-label' }, [el('span', {}, ['★ FAME']), balNum]),
         el('div', { class: 'sp-bar' }, [barOld, barNew]),
       ]),
+      condBlock(r.condition?.[i]),
     ]);
     return { col, rows, total, s, barNew, balNum, balFrom, balTo, won };
   });
@@ -13801,7 +14108,9 @@ function showSpectacle(app, m, before, onClose) {
     }
   });
   tl += 1000;
-  at(tl, () => { root.classList.add('s5'); finished = true; });
+  at(tl, () => root.classList.add('s5'));
+  tl += 1100;
+  at(tl, () => { root.classList.add('s6'); finished = true; });
 
   for (const s of steps) timers.push(setTimeout(() => { if (!finished || s.at === tl) s.fn(false); }, s.at));
 

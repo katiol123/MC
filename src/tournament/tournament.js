@@ -11,6 +11,7 @@ import { AIController } from '../ai/aiController.js';
 import { ROSTER } from '../data/fighters.js';
 import { Rng } from '../core/rng.js';
 import { MatchStats } from './stats.js';
+import { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } from './condition.js';
 
 export const TOURNAMENT_RULES = { roundsToWin: 2, roundTime: 99 };
 /**
@@ -23,7 +24,7 @@ export const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 export const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 2;
+const VERSION = 3;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 export function roundRobin(ids) {
@@ -53,7 +54,12 @@ export function createTournament({ ids = ROSTER.map((f) => f.id), level = 'norma
   return {
     version: VERSION, created: Date.now(), seed, level, ids: ids.slice(), rounds,
     // per-fighter state that will grow (level-ups, injuries, upgrades); empty overrides for now
-    fighters: Object.fromEntries(ids.map((id) => [id, { overrides: {}, sp: 0, fame: 0, fameEarned: 0 }])),
+    fighters: Object.fromEntries(ids.map((id) => {
+      const f = { overrides: {}, sp: 0, fame: 0, fameEarned: 0 };
+      initCondition(f);
+      return [id, f];
+    })),
+    camp: [], // per round: what each manager bought after it
     roundAwards: [], // per round: the awards list, filled in when the round completes
     finalAwards: null,
   };
@@ -73,16 +79,22 @@ export function currentRound(t) {
   return n ? n.ri : t.rounds.length - 1;
 }
 
-/** Definition overrides for both fighters of a match, as they are right now (snapshot). */
+/**
+ * Definition overrides for both fighters of a match, as they are right now (snapshot): their own
+ * overrides plus the current stamina / morale applied to the bars.
+ */
 export function snapshotOverrides(t, m) {
-  const clone = (o) => JSON.parse(JSON.stringify(o || {}));
-  return [clone(t.fighters[m.a]?.overrides), clone(t.fighters[m.b]?.overrides)];
+  return [m.a, m.b].map((id) => {
+    const f = t.fighters[id];
+    return conditionOverrides(id, f?.overrides || {}, f || COND.start);
+  });
 }
 
 /** A fresh Match + AI pair for a scheduled match (used for live viewing, simulation and replays). */
 export function setupMatch(t, m, overrides = m.result?.overrides || snapshotOverrides(t, m)) {
   const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], ...TOURNAMENT_RULES });
   const ai = [new AIController(0, { level: t.level, seed: m.seed }), new AIController(1, { level: t.level, seed: m.seed * 7 + 3 })];
+  for (const a of ai) a.fatalityChance = fatalityChance;
   return { match, ai, overrides };
 }
 
@@ -121,17 +133,30 @@ export class MatchRunner {
 /** Stores a finished match (winner, score, stats, spectacle points, the overrides used). */
 export function recordResult(t, m, match, stats, overrides) {
   const rep = stats.report(match);
+  const tableBefore = standings(t);
+  const played = tableBefore.some((r) => r.played > 0);
+  const underdog = new Set(played ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : []);
   m.result = { ...rep, overrides, playedAt: Date.now() };
+  m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
   rep.sides.forEach((s, i) => {
-    const fame = Math.round(s.spectacle.total * FAME_PER_SP);
+    const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
+    const under = underdog.has(ids[i]);
+    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + (firedUp ? COND.firedUpFame : 0) + (under ? COND.underdogFame : 0)));
     s.fame = fame;
+    s.firedUp = firedUp;
+    s.underdog = under;
     t.fighters[ids[i]].sp += s.spectacle.total;
     addFame(t, ids[i], fame);
   });
   // a round (tour) that just completed hands out its awards; the last match closes the tournament
   t.rounds.forEach((r, ri) => {
-    if (!t.roundAwards[ri] && roundComplete(t, ri)) t.roundAwards[ri] = grantAwards(t, awards(t, ri));
+    if (!t.roundAwards[ri] && roundComplete(t, ri)) {
+      t.roundAwards[ri] = grantAwards(t, awards(t, ri));
+      // the camp between rounds: everyone rests, then the managers spend fame on recovery
+      restRound(t);
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, autoManage(t, id)]));
+    }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
   save(t);
@@ -147,14 +172,17 @@ function addFame(t, id, n) {
 /** Each award winner gets AWARD_FAME bonus fame; returns the list with the bonus noted. */
 function grantAwards(t, list) {
   return list.map((a) => {
-    if (a.id) addFame(t, a.id, AWARD_FAME);
+    if (a.id) {
+      addFame(t, a.id, AWARD_FAME);
+      t.fighters[a.id].morale = Math.min(100, t.fighters[a.id].morale + COND.award);
+    }
     return { ...a, fame: a.id ? AWARD_FAME : 0 };
   });
 }
 
 /** League table with tie-breaks: points, head-to-head, round difference, damage dealt, perfects. */
 export function standings(t) {
-  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame });
+  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale });
   const rows = Object.fromEntries(t.ids.map((id) => [id, row(id)]));
   const h2h = {};
   for (const { m } of allMatches(t)) {

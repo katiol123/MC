@@ -11,6 +11,26 @@ import { el } from './dom.js';
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const HINT = Object.fromEntries(SPECTACLE_RULES.map((r) => [r.key, r.hint || (r.per ? `${r.per} pts each` : '')]));
 
+/** Stamina and morale before → after the match, with the reasons (revealed in step 5). */
+function condBlock(c) {
+  if (!c) return null;
+  const row = (label, [a, b], cls) => {
+    const d = Math.round(b - a);
+    return el('div', { class: `sp-cond ${cls}` }, [
+      el('span', { class: 'sp-cond-label' }, [label]),
+      el('span', { class: 'sp-cond-bar' }, [
+        el('b', { class: 'from', style: { width: `${a}%` } }),
+        el('b', { class: `to ${d < 0 ? 'down' : 'up'}`, style: { '--a': `${Math.min(a, b)}%`, '--w': `${Math.abs(b - a)}%` } }),
+      ]),
+      el('span', { class: 'sp-cond-num' }, [`${Math.round(a)} → ${Math.round(b)}`]),
+      el('span', { class: `sp-cond-d ${d < 0 ? 'neg' : 'pos'}` }, [`${d >= 0 ? '+' : ''}${d}`]),
+    ]);
+  };
+  const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
+    .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
+  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+}
+
 export function showSpectacle(app, m, before, onClose) {
   const r = m.result;
   const ids = [m.a, m.b];
@@ -51,7 +71,8 @@ export function showSpectacle(app, m, before, onClose) {
     });
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
-    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`]);
+    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
+    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`, bonus ? el('small', {}, [` ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const balNum = el('span', { class: 'sp-bal-num' }, [String(balFrom)]);
@@ -67,6 +88,7 @@ export function showSpectacle(app, m, before, onClose) {
         el('div', { class: 'sp-bal-label' }, [el('span', {}, ['★ FAME']), balNum]),
         el('div', { class: 'sp-bar' }, [barOld, barNew]),
       ]),
+      condBlock(r.condition?.[i]),
     ]);
     return { col, rows, total, s, barNew, balNum, balFrom, balTo, won };
   });
@@ -125,7 +147,9 @@ export function showSpectacle(app, m, before, onClose) {
     }
   });
   tl += 1000;
-  at(tl, () => { root.classList.add('s5'); finished = true; });
+  at(tl, () => root.classList.add('s5'));
+  tl += 1100;
+  at(tl, () => { root.classList.add('s6'); finished = true; });
 
   for (const s of steps) timers.push(setTimeout(() => { if (!finished || s.at === tl) s.fn(false); }, s.at));
 

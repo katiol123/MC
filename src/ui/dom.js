@@ -2,6 +2,7 @@
 export function el(tag, attrs = {}, children = []) {
   const e = document.createElement(tag);
   for (const k in attrs) {
+    if (attrs[k] == null) continue;
     if (k === 'class') e.className = attrs[k];
     else if (k === 'style' && typeof attrs[k] === 'object') {
       for (const sk in attrs[k]) {
