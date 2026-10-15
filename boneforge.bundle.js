@@ -12463,6 +12463,7 @@ __define("src/tournament/tournament.js", function (__exports, __require) {
   Object.defineProperty(__exports, "setupMatch", { enumerable: true, get: () => setupMatch });
   Object.defineProperty(__exports, "MatchRunner", { enumerable: true, get: () => MatchRunner });
   Object.defineProperty(__exports, "recordResult", { enumerable: true, get: () => recordResult });
+  Object.defineProperty(__exports, "snapshot", { enumerable: true, get: () => snapshot });
   Object.defineProperty(__exports, "standings", { enumerable: true, get: () => standings });
   Object.defineProperty(__exports, "roundComplete", { enumerable: true, get: () => roundComplete });
   Object.defineProperty(__exports, "awards", { enumerable: true, get: () => awards });
@@ -12499,7 +12500,7 @@ const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 4;
+const VERSION = 5;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 function roundRobin(ids) {
@@ -12518,7 +12519,7 @@ function roundRobin(ids) {
   return rounds;
 }
 
-function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', seed = Math.floor(Math.random() * 1e9) } = {}) {
+function createTournamentRaw({ ids = ROSTER.map((f) => f.id), level = 'normal', seed = Math.floor(Math.random() * 1e9) } = {}) {
   const rng = new Rng(seed);
   const shuffled = ids.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -12535,10 +12536,18 @@ function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', see
       initInjuries(f);
       return [id, f];
     })),
-    camp: [], // per round: what each manager bought after it
+    camp: [], // per round: { id: { items, spent, fameLeft } } what each manager bought after it
+    underdogs: [], // per round: the bottom of the table when the round started (fame bonus)
+    history: [], // per completed round (index 0 = before the first round): snapshot per fighter, for the charts
     roundAwards: [], // per round: the awards list, filled in when the round completes
     finalAwards: null,
   };
+}
+
+function createTournament(opts) {
+  const t = createTournamentRaw(opts);
+  t.history[0] = snapshot(t);
+  return t;
 }
 
 function allMatches(t) {
@@ -12615,8 +12624,10 @@ class MatchRunner {
 function recordResult(t, m, match, stats, overrides) {
   const rep = stats.report(match);
   const tableBefore = standings(t);
-  const played = tableBefore.some((r) => r.played > 0);
-  const underdog = new Set(played ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : []);
+  // the underdogs of a round are fixed by the table at the start of that round (its first match)
+  const ri = t.rounds.findIndex((r) => r.includes(m));
+  if (t.underdogs[ri] === undefined) t.underdogs[ri] = ri + 1 >= COND.underdogFromRound ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : [];
+  const underdog = new Set(t.underdogs[ri]);
   m.result = { ...rep, overrides, playedAt: Date.now() };
   m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
@@ -12643,12 +12654,30 @@ function recordResult(t, m, match, stats, overrides) {
       t.roundAwards[ri] = grantAwards(t, awards(t, ri));
       // the camp between rounds: everyone rests, then the managers spend fame on recovery
       restRound(t);
-      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, [...autoManage(t, id), ...autoInvest(t, id, BASE[id])]]));
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => {
+        const f = t.fighters[id], before = f.fame;
+        const items = [...autoManage(t, id), ...autoInvest(t, id, BASE[id])];
+        return [id, { items, spent: before - f.fame, fameLeft: f.fame }];
+      }));
+      t.history[ri + 1] = snapshot(t);
     }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
   save(t);
   return m.result;
+}
+
+/** Per-fighter numbers for the charts: place, fame, attribute index, morale, stamina, injuries. */
+function snapshot(t) {
+  const table = standings(t);
+  const out = {};
+  table.forEach((r, i) => {
+    const f = t.fighters[r.id], b = BASE[r.id];
+    const keys = Object.keys(b);
+    const attr = keys.reduce((s, a) => s + (b[a] ?? 0.5) + (f.perm?.[a] || 0), 0) / keys.length;
+    out[r.id] = { place: i + 1, pts: r.pts, fame: f.fame, fameEarned: f.fameEarned, attr: Math.round(attr * 1000) / 10, morale: Math.round(f.morale), stamina: Math.round(f.stamina), injuries: f.injuries.length };
+  });
+  return out;
 }
 
 function addFame(t, id, n) {
@@ -12982,7 +13011,7 @@ const COND = {
   streak: 3, // a streak of this many results amplifies morale changes by 50 %
   exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
   firedUp: 90, firedUpFame: 0.1, // confident fighters get 10 % more fame (the crowd loves them)
-  underdogs: 4, underdogFame: 0.2, // the bottom 4 of the table get 20 % more fame (fans back the underdog)
+  underdogs: 4, underdogFame: 0.2, underdogFromRound: 3, // from round 3, the bottom 4 of the table AT THE START OF THE ROUND get 20 % more fame
   redemption: 35, redemptionMorale: 6, // a win from a low ebb lifts morale extra
 };
 
@@ -13822,6 +13851,8 @@ const { ROSTER } = __require("src/data/fighters.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 const { createTournament, load, save, clearSaved, standings, awards, tournamentAwards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
 const { showSpectacle } = __require("src/ui/spectacle.js");
+const { faceStyle } = __require("src/ui/faces.js");
+const { showCharts } = __require("src/ui/charts.js");
 const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
 const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } = __require("src/tournament/injuries.js");
 const { ATTRIBUTES } = __require("src/data/attributes.js");
@@ -13852,8 +13883,10 @@ class TournamentScene {
     this.app.audio.stopMusic();
     this.unsub = this.app.keyboard.onPress((code) => this.onKey(code));
     if (!this.t) return this.showNew();
-    this.render();
+    // coming back from a fight straight into a report: the table is drawn (and animated) only once
+    // the report closes, so it never flashes underneath
     if (this.afterEnter) { const f = this.afterEnter; this.afterEnter = null; f(this); }
+    else this.render();
   }
 
   exit() {
@@ -13870,6 +13903,7 @@ class TournamentScene {
     if (code === 'Enter' && !isFinished(this.t)) this.watchNext();
     else if (code === 'Space' && !isFinished(this.t)) this.simulate('one');
     else if (code === 'KeyG') this.showGrid();
+    else if (code === 'KeyC') this.openCharts();
     else if (code === 'ArrowLeft' || code === 'KeyA') this.browse(-1);
     else if (code === 'ArrowRight' || code === 'KeyD') this.browse(1);
     else if (code === 'Escape') this.app.goTitle();
@@ -13895,7 +13929,7 @@ class TournamentScene {
         el('p', { class: 'tour-lead' }, [`${ROSTER.length} fighters · everyone fights everyone · ${ROSTER.length - 1} rounds · ${(ROSTER.length * (ROSTER.length - 1)) / 2} matches`]),
         el('p', { class: 'tour-lead small' }, [`Best of 3 · CPU level: ${level} · 2:0 win = ${POINTS.win20} pts, 2:1 = ${POINTS.win21}, 1:2 loss = ${POINTS.loss12}`]),
         el('p', { class: 'tour-lead small' }, [`Spectacle points turn into FAME (${FAME_PER_SP}:1) · every round award: +${AWARD_FAME} fame`]),
-        el('div', { class: 'tour-faces' }, ROSTER.map((f, i) => el('div', { class: 'tour-face', style: { backgroundImage: `url(${this.app.portraitURL(f.id)})`, '--i': i } }))),
+        el('div', { class: 'tour-faces' }, ROSTER.map((f, i) => el('div', { class: 'tour-face', style: { ...faceStyle(this.app, f.id), '--i': i } }))),
         el('div', { class: 'tour-actions' }, [
           btn('START TOURNAMENT', () => { this.t = createTournament({ level }); save(this.t); this.app.audio.ui('confirm'); this.render(); }, 'big'),
           btn('MAIN MENU', () => this.app.goTitle()),
@@ -13919,7 +13953,7 @@ class TournamentScene {
 
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
-      el('span', { class: 'tface', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }),
+      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
       el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
@@ -13931,11 +13965,13 @@ class TournamentScene {
       el('span', { class: 'tpts' }, [String(r.pts)]),
     ]));
 
+    const placeOf = Object.fromEntries(table.map((r, i) => [r.id, i + 1]));
     const fixtures = t.rounds[vr].map((m) => {
       const r = m.result, isNext = nx && nx.m === m;
       const side = (id, i) => el('div', { class: `fx-side ${r && r.winner === i ? 'won' : ''} ${r && r.winner !== i && r.winner !== 'draw' ? 'lost' : ''}` }, [
-        el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+        el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
         el('span', { class: 'fx-name' }, [short(id)]),
+        el('span', { class: 'fx-place', title: 'current place in the table' }, [`(${placeOf[id]})`]),
       ]);
       return el('div', { class: `fx ${isNext ? 'next' : ''} ${r ? 'done' : ''}`, onclick: r ? () => this.replay(m) : null, title: r ? 'Click to replay' : '' }, [
         side(m.a, 0),
@@ -13967,12 +14003,12 @@ class TournamentScene {
         el('div', { class: 'fixtures' }, fixtures),
         roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
         el('div', { class: 'tour-actions col' }, finished
-          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
           : [
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE ALL', () => this.simulate('all')), btn('RESULTS GRID', () => this.showGrid())]),
-            btn('🏕 TRAINING CAMP · spend fame', () => this.showCamp(), 'camp'),
+            el('div', { class: 'tour-actions' }, [btn('🏕 TRAINING CAMP', () => this.showCamp(), 'camp wide'), btn('📈 CHARTS', () => this.openCharts(), 'camp wide')]),
             el('div', { class: 'tour-actions' }, [btn('NEW', () => this.confirmNew(), 'mini wide'), btn('MAIN MENU', () => this.app.goTitle(), 'mini wide')]),
           ]),
         el('div', { class: 'tour-help' }, ['Enter watch · Space simulate · ◀ ▶ rounds · G grid · click a result to replay']),
@@ -14061,9 +14097,9 @@ class TournamentScene {
       const m = s.queue.shift();
       s.runner = new MatchRunner(this.t, m);
       this.simVs.replaceChildren(
-        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.a)})` } }),
+        el('span', { class: 'fx-face big', style: { ...faceStyle(this.app, m.a) } }),
         el('b', {}, ['VS']),
-        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.b)})` } }),
+        el('span', { class: 'fx-face big', style: { ...faceStyle(this.app, m.b) } }),
       );
     }
     if (s.runner.advance(14)) {
@@ -14083,9 +14119,13 @@ class TournamentScene {
     this.modal = null;
     this.simEl?.remove();
     this.viewRound = null;
-    this.render();
-    if (s.single && s.last) this.spectacle(s.last, s.before);
-    else this.afterResults();
+    if (s.single && s.last) {
+      this.root?.remove(); // the report opens on a clean screen; the table animates in after it
+      this.spectacle(s.last, s.before);
+    } else {
+      this.render();
+      this.afterResults();
+    }
   }
 
   // --- spectacle report ---------------------------------------------------------------------------
@@ -14108,9 +14148,9 @@ class TournamentScene {
       res[`${m.a}|${m.b}`] = { m, i: 0 };
       res[`${m.b}|${m.a}`] = { m, i: 1 };
     }
-    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(id)})` }, title: NAME[id] }))];
+    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: NAME[id] }))];
     const body = order.flatMap((rid) => [
-      el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(rid)})` }, title: NAME[rid] }),
+      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: NAME[rid] }),
       ...order.map((cid) => {
         if (rid === cid) return el('div', { class: 'gcell self' });
         const x = res[`${rid}|${cid}`];
@@ -14144,10 +14184,10 @@ class TournamentScene {
         const s = conditionShift(v, kind);
         return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
       };
-      const bought = lastCamp[id] || [];
+      const bought = lastCamp[id]?.items || [];
       return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
         el('div', { class: 'camp-top' }, [
-          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
           el('span', { class: 'camp-name' }, [short(id)]),
           el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
             el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
@@ -14215,7 +14255,7 @@ class TournamentScene {
     const wrap = el('div', { class: 'menu-overlay upgrades' }, [
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
-          el('span', { class: 'sp-portrait', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
           el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
@@ -14232,6 +14272,11 @@ class TournamentScene {
     document.getElementById('ui').appendChild(wrap);
   }
 
+  openCharts() {
+    this.modal = true;
+    showCharts(this.app, this.t, () => { this.modal = null; });
+  }
+
   // --- awards ---------------------------------------------------------------------------------------
   /** After results come in: newly completed rounds get their awards screen, then the final. */
   afterResults() {
@@ -14242,14 +14287,52 @@ class TournamentScene {
     save(t);
     const done = () => { if (isFinished(t)) this.showFinal(); };
     // a long batch completes many rounds at once: show the latest one (the rest stay viewable)
-    if (fresh.length) this.showRoundAwards(fresh[fresh.length - 1], done);
+    const last = fresh[fresh.length - 1];
+    if (fresh.length) this.showRoundAwards(last, () => this.showCampReport(last, done));
     else done();
+  }
+
+  /** After the round awards: what every fighter's manager spent fame on in the camp (or that they saved). */
+  showCampReport(ri, then = null) {
+    const t = this.t, camp = t.camp?.[ri];
+    if (!camp) return then?.();
+    const label = (b) => (b === 'treat' ? '🩺 Treatment' : b.startsWith('up:') ? `⬆ ${ATTR_LABEL[b.slice(3)]}` : `${SHOP.find((x) => x.id === b)?.icon} ${SHOP.find((x) => x.id === b)?.label}`);
+    const order = standings(t).map((r) => r.id);
+    const rows = order.map((id, i) => {
+      const c = camp[id] || { items: [], spent: 0, fameLeft: t.fighters[id].fame };
+      const counts = {};
+      for (const b of c.items) counts[b] = (counts[b] || 0) + 1;
+      return el('div', { class: `cr-row ${c.spent ? '' : 'saved'}`, style: { '--i': i } }, [
+        el('span', { class: 'fx-face', style: faceStyle(this.app, id) }),
+        el('span', { class: 'cr-name' }, [short(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
+        el('span', { class: 'cr-items' }, c.items.length
+          ? Object.entries(counts).map(([b, n]) => el('em', {}, [`${label(b)}${n > 1 ? ` ×${n}` : ''}`]))
+          : [el('em', { class: 'none' }, ['spent nothing'])]),
+        el('span', { class: 'cr-spent' }, [c.spent ? `−${c.spent}` : '0']),
+        el('span', { class: 'cr-left' }, [`★${c.fameLeft}`]),
+      ]);
+    });
+    const close = () => { wrap.remove(); this.modal = null; unsub(); then?.(); };
+    const total = Object.values(camp).reduce((a, c) => a + c.spent, 0);
+    const wrap = el('div', { class: 'menu-overlay final camp-report' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, [`AFTER ROUND ${ri + 1}`]),
+        el('div', { class: 'awards-title small' }, ['TRAINING CAMP SPENDING']),
+        el('div', { class: 'cr-head' }, [el('span', {}, ['']), el('span', {}, ['FIGHTER']), el('span', {}, ['BOUGHT']), el('span', {}, ['SPENT']), el('span', {}, ['FAME LEFT'])]),
+        el('div', { class: 'cr-list' }, rows),
+        el('div', { class: 'cr-total' }, [`League total: ★${total} spent`]),
+        el('div', { class: 'tour-actions' }, [btn('CONTINUE', close, 'big')]),
+      ]),
+    ]);
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (['Escape', 'Enter', 'Space'].includes(code)) close(); });
+    document.getElementById('ui').appendChild(wrap);
   }
 
   awardCards(list, delay = 0.4) {
     return el('div', { class: 'awards' }, list.map((a, i) => el('div', { class: 'award', style: { '--d': `${delay + i * 0.3}s` } }, [
       el('div', { class: 'award-title' }, [a.title]),
-      a.id ? el('div', { class: 'award-face', style: { backgroundImage: `url(${this.app.portraitURL(a.id)})` } }) : el('div', { class: 'award-face none' }),
+      a.id ? el('div', { class: 'award-face', style: { ...faceStyle(this.app, a.id) } }) : el('div', { class: 'award-face none' }),
       el('div', { class: 'award-name' }, [a.id ? short(a.id) : 'nobody']),
       el('div', { class: 'award-value' }, [a.value]),
       a.note ? el('div', { class: 'award-note' }, [a.note.replace(/vs (\w+)/, (_, id) => `vs ${short(id)}`)]) : null,
@@ -14288,7 +14371,7 @@ class TournamentScene {
           el('div', { class: 'final-name' }, [NAME[champ.id], el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
-          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
         el('div', { class: 'awards-label' }, ['TOURNAMENT AWARDS']),
         this.awardCards(list, 0.9),
         el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
@@ -14337,6 +14420,7 @@ __define("src/ui/spectacle.js", function (__exports, __require) {
 const { ROSTER } = __require("src/data/fighters.js");
 const { SPECTACLE_RULES } = __require("src/tournament/stats.js");
 const { el } = __require("src/ui/dom.js");
+const { faceStyle } = __require("src/ui/faces.js");
 const { INJURIES } = __require("src/tournament/injuries.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -14357,9 +14441,10 @@ function condBlock(c) {
       el('span', { class: `sp-cond-d ${d < 0 ? 'neg' : 'pos'}` }, [`${d >= 0 ? '+' : ''}${d}`]),
     ]);
   };
-  const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
-    .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
-  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+  // each bar gets its own reasons right under it
+  const notes = (key, cls) => el('div', { class: `sp-notes ${cls}` }, c.notes.filter((n) => n[key]).map((n) =>
+    el('span', { class: n[key] < 0 ? 'neg' : 'pos' }, [`${n.label} ${n[key] > 0 ? '+' : ''}${n[key]}`])));
+  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), notes('stamina', 'sta'), row('MORALE', c.morale, 'mor'), notes('morale', 'mor')]);
 }
 
 /** A new injury from this match: what it is, how long, and the permanent damage. */
@@ -14414,13 +14499,13 @@ function showSpectacle(app, m, before, onClose) {
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
     const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
-    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`, bonus ? el('small', {}, [` ${bonus}`]) : null]);
+    const fameChip = el('div', { class: 'sp-fame' }, [`→ ${fameOf(i)} FAME`, bonus ? el('small', {}, [` · ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const balNum = el('span', { class: 'sp-bal-num' }, [String(balFrom)]);
     const col = el('div', { class: `sp-col ${i ? 'right' : 'left'} ${won ? 'won' : ''}` }, [
       el('div', { class: 'sp-head' }, [
-        el('div', { class: 'sp-portrait', style: { backgroundImage: `url(${app.portraitURL(id)})` } }),
+        el('div', { class: 'sp-portrait', style: faceStyle(app, id) }),
         el('div', { class: 'sp-name' }, [NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
       ]),
       el('div', { class: 'sp-list' }, rows.length ? rows.map((x) => x.row) : [el('div', { class: 'sp-row empty' }, ['no highlights this time'])]),
@@ -14519,6 +14604,212 @@ function showSpectacle(app, m, before, onClose) {
   });
   document.getElementById('ui').appendChild(root);
   return { close };
+}
+
+});
+__define("src/ui/faces.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "faceStyle", { enumerable: true, get: () => faceStyle });
+// Round avatars: every portrait is framed on the fighter's FACE (the portraits are upper-body
+// cut-outs with the face in a different place on each). FACE = [centre x, centre y, face width],
+// all as fractions of the portrait (600×1071).
+const FACE = {
+  brick: [0.45, 0.23, 0.5], bruno: [0.45, 0.29, 0.45], chuy: [0.4, 0.28, 0.32], cinder: [0.5, 0.32, 0.35],
+  goro: [0.48, 0.31, 0.55], grizz: [0.5, 0.33, 0.42], hawk: [0.45, 0.28, 0.4], jaguar: [0.52, 0.29, 0.42],
+  jax: [0.48, 0.33, 0.5], rattigan: [0.48, 0.35, 0.5], roxy: [0.38, 0.27, 0.34], smiles: [0.48, 0.32, 0.58],
+  snapper: [0.55, 0.24, 0.55], sobby: [0.5, 0.27, 0.5], tao: [0.6, 0.27, 0.36], vellaro: [0.48, 0.36, 0.45],
+};
+const ASPECT = 1071 / 600;
+
+/** Inline style that fills a round box with the fighter's face (works at any box size). */
+function faceStyle(app, id, fill = 0.9) {
+  const [cx, cy, fw] = FACE[id] || [0.5, 0.3, 0.45];
+  const k = fill / fw; // image width relative to the box
+  const px = (0.5 - cx * k) / (1 - k), py = (0.5 - cy * k * ASPECT) / (1 - k * ASPECT);
+  return {
+    backgroundImage: `url(${app.portraitURL(id)})`,
+    backgroundSize: `${(k * 100).toFixed(1)}% auto`,
+    backgroundPosition: `${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%`,
+    backgroundRepeat: 'no-repeat',
+  };
+}
+
+});
+__define("src/ui/charts.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "showCharts", { enumerable: true, get: () => showCharts });
+// Tournament charts: how any set of fighters moved through the tournament, round by round.
+// Metrics: table place, fame balance, fame earned, attribute index (average bar incl. upgrades and
+// injury damage), morale, stamina. Pick any fighters (or all) to compare.
+//   - every fighter keeps one colour + marker shape whatever else is selected
+//   - equal values never merge into one line: each series is nudged by a small fixed offset
+//   - hover a line to bring it forward; hover the plot for a crosshair with every value of that round
+const { ROSTER } = __require("src/data/fighters.js");
+const { el } = __require("src/ui/dom.js");
+const { faceStyle } = __require("src/ui/faces.js");
+
+const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
+const short = (id) => { const n = NAME[id] || id; const m = n.match(/"([^"]+)"/); return m ? m[1] : n.split(' ').slice(-1)[0]; };
+
+const METRICS = [
+  { key: 'place', label: 'PLACE', invert: true, fmt: (v) => `#${v}` },
+  { key: 'fame', label: 'FAME (balance)', fmt: (v) => `★${v}` },
+  { key: 'fameEarned', label: 'FAME EARNED', fmt: (v) => `★${v}` },
+  { key: 'attr', label: 'ATTRIBUTES', fmt: (v) => `${v.toFixed(1)} %`, hint: 'average of the 10 bars (base + upgrades − injury damage), % of the roster range' },
+  { key: 'morale', label: 'MORALE', fmt: (v) => String(v), fixed: [0, 100] },
+  { key: 'stamina', label: 'STAMINA', fmt: (v) => String(v), fixed: [0, 100] },
+];
+
+// 16 fixed identity colours (well apart in hue, alternating lightness for neighbours) + 4 marker shapes
+const COLORS = ['#ff4fd8', '#3fe6d0', '#ffd23f', '#7a8aff', '#ff8a3a', '#5ff07a', '#ff5a6a', '#4fb8ff',
+  '#d88aff', '#c8f050', '#ffb8e0', '#2fb8a8', '#f0a050', '#a0a0ff', '#e0e0e0', '#ff3a9a'];
+const SHAPES = ['circle', 'square', 'diamond', 'triangle'];
+
+const W = 860, H = 470, PAD = { l: 58, r: 120, t: 18, b: 34 };
+
+function marker(shape, x, y, r, color) {
+  if (shape === 'square') return `<rect x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}" rx="1.5" fill="${color}" stroke="#0c0610" stroke-width="2"/>`;
+  if (shape === 'diamond') return `<path d="M${x} ${y - r - 1}L${x + r + 1} ${y}L${x} ${y + r + 1}L${x - r - 1} ${y}Z" fill="${color}" stroke="#0c0610" stroke-width="2"/>`;
+  if (shape === 'triangle') return `<path d="M${x} ${y - r - 1}L${x + r + 1} ${y + r}L${x - r - 1} ${y + r}Z" fill="${color}" stroke="#0c0610" stroke-width="2"/>`;
+  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" stroke="#0c0610" stroke-width="2"/>`;
+}
+
+function showCharts(app, t, onClose) {
+  const ids = t.ids.slice();
+  const colorOf = Object.fromEntries(ids.map((id, i) => [id, COLORS[i % COLORS.length]]));
+  const shapeOf = Object.fromEntries(ids.map((id, i) => [id, SHAPES[i % SHAPES.length]]));
+  const hist = (t.history || []).map((h, i) => (h ? { r: i, h } : null)).filter(Boolean);
+  let metric = METRICS[0];
+  let sel = new Set(standingsTop(t, 4));
+  let hot = null;
+
+  const plot = el('div', { class: 'ch-plot' });
+  const tip = el('div', { class: 'ch-tip' });
+  const chips = el('div', { class: 'ch-chips' });
+  const tabs = el('div', { class: 'ch-tabs' });
+  const note = el('div', { class: 'ch-note' });
+
+  function draw() {
+    tabs.replaceChildren(...METRICS.map((m) => el('button', { class: `ch-tab ${m === metric ? 'on' : ''}`, onclick: () => { metric = m; draw(); } }, [m.label])));
+    chips.replaceChildren(
+      el('button', { class: 'ch-chip all', onclick: () => { sel = new Set(ids); draw(); } }, ['ALL']),
+      el('button', { class: 'ch-chip all', onclick: () => { sel = new Set(); draw(); } }, ['NONE']),
+      ...ids.map((id) => el('button', {
+        class: `ch-chip ${sel.has(id) ? 'on' : ''}`, style: { '--c': colorOf[id] },
+        onclick: () => { sel.has(id) ? sel.delete(id) : sel.add(id); draw(); },
+        onmouseenter: () => { hot = id; drawPlot(); }, onmouseleave: () => { hot = null; drawPlot(); },
+      }, [el('span', { class: 'fx-face', style: faceStyle(app, id) }), el('i', {}), short(id)])),
+    );
+    note.textContent = metric.hint || (hist.length < 2 ? 'The charts fill in as rounds are completed.' : '');
+    drawPlot();
+  }
+
+  function drawPlot() {
+    const series = ids.filter((id) => sel.has(id));
+    const xs = hist.map((x) => x.r);
+    const maxR = Math.max(1, ...xs);
+    let lo = Infinity, hi = -Infinity;
+    for (const id of series) for (const { h } of hist) { const v = h[id]?.[metric.key]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+    if (metric.key === 'place') { lo = 1; hi = ids.length; }
+    else if (metric.fixed) [lo, hi] = metric.fixed;
+    if (!(hi > lo)) { lo = (isFinite(lo) ? lo : 0) - 1; hi = (isFinite(hi) ? hi : 1) + 1; }
+    const span = hi - lo, padv = metric.key === 'place' || metric.fixed ? 0 : span * 0.08;
+    lo -= padv; hi += padv;
+    const X = (r) => PAD.l + (r / maxR) * (W - PAD.l - PAD.r);
+    const Y = (v) => {
+      const k = (v - lo) / (hi - lo);
+      return PAD.t + (metric.invert ? k : 1 - k) * (H - PAD.t - PAD.b);
+    };
+    // nudge: equal values stay distinguishable (each series a little up / down, fixed per fighter)
+    const nudge = (id) => (series.length > 1 ? (ids.indexOf(id) - (ids.length - 1) / 2) * 1.1 : 0);
+    let g = '';
+    // grid + axes (recessive)
+    const ticks = metric.key === 'place' ? [1, 4, 8, 12, 16].filter((v) => v <= ids.length) : niceTicks(lo, hi, 5);
+    for (const v of ticks) {
+      const y = Y(v);
+      g += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.08)"/>`;
+      g += `<text x="${PAD.l - 8}" y="${y + 4}" text-anchor="end" class="ch-ax">${metric.fmt(v)}</text>`;
+    }
+    for (const r of xs) {
+      if (maxR > 10 && r % 2 && r !== maxR) continue;
+      g += `<text x="${X(r)}" y="${H - 10}" text-anchor="middle" class="ch-ax">${r === 0 ? 'start' : `R${r}`}</text>`;
+    }
+    // lines: the hovered one last (on top), others dimmed while something is hovered
+    const order = series.filter((id) => id !== hot).concat(series.includes(hot) ? [hot] : []);
+    for (const id of order) {
+      const pts = hist.map(({ r, h }) => (h[id] ? [X(r), Y(h[id][metric.key]) + nudge(id)] : null)).filter(Boolean);
+      if (!pts.length) continue;
+      const dim = hot && hot !== id ? 0.18 : 1;
+      const c = colorOf[id];
+      g += `<g opacity="${dim}" data-id="${id}">`;
+      g += `<polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#0c0610" stroke-width="5" stroke-linejoin="round"/>`;
+      g += `<polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="${hot === id ? 3.5 : 2}" stroke-linejoin="round"/>`;
+      for (const [x, y] of pts) g += marker(shapeOf[id], x, y, hot === id ? 5 : 4, c);
+      // direct label at the end of the line (when few series or hovered)
+      if (series.length <= 6 || hot === id) {
+        const [x, y] = pts[pts.length - 1];
+        g += `<text x="${x + 10}" y="${y + 4}" class="ch-lab" fill="#efe6fb">${short(id)}</text>`;
+      }
+      g += '</g>';
+    }
+    // crosshair layer
+    g += `<line class="ch-cross" x1="0" x2="0" y1="${PAD.t}" y2="${H - PAD.b}" stroke="rgba(255,255,255,.35)" stroke-dasharray="3 3" visibility="hidden"/>`;
+    plot.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${g}</svg>`;
+    const svg = plot.firstChild;
+    svg.addEventListener('mousemove', (e) => {
+      const b = svg.getBoundingClientRect();
+      const mx = ((e.clientX - b.left) / b.width) * W;
+      if (!hist.length || !series.length) return;
+      const r = xs.reduce((best, x) => (Math.abs(X(x) - mx) < Math.abs(X(best) - mx) ? x : best), xs[0]);
+      const cross = svg.querySelector('.ch-cross');
+      cross.setAttribute('x1', X(r)); cross.setAttribute('x2', X(r)); cross.setAttribute('visibility', 'visible');
+      const h = hist.find((x) => x.r === r).h;
+      const rows = series.filter((id) => h[id]).map((id) => [id, h[id][metric.key]])
+        .sort((a, b) => (metric.invert ? a[1] - b[1] : b[1] - a[1]));
+      tip.replaceChildren(el('b', {}, [r === 0 ? 'START' : `AFTER ROUND ${r}`]), ...rows.map(([id, v]) => el('div', { class: hot === id ? 'hot' : '' }, [
+        el('i', { style: { background: colorOf[id] } }), el('span', {}, [short(id)]), el('em', {}, [metric.fmt(v)]),
+      ])));
+      tip.style.display = 'block';
+      const left = (X(r) / W) * b.width;
+      tip.style.left = `${left > b.width * 0.6 ? left - 200 : left + 16}px`;
+    });
+    svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; svg.querySelector('.ch-cross')?.setAttribute('visibility', 'hidden'); });
+    // hovering a line brings it forward without redrawing (the crosshair and tooltip stay)
+    const groups = [...svg.querySelectorAll('g[data-id]')];
+    const focus = (id) => {
+      hot = id;
+      for (const n of groups) n.setAttribute('opacity', !id || n.dataset.id === id ? 1 : 0.18);
+      const n = groups.find((x) => x.dataset.id === id);
+      if (n) svg.insertBefore(n, svg.querySelector('.ch-cross'));
+    };
+    groups.forEach((n) => n.addEventListener('mouseenter', () => focus(n.dataset.id)));
+    svg.addEventListener('mouseleave', () => focus(null));
+    plot.appendChild(tip);
+  }
+
+  const close = () => { wrap.remove(); unsub(); onClose?.(); };
+  const wrap = el('div', { class: 'menu-overlay charts' }, [
+    el('div', { class: 'ch-panel' }, [
+      el('div', { class: 'ch-head' }, [el('div', { class: 'awards-title small' }, ['CHARTS']), tabs, el('button', { class: 'tbtn mini', onclick: close }, ['CLOSE'])]),
+      note,
+      el('div', { class: 'ch-body' }, [plot, chips]),
+    ]),
+  ]);
+  const unsub = app.keyboard.onPress((code) => { if (code === 'Escape') close(); });
+  document.getElementById('ui').appendChild(wrap);
+  draw();
+}
+
+function standingsTop(t, n) {
+  const last = (t.history || []).filter(Boolean).pop();
+  if (!last) return t.ids.slice(0, n);
+  return Object.entries(last).sort((a, b) => a[1].place - b[1].place).slice(0, n).map(([id]) => id);
+}
+
+function niceTicks(lo, hi, n) {
+  const step0 = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((s) => s >= step0) || step0;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 100) / 100);
+  return out;
 }
 
 });

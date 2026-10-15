@@ -29,7 +29,7 @@ export const COND = {
   streak: 3, // a streak of this many results amplifies morale changes by 50 %
   exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
   firedUp: 90, firedUpFame: 0.1, // confident fighters get 10 % more fame (the crowd loves them)
-  underdogs: 4, underdogFame: 0.2, // the bottom 4 of the table get 20 % more fame (fans back the underdog)
+  underdogs: 4, underdogFame: 0.2, underdogFromRound: 3, // from round 3, the bottom 4 of the table AT THE START OF THE ROUND get 20 % more fame
   redemption: 35, redemptionMorale: 6, // a win from a low ebb lifts morale extra
 };
 

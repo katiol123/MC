@@ -8,6 +8,8 @@ import {
   currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME,
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
+import { faceStyle } from './faces.js';
+import { showCharts } from './charts.js';
 import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
 import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } from '../tournament/injuries.js';
 import { ATTRIBUTES } from '../data/attributes.js';
@@ -38,8 +40,10 @@ export class TournamentScene {
     this.app.audio.stopMusic();
     this.unsub = this.app.keyboard.onPress((code) => this.onKey(code));
     if (!this.t) return this.showNew();
-    this.render();
+    // coming back from a fight straight into a report: the table is drawn (and animated) only once
+    // the report closes, so it never flashes underneath
     if (this.afterEnter) { const f = this.afterEnter; this.afterEnter = null; f(this); }
+    else this.render();
   }
 
   exit() {
@@ -56,6 +60,7 @@ export class TournamentScene {
     if (code === 'Enter' && !isFinished(this.t)) this.watchNext();
     else if (code === 'Space' && !isFinished(this.t)) this.simulate('one');
     else if (code === 'KeyG') this.showGrid();
+    else if (code === 'KeyC') this.openCharts();
     else if (code === 'ArrowLeft' || code === 'KeyA') this.browse(-1);
     else if (code === 'ArrowRight' || code === 'KeyD') this.browse(1);
     else if (code === 'Escape') this.app.goTitle();
@@ -81,7 +86,7 @@ export class TournamentScene {
         el('p', { class: 'tour-lead' }, [`${ROSTER.length} fighters · everyone fights everyone · ${ROSTER.length - 1} rounds · ${(ROSTER.length * (ROSTER.length - 1)) / 2} matches`]),
         el('p', { class: 'tour-lead small' }, [`Best of 3 · CPU level: ${level} · 2:0 win = ${POINTS.win20} pts, 2:1 = ${POINTS.win21}, 1:2 loss = ${POINTS.loss12}`]),
         el('p', { class: 'tour-lead small' }, [`Spectacle points turn into FAME (${FAME_PER_SP}:1) · every round award: +${AWARD_FAME} fame`]),
-        el('div', { class: 'tour-faces' }, ROSTER.map((f, i) => el('div', { class: 'tour-face', style: { backgroundImage: `url(${this.app.portraitURL(f.id)})`, '--i': i } }))),
+        el('div', { class: 'tour-faces' }, ROSTER.map((f, i) => el('div', { class: 'tour-face', style: { ...faceStyle(this.app, f.id), '--i': i } }))),
         el('div', { class: 'tour-actions' }, [
           btn('START TOURNAMENT', () => { this.t = createTournament({ level }); save(this.t); this.app.audio.ui('confirm'); this.render(); }, 'big'),
           btn('MAIN MENU', () => this.app.goTitle()),
@@ -105,7 +110,7 @@ export class TournamentScene {
 
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
-      el('span', { class: 'tface', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }),
+      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
       el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
@@ -117,11 +122,13 @@ export class TournamentScene {
       el('span', { class: 'tpts' }, [String(r.pts)]),
     ]));
 
+    const placeOf = Object.fromEntries(table.map((r, i) => [r.id, i + 1]));
     const fixtures = t.rounds[vr].map((m) => {
       const r = m.result, isNext = nx && nx.m === m;
       const side = (id, i) => el('div', { class: `fx-side ${r && r.winner === i ? 'won' : ''} ${r && r.winner !== i && r.winner !== 'draw' ? 'lost' : ''}` }, [
-        el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+        el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
         el('span', { class: 'fx-name' }, [short(id)]),
+        el('span', { class: 'fx-place', title: 'current place in the table' }, [`(${placeOf[id]})`]),
       ]);
       return el('div', { class: `fx ${isNext ? 'next' : ''} ${r ? 'done' : ''}`, onclick: r ? () => this.replay(m) : null, title: r ? 'Click to replay' : '' }, [
         side(m.a, 0),
@@ -153,12 +160,12 @@ export class TournamentScene {
         el('div', { class: 'fixtures' }, fixtures),
         roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
         el('div', { class: 'tour-actions col' }, finished
-          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          ? [btn('AWARDS', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
           : [
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE ALL', () => this.simulate('all')), btn('RESULTS GRID', () => this.showGrid())]),
-            btn('🏕 TRAINING CAMP · spend fame', () => this.showCamp(), 'camp'),
+            el('div', { class: 'tour-actions' }, [btn('🏕 TRAINING CAMP', () => this.showCamp(), 'camp wide'), btn('📈 CHARTS', () => this.openCharts(), 'camp wide')]),
             el('div', { class: 'tour-actions' }, [btn('NEW', () => this.confirmNew(), 'mini wide'), btn('MAIN MENU', () => this.app.goTitle(), 'mini wide')]),
           ]),
         el('div', { class: 'tour-help' }, ['Enter watch · Space simulate · ◀ ▶ rounds · G grid · click a result to replay']),
@@ -247,9 +254,9 @@ export class TournamentScene {
       const m = s.queue.shift();
       s.runner = new MatchRunner(this.t, m);
       this.simVs.replaceChildren(
-        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.a)})` } }),
+        el('span', { class: 'fx-face big', style: { ...faceStyle(this.app, m.a) } }),
         el('b', {}, ['VS']),
-        el('span', { class: 'fx-face big', style: { backgroundImage: `url(${this.app.portraitURL(m.b)})` } }),
+        el('span', { class: 'fx-face big', style: { ...faceStyle(this.app, m.b) } }),
       );
     }
     if (s.runner.advance(14)) {
@@ -269,9 +276,13 @@ export class TournamentScene {
     this.modal = null;
     this.simEl?.remove();
     this.viewRound = null;
-    this.render();
-    if (s.single && s.last) this.spectacle(s.last, s.before);
-    else this.afterResults();
+    if (s.single && s.last) {
+      this.root?.remove(); // the report opens on a clean screen; the table animates in after it
+      this.spectacle(s.last, s.before);
+    } else {
+      this.render();
+      this.afterResults();
+    }
   }
 
   // --- spectacle report ---------------------------------------------------------------------------
@@ -294,9 +305,9 @@ export class TournamentScene {
       res[`${m.a}|${m.b}`] = { m, i: 0 };
       res[`${m.b}|${m.a}`] = { m, i: 1 };
     }
-    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(id)})` }, title: NAME[id] }))];
+    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: NAME[id] }))];
     const body = order.flatMap((rid) => [
-      el('div', { class: 'gcell ghead', style: { backgroundImage: `url(${this.app.portraitURL(rid)})` }, title: NAME[rid] }),
+      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: NAME[rid] }),
       ...order.map((cid) => {
         if (rid === cid) return el('div', { class: 'gcell self' });
         const x = res[`${rid}|${cid}`];
@@ -330,10 +341,10 @@ export class TournamentScene {
         const s = conditionShift(v, kind);
         return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
       };
-      const bought = lastCamp[id] || [];
+      const bought = lastCamp[id]?.items || [];
       return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
         el('div', { class: 'camp-top' }, [
-          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
           el('span', { class: 'camp-name' }, [short(id)]),
           el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
             el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
@@ -401,7 +412,7 @@ export class TournamentScene {
     const wrap = el('div', { class: 'menu-overlay upgrades' }, [
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
-          el('span', { class: 'sp-portrait', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
           el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
@@ -418,6 +429,11 @@ export class TournamentScene {
     document.getElementById('ui').appendChild(wrap);
   }
 
+  openCharts() {
+    this.modal = true;
+    showCharts(this.app, this.t, () => { this.modal = null; });
+  }
+
   // --- awards ---------------------------------------------------------------------------------------
   /** After results come in: newly completed rounds get their awards screen, then the final. */
   afterResults() {
@@ -428,14 +444,52 @@ export class TournamentScene {
     save(t);
     const done = () => { if (isFinished(t)) this.showFinal(); };
     // a long batch completes many rounds at once: show the latest one (the rest stay viewable)
-    if (fresh.length) this.showRoundAwards(fresh[fresh.length - 1], done);
+    const last = fresh[fresh.length - 1];
+    if (fresh.length) this.showRoundAwards(last, () => this.showCampReport(last, done));
     else done();
+  }
+
+  /** After the round awards: what every fighter's manager spent fame on in the camp (or that they saved). */
+  showCampReport(ri, then = null) {
+    const t = this.t, camp = t.camp?.[ri];
+    if (!camp) return then?.();
+    const label = (b) => (b === 'treat' ? '🩺 Treatment' : b.startsWith('up:') ? `⬆ ${ATTR_LABEL[b.slice(3)]}` : `${SHOP.find((x) => x.id === b)?.icon} ${SHOP.find((x) => x.id === b)?.label}`);
+    const order = standings(t).map((r) => r.id);
+    const rows = order.map((id, i) => {
+      const c = camp[id] || { items: [], spent: 0, fameLeft: t.fighters[id].fame };
+      const counts = {};
+      for (const b of c.items) counts[b] = (counts[b] || 0) + 1;
+      return el('div', { class: `cr-row ${c.spent ? '' : 'saved'}`, style: { '--i': i } }, [
+        el('span', { class: 'fx-face', style: faceStyle(this.app, id) }),
+        el('span', { class: 'cr-name' }, [short(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
+        el('span', { class: 'cr-items' }, c.items.length
+          ? Object.entries(counts).map(([b, n]) => el('em', {}, [`${label(b)}${n > 1 ? ` ×${n}` : ''}`]))
+          : [el('em', { class: 'none' }, ['spent nothing'])]),
+        el('span', { class: 'cr-spent' }, [c.spent ? `−${c.spent}` : '0']),
+        el('span', { class: 'cr-left' }, [`★${c.fameLeft}`]),
+      ]);
+    });
+    const close = () => { wrap.remove(); this.modal = null; unsub(); then?.(); };
+    const total = Object.values(camp).reduce((a, c) => a + c.spent, 0);
+    const wrap = el('div', { class: 'menu-overlay final camp-report' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, [`AFTER ROUND ${ri + 1}`]),
+        el('div', { class: 'awards-title small' }, ['TRAINING CAMP SPENDING']),
+        el('div', { class: 'cr-head' }, [el('span', {}, ['']), el('span', {}, ['FIGHTER']), el('span', {}, ['BOUGHT']), el('span', {}, ['SPENT']), el('span', {}, ['FAME LEFT'])]),
+        el('div', { class: 'cr-list' }, rows),
+        el('div', { class: 'cr-total' }, [`League total: ★${total} spent`]),
+        el('div', { class: 'tour-actions' }, [btn('CONTINUE', close, 'big')]),
+      ]),
+    ]);
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (['Escape', 'Enter', 'Space'].includes(code)) close(); });
+    document.getElementById('ui').appendChild(wrap);
   }
 
   awardCards(list, delay = 0.4) {
     return el('div', { class: 'awards' }, list.map((a, i) => el('div', { class: 'award', style: { '--d': `${delay + i * 0.3}s` } }, [
       el('div', { class: 'award-title' }, [a.title]),
-      a.id ? el('div', { class: 'award-face', style: { backgroundImage: `url(${this.app.portraitURL(a.id)})` } }) : el('div', { class: 'award-face none' }),
+      a.id ? el('div', { class: 'award-face', style: { ...faceStyle(this.app, a.id) } }) : el('div', { class: 'award-face none' }),
       el('div', { class: 'award-name' }, [a.id ? short(a.id) : 'nobody']),
       el('div', { class: 'award-value' }, [a.value]),
       a.note ? el('div', { class: 'award-note' }, [a.note.replace(/vs (\w+)/, (_, id) => `vs ${short(id)}`)]) : null,
@@ -474,7 +528,7 @@ export class TournamentScene {
           el('div', { class: 'final-name' }, [NAME[champ.id], el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
-          el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
         el('div', { class: 'awards-label' }, ['TOURNAMENT AWARDS']),
         this.awardCards(list, 0.9),
         el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),

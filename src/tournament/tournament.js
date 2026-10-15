@@ -27,7 +27,7 @@ export const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 export const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 4;
+const VERSION = 5;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 export function roundRobin(ids) {
@@ -46,7 +46,7 @@ export function roundRobin(ids) {
   return rounds;
 }
 
-export function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', seed = Math.floor(Math.random() * 1e9) } = {}) {
+function createTournamentRaw({ ids = ROSTER.map((f) => f.id), level = 'normal', seed = Math.floor(Math.random() * 1e9) } = {}) {
   const rng = new Rng(seed);
   const shuffled = ids.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -63,10 +63,18 @@ export function createTournament({ ids = ROSTER.map((f) => f.id), level = 'norma
       initInjuries(f);
       return [id, f];
     })),
-    camp: [], // per round: what each manager bought after it
+    camp: [], // per round: { id: { items, spent, fameLeft } } what each manager bought after it
+    underdogs: [], // per round: the bottom of the table when the round started (fame bonus)
+    history: [], // per completed round (index 0 = before the first round): snapshot per fighter, for the charts
     roundAwards: [], // per round: the awards list, filled in when the round completes
     finalAwards: null,
   };
+}
+
+export function createTournament(opts) {
+  const t = createTournamentRaw(opts);
+  t.history[0] = snapshot(t);
+  return t;
 }
 
 export function allMatches(t) {
@@ -143,8 +151,10 @@ export class MatchRunner {
 export function recordResult(t, m, match, stats, overrides) {
   const rep = stats.report(match);
   const tableBefore = standings(t);
-  const played = tableBefore.some((r) => r.played > 0);
-  const underdog = new Set(played ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : []);
+  // the underdogs of a round are fixed by the table at the start of that round (its first match)
+  const ri = t.rounds.findIndex((r) => r.includes(m));
+  if (t.underdogs[ri] === undefined) t.underdogs[ri] = ri + 1 >= COND.underdogFromRound ? tableBefore.slice(-COND.underdogs).map((r) => r.id) : [];
+  const underdog = new Set(t.underdogs[ri]);
   m.result = { ...rep, overrides, playedAt: Date.now() };
   m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
@@ -171,12 +181,30 @@ export function recordResult(t, m, match, stats, overrides) {
       t.roundAwards[ri] = grantAwards(t, awards(t, ri));
       // the camp between rounds: everyone rests, then the managers spend fame on recovery
       restRound(t);
-      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, [...autoManage(t, id), ...autoInvest(t, id, BASE[id])]]));
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => {
+        const f = t.fighters[id], before = f.fame;
+        const items = [...autoManage(t, id), ...autoInvest(t, id, BASE[id])];
+        return [id, { items, spent: before - f.fame, fameLeft: f.fame }];
+      }));
+      t.history[ri + 1] = snapshot(t);
     }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
   save(t);
   return m.result;
+}
+
+/** Per-fighter numbers for the charts: place, fame, attribute index, morale, stamina, injuries. */
+export function snapshot(t) {
+  const table = standings(t);
+  const out = {};
+  table.forEach((r, i) => {
+    const f = t.fighters[r.id], b = BASE[r.id];
+    const keys = Object.keys(b);
+    const attr = keys.reduce((s, a) => s + (b[a] ?? 0.5) + (f.perm?.[a] || 0), 0) / keys.length;
+    out[r.id] = { place: i + 1, pts: r.pts, fame: f.fame, fameEarned: f.fameEarned, attr: Math.round(attr * 1000) / 10, morale: Math.round(f.morale), stamina: Math.round(f.stamina), injuries: f.injuries.length };
+  });
+  return out;
 }
 
 function addFame(t, id, n) {

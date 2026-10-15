@@ -149,3 +149,21 @@ test('injury debuffs act in the fight: no dashes with a sprained ankle, weaker m
   f.gainMeter(20);
   assert.equal(f.meter, 10);
 });
+
+test('underdog fame bonus: none in rounds 1-2, from round 3 the bottom 4 of the table at the START of the round', () => {
+  const t = createTournament({ seed: 9, ids: ['brick', 'jax', 'roxy', 'tao', 'bruno', 'hawk', 'goro', 'sobby'] });
+  const startTables = [];
+  t.rounds.forEach((round, ri) => {
+    startTables[ri] = standings(t).map((r) => r.id);
+    for (const m of round) { const r = new MatchRunner(t, m); r.finish(); r.record(); }
+  });
+  assert.deepEqual(t.underdogs[0], []);
+  assert.deepEqual(t.underdogs[1], []);
+  for (let ri = 2; ri < t.rounds.length; ri++) {
+    assert.deepEqual(t.underdogs[ri], startTables[ri].slice(-4), `round ${ri + 1}`);
+    for (const m of t.rounds[ri]) {
+      [m.a, m.b].forEach((id, i) => assert.equal(m.result.sides[i].underdog, t.underdogs[ri].includes(id)));
+    }
+  }
+  assert.ok(t.history.length === t.rounds.length + 1 && t.history.every(Boolean), 'a chart snapshot per round');
+});

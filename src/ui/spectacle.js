@@ -7,6 +7,7 @@
 import { ROSTER } from '../data/fighters.js';
 import { SPECTACLE_RULES } from '../tournament/stats.js';
 import { el } from './dom.js';
+import { faceStyle } from './faces.js';
 import { INJURIES } from '../tournament/injuries.js';
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -27,9 +28,10 @@ function condBlock(c) {
       el('span', { class: `sp-cond-d ${d < 0 ? 'neg' : 'pos'}` }, [`${d >= 0 ? '+' : ''}${d}`]),
     ]);
   };
-  const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
-    .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
-  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+  // each bar gets its own reasons right under it
+  const notes = (key, cls) => el('div', { class: `sp-notes ${cls}` }, c.notes.filter((n) => n[key]).map((n) =>
+    el('span', { class: n[key] < 0 ? 'neg' : 'pos' }, [`${n.label} ${n[key] > 0 ? '+' : ''}${n[key]}`])));
+  return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), notes('stamina', 'sta'), row('MORALE', c.morale, 'mor'), notes('morale', 'mor')]);
 }
 
 /** A new injury from this match: what it is, how long, and the permanent damage. */
@@ -84,13 +86,13 @@ export function showSpectacle(app, m, before, onClose) {
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
     const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
-    const fameChip = el('div', { class: 'sp-fame' }, [`→ +${fameOf(i)} FAME`, bonus ? el('small', {}, [` ${bonus}`]) : null]);
+    const fameChip = el('div', { class: 'sp-fame' }, [`→ ${fameOf(i)} FAME`, bonus ? el('small', {}, [` · ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const balNum = el('span', { class: 'sp-bal-num' }, [String(balFrom)]);
     const col = el('div', { class: `sp-col ${i ? 'right' : 'left'} ${won ? 'won' : ''}` }, [
       el('div', { class: 'sp-head' }, [
-        el('div', { class: 'sp-portrait', style: { backgroundImage: `url(${app.portraitURL(id)})` } }),
+        el('div', { class: 'sp-portrait', style: faceStyle(app, id) }),
         el('div', { class: 'sp-name' }, [NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
       ]),
       el('div', { class: 'sp-list' }, rows.length ? rows.map((x) => x.row) : [el('div', { class: 'sp-row empty' }, ['no highlights this time'])]),
