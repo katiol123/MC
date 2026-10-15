@@ -13,7 +13,39 @@ import { Camera } from './camera.js';
 import { Arena } from './arena.js';
 import { drawHud } from './hud.js';
 import { drawDebug } from './debugDraw.js';
-import { rgba } from './color.js';
+import { rgba, mix } from './color.js';
+
+/** Facial expression for the fighter's current state. */
+function faceFor(f) {
+  switch (f.state) {
+    case 'attack': case 'throwing': {
+      const d = f.move?.def;
+      return d && (d.strength === 'heavy' || d.isSpecial || d.super || d.type === 'throw') ? 'shout' : 'attack';
+    }
+    case 'blockstun': return 'strain';
+    case 'hitstun': case 'juggle': case 'stagger': case 'knockdown': case 'thrown': case 'defeat': return 'hurt';
+    case 'dizzy': case 'dazed': return 'dizzy';
+    case 'ko': return 'ko';
+    case 'victory': return 'happy';
+    default: return null;
+  }
+}
+
+/** Natural blinking: irregular intervals (2.4-5 s), a quick close-open; returns lid closure 0..1. */
+function blinkAt(t, seed) {
+  const period = 3.2;
+  const n = Math.floor(t / period);
+  const h = Math.abs(Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453) % 1;
+  const at = n * period + h * (period - 0.3);
+  const dt = t - at;
+  if (dt < 0 || dt > 0.16) {
+    // occasional double blink
+    const dt2 = dt - 0.22;
+    if (h > 0.8 && dt2 >= 0 && dt2 < 0.16) return 1 - Math.abs(dt2 - 0.08) / 0.08;
+    return 0;
+  }
+  return Math.min(1, 1.6 * (1 - Math.abs(dt - 0.08) / 0.08));
+}
 
 export class FightRenderer {
   constructor(match, { arena = 'dusk', portraits = {}, hud = true } = {}) {
@@ -26,6 +58,8 @@ export class FightRenderer {
     this.cam = new Camera();
     this.cam.snap(match.fighters);
     this.arena = new Arena(arena);
+    // back light on the fighters: the colour of the low sky / sun behind them
+    this.envRim = mix(this.arena.pal.sun, this.arena.pal.skyLow, 0.55);
     this.portraits = portraits;
     this.hud = { trail: match.fighters.map((f) => f.health), announce: null, combo: [null, null] };
     this.drawOrder = [0, 1];
@@ -146,8 +180,8 @@ export class FightRenderer {
     ctx.translate(s.x + jitter, s.y);
     if (fx.sx !== undefined || fx.sy !== undefined) ctx.scale(fx.sx ?? 1, fx.sy ?? 1);
     ctx.scale(z * f.facing * sec.facingScale * spin * (1 + 0.05 * sq), -z * (1 - 0.04 * sq));
-    const expression = ['hitstun', 'juggle', 'stagger', 'knockdown', 'ko', 'dizzy', 'defeat'].includes(f.state) ? 'hurt' : null;
-    const blink = (Math.floor((now + i * 1700) / 100) % 38) === 0;
+    const expression = faceFor(f);
+    const blink = blinkAt(now / 1000 + i * 1.37, i);
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
     const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
@@ -170,6 +204,8 @@ export class FightRenderer {
       chains: sec.localChains(alpha, x, y, f.facing),
       expression,
       blink,
+      facing: f.facing * sec.facingScale * spin * (fx.sx ?? 1),
+      envRim: this.envRim,
     });
     if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
     if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);

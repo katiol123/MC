@@ -73,7 +73,7 @@ export class FighterPreview {
     ctx.save();
     ctx.translate(canvas.width / 2 - 30 * k * this.facing, canvas.height - 26 * k + -f.body.y * scale * k);
     ctx.scale(scale * k * this.facing, -scale * k);
-    this.painter.draw(ctx, skel, { layers: f.anim.layers, chains: this.sec.localChains(a, f.body.x, f.body.y, 1) });
+    this.painter.draw(ctx, skel, { layers: f.anim.layers, chains: this.sec.localChains(a, f.body.x, f.body.y, 1), facing: -1, now: performance.now() });
     ctx.restore();
   }
 }
