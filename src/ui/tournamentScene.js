@@ -18,6 +18,7 @@ const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}
 const ATTR_LABEL = Object.fromEntries(ATTRIBUTES.map((a) => [a.id, a.label]));
 const boughtIcon = (b) => (b === 'treat' ? '🩺' : b.startsWith('up:') ? '⬆' : SHOP.find((x) => x.id === b)?.icon || '');
 import { FightScene } from './fightScene.js';
+import { VersusScene } from './versusScene.js';
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const short = (id) => {
@@ -198,7 +199,7 @@ export class TournamentScene {
   playLive(m) {
     const app = this.app, t = this.t;
     const back = (view) => app.setScene(new TournamentScene(app, { tournament: t, view }));
-    app.setScene(new FightScene(app, {
+    this.versus(m, false, () => app.setScene(new FightScene(app, {
       p1: m.a, p2: m.b, mode: 'watch',
       tournament: {
         t, m, replay: false,
@@ -210,17 +211,27 @@ export class TournamentScene {
         // quitting a live match: the result is decided by simulating the same seed
         onQuit: () => back((s) => s.simulate('match', m)),
       },
-    }));
+    })));
   }
 
   replay(m) {
     const app = this.app, t = this.t;
     this.app.audio.ui('confirm');
     const back = () => app.setScene(new TournamentScene(app, { tournament: t }));
-    app.setScene(new FightScene(app, {
+    this.versus(m, true, () => app.setScene(new FightScene(app, {
       p1: m.a, p2: m.b, mode: 'watch',
       tournament: { t, m, replay: true, onEnd: () => setTimeout(back, 1200), onQuit: back },
-    }));
+    })));
+  }
+
+  /** VS splash before a tournament fight: round number, places in the table (as of now). */
+  versus(m, isReplay, start) {
+    const t = this.t;
+    const ri = t.rounds.findIndex((r) => r.includes(m));
+    const order = standings(t).map((r) => r.id);
+    const place = (id) => `#${order.indexOf(id) + 1} IN TABLE`;
+    const sub = `${isReplay ? 'REPLAY · ' : ''}TOURNAMENT · ROUND ${ri + 1} OF ${t.rounds.length}`;
+    this.app.setScene(new VersusScene(this.app, m.a, m.b, 'watch', { sub, tags: isReplay || ri === 0 ? null : [place(m.a), place(m.b)], start }));
   }
 
   // --- background simulation ----------------------------------------------------------------------

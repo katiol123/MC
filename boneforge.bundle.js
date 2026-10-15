@@ -13789,8 +13789,10 @@ const { ROSTER } = __require("src/data/fighters.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 
 class VersusScene {
-  constructor(app, p1, p2, mode) {
+  /** opts: { sub, tags: [left, right], start } — `start` replaces the default fight launch. */
+  constructor(app, p1, p2, mode, opts = {}) {
     this.app = app;
+    this.opts = opts;
     this.p1 = p1;
     this.p2 = p2;
     this.mode = mode;
@@ -13799,16 +13801,18 @@ class VersusScene {
   enter() {
     clearUI();
     const a = ROSTER.find((f) => f.id === this.p1), b = ROSTER.find((f) => f.id === this.p2);
-    const half = (f, s) => el('div', { class: `vs-half ${s}` }, [
+    const tags = this.opts.tags || [];
+    const half = (f, s, tag) => el('div', { class: `vs-half ${s}` }, [
       el('div', { class: 'vs-img', style: { backgroundImage: `url(${this.app.portraitURL(f.id)})` } }),
       el('div', { class: 'vs-name' }, [f.name]),
       el('div', { class: 'vs-title' }, [f.title]),
+      tag ? el('div', { class: 'vs-tag' }, [tag]) : null,
     ]);
     this.root = el('div', { class: 'versus' }, [
-      half(a, 'left'), half(b, 'right'),
+      half(a, 'left', tags[0]), half(b, 'right', tags[1]),
       el('div', { class: 'vs-bolt' }),
       el('div', { class: 'vs-text' }, ['VS']),
-      el('div', { class: 'vs-sub' }, ['PIER 9 · FIGHT NIGHT']),
+      el('div', { class: 'vs-sub' }, [this.opts.sub || 'PIER 9 · FIGHT NIGHT']),
     ]);
     document.getElementById('ui').appendChild(this.root);
     this.app.audio.ui('slam');
@@ -13820,7 +13824,8 @@ class VersusScene {
   go() {
     if (this.gone) return;
     this.gone = true;
-    this.app.startFight(this.p1, this.p2, this.mode);
+    if (this.opts.start) this.opts.start();
+    else this.app.startFight(this.p1, this.p2, this.mode);
   }
   frame(dt) {
     this.t += dt;
@@ -13855,6 +13860,7 @@ const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}
 const ATTR_LABEL = Object.fromEntries(ATTRIBUTES.map((a) => [a.id, a.label]));
 const boughtIcon = (b) => (b === 'treat' ? '🩺' : b.startsWith('up:') ? '⬆' : SHOP.find((x) => x.id === b)?.icon || '');
 const { FightScene } = __require("src/ui/fightScene.js");
+const { VersusScene } = __require("src/ui/versusScene.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const short = (id) => {
@@ -14035,7 +14041,7 @@ class TournamentScene {
   playLive(m) {
     const app = this.app, t = this.t;
     const back = (view) => app.setScene(new TournamentScene(app, { tournament: t, view }));
-    app.setScene(new FightScene(app, {
+    this.versus(m, false, () => app.setScene(new FightScene(app, {
       p1: m.a, p2: m.b, mode: 'watch',
       tournament: {
         t, m, replay: false,
@@ -14047,17 +14053,27 @@ class TournamentScene {
         // quitting a live match: the result is decided by simulating the same seed
         onQuit: () => back((s) => s.simulate('match', m)),
       },
-    }));
+    })));
   }
 
   replay(m) {
     const app = this.app, t = this.t;
     this.app.audio.ui('confirm');
     const back = () => app.setScene(new TournamentScene(app, { tournament: t }));
-    app.setScene(new FightScene(app, {
+    this.versus(m, true, () => app.setScene(new FightScene(app, {
       p1: m.a, p2: m.b, mode: 'watch',
       tournament: { t, m, replay: true, onEnd: () => setTimeout(back, 1200), onQuit: back },
-    }));
+    })));
+  }
+
+  /** VS splash before a tournament fight: round number, places in the table (as of now). */
+  versus(m, isReplay, start) {
+    const t = this.t;
+    const ri = t.rounds.findIndex((r) => r.includes(m));
+    const order = standings(t).map((r) => r.id);
+    const place = (id) => `#${order.indexOf(id) + 1} IN TABLE`;
+    const sub = `${isReplay ? 'REPLAY · ' : ''}TOURNAMENT · ROUND ${ri + 1} OF ${t.rounds.length}`;
+    this.app.setScene(new VersusScene(this.app, m.a, m.b, 'watch', { sub, tags: isReplay || ri === 0 ? null : [place(m.a), place(m.b)], start }));
   }
 
   // --- background simulation ----------------------------------------------------------------------

@@ -159,6 +159,8 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 @keyframes drift2 { to { transform: scaleX(-1) translateX(24px) scale(1.04); } }
 .vs-name { position: absolute; bottom: 70px; font-size: 46px; text-shadow: 4px 4px 0 var(--ink); }
 .vs-title { position: absolute; bottom: 44px; font: italic 800 18px "Segoe UI", sans-serif; color: var(--gold); }
+.vs-tag { position: absolute; bottom: 126px; padding: 3px 10px; font: 800 15px "Segoe UI", sans-serif; letter-spacing: 3px; color: var(--ink); background: var(--gold); box-shadow: 3px 3px 0 var(--ink); animation: slamIn .3s .6s backwards; }
+.left .vs-tag { left: 40px; } .right .vs-tag { right: 40px; }
 .left .vs-name, .left .vs-title { left: 40px; } .left .vs-name { color: var(--p1); }
 .right .vs-name, .right .vs-title { right: 40px; text-align: right; } .right .vs-name { color: var(--p2); }
 .vs-text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) skewX(-10deg); font-size: 190px; color: var(--gold); text-shadow: 6px 6px 0 var(--p1), -6px -6px 0 var(--p2), 0 0 40px rgba(255,210,63,.6); animation: vsSlam .45s .5s cubic-bezier(.2,1.8,.4,1) backwards, vsFlicker .12s 1s 6; }
