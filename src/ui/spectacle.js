@@ -85,7 +85,7 @@ export function showSpectacle(app, m, before, onClose) {
     });
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
-    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
+    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].hype ? `hype +${Math.round(r.sides[i].hype * 100)}% (${r.sides[i].streak} wins in a row)` : null].filter(Boolean).join(' · ');
     const fameChip = el('div', { class: 'sp-fame' }, [`→ ${fameOf(i)} FAME`, bonus ? el('small', {}, [` · ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });

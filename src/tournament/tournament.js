@@ -11,7 +11,7 @@ import { AIController } from '../ai/aiController.js';
 import { ROSTER } from '../data/fighters.js';
 import { Rng } from '../core/rng.js';
 import { MatchStats } from './stats.js';
-import { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } from './condition.js';
+import { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, hypeBonus, COND } from './condition.js';
 import { initInjuries, profileShift, activeEffects, injuryRoller, addInjury, tickInjuries, autoInvest, leagueDrift } from './injuries.js';
 
 const BASE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -165,11 +165,12 @@ export function recordResult(t, m, match, stats, overrides) {
     return kind ? addInjury(t, id, kind, drift) : null;
   });
   rep.sides.forEach((s, i) => {
-    const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
+    const hype = hypeBonus(t.fighters[ids[i]].streak); // streak already counts this match
     const under = underdog.has(ids[i]);
-    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + (firedUp ? COND.firedUpFame : 0) + (under ? COND.underdogFame : 0)));
+    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + hype + (under ? COND.underdogFame : 0)));
     s.fame = fame;
-    s.firedUp = firedUp;
+    s.hype = hype;
+    s.streak = Math.max(0, t.fighters[ids[i]].streak);
     s.underdog = under;
     t.fighters[ids[i]].sp += s.spectacle.total;
     addFame(t, ids[i], fame);

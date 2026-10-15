@@ -353,7 +353,7 @@ export class TournamentScene {
         return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
       };
       const bought = lastCamp[id]?.items || [];
-      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
+      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''}` }, [
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
           el('span', { class: 'camp-name' }, [short(id)]),

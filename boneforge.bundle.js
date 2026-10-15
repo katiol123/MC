@@ -12483,7 +12483,7 @@ const { AIController } = __require("src/ai/aiController.js");
 const { ROSTER } = __require("src/data/fighters.js");
 const { Rng } = __require("src/core/rng.js");
 const { MatchStats } = __require("src/tournament/stats.js");
-const { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } = __require("src/tournament/condition.js");
+const { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, hypeBonus, COND } = __require("src/tournament/condition.js");
 const { initInjuries, profileShift, activeEffects, injuryRoller, addInjury, tickInjuries, autoInvest, leagueDrift } = __require("src/tournament/injuries.js");
 
 const BASE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -12637,11 +12637,12 @@ function recordResult(t, m, match, stats, overrides) {
     return kind ? addInjury(t, id, kind, drift) : null;
   });
   rep.sides.forEach((s, i) => {
-    const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
+    const hype = hypeBonus(t.fighters[ids[i]].streak); // streak already counts this match
     const under = underdog.has(ids[i]);
-    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + (firedUp ? COND.firedUpFame : 0) + (under ? COND.underdogFame : 0)));
+    const fame = Math.round(s.spectacle.total * FAME_PER_SP * (1 + hype + (under ? COND.underdogFame : 0)));
     s.fame = fame;
-    s.firedUp = firedUp;
+    s.hype = hype;
+    s.streak = Math.max(0, t.fighters[ids[i]].streak);
     s.underdog = under;
     t.fighters[ids[i]].sp += s.spectacle.total;
     addFame(t, ids[i], fame);
@@ -12970,6 +12971,7 @@ __define("src/tournament/condition.js", function (__exports, __require) {
   Object.defineProperty(__exports, "fatalityChance", { enumerable: true, get: () => fatalityChance });
   Object.defineProperty(__exports, "initCondition", { enumerable: true, get: () => initCondition });
   Object.defineProperty(__exports, "applyMatch", { enumerable: true, get: () => applyMatch });
+  Object.defineProperty(__exports, "hypeBonus", { enumerable: true, get: () => hypeBonus });
   Object.defineProperty(__exports, "restRound", { enumerable: true, get: () => restRound });
   Object.defineProperty(__exports, "canBuy", { enumerable: true, get: () => canBuy });
   Object.defineProperty(__exports, "buy", { enumerable: true, get: () => buy });
@@ -13004,7 +13006,7 @@ const COND = {
   fatalityDone: 6, fatalitySuffered: -12, upset: 6, award: 4, crowdPerSp: 1 / 40, crowdCap: 5,
   streak: 3, // a streak of this many results amplifies morale changes by 50 %
   exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
-  firedUp: 90, firedUpFame: 0.1, // confident fighters get 10 % more fame (the crowd loves them)
+  hypeFrom: 3, hypeStep: 0.05, hypeMax: 0.2, // HYPE: from the 3rd straight win, +5 % fame per win (max +20 %) - people come to see the streak
   underdogs: 4, underdogFame: 0.2, underdogFromRound: 3, // from round 3, the bottom 4 of the table AT THE START OF THE ROUND get 20 % more fame
   redemption: 35, redemptionMorale: 6, // a win from a low ebb lifts morale extra
 };
@@ -13084,17 +13086,19 @@ function applyMatch(t, m, result, table) {
     if (won && rank[ids[1 - i]] !== undefined && rank[ids[1 - i]] + 3 <= rank[id]) add('Upset win', COND.upset);
     if (won && before.morale <= COND.redemption) add('Redemption', COND.redemptionMorale);
     add('Crowd love', Math.min(COND.crowdCap, Math.floor(s.spectacle.total * COND.crowdPerSp)));
-    // streaks amplify morale swings
+    // a losing streak deepens the morale slump (a winning streak pays in fame instead: see hypeBonus)
     f.streak = won ? Math.max(1, f.streak + 1) : lost ? Math.min(-1, f.streak - 1) : 0;
-    if (Math.abs(f.streak) >= COND.streak && Math.sign(dm) === Math.sign(f.streak)) {
-      const bonus = Math.round(dm * 0.5);
-      add(f.streak > 0 ? `On fire (${f.streak} wins)` : `Slump (${-f.streak} losses)`, bonus);
-    }
+    if (-f.streak >= COND.streak && dm < 0) add(`Slump (${-f.streak} losses)`, Math.round(dm * 0.5));
     if (before.stamina < COND.exhausted) add('Exhausted', COND.exhaustedMorale);
     f.stamina = clamp(f.stamina + ds, 0, 100);
     f.morale = clamp(f.morale + dm, 0, 100);
     return { stamina: [before.stamina, f.stamina], morale: [before.morale, f.morale], notes };
   });
+}
+
+/** Fame bonus of a winning streak (the streak includes the match just played). */
+function hypeBonus(streak) {
+  return streak >= COND.hypeFrom ? Math.min(COND.hypeMax, (streak - COND.hypeFrom + 1) * COND.hypeStep) : 0;
 }
 
 /** Between rounds: free rest, morale settles toward calm. */
@@ -14195,7 +14199,7 @@ class TournamentScene {
         return `${s >= 0 ? '+' : '−'}${Math.abs(s * 10).toFixed(1)}`;
       };
       const bought = lastCamp[id]?.items || [];
-      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''} ${f.morale >= COND.firedUp ? 'fired' : ''}` }, [
+      return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''}` }, [
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
           el('span', { class: 'camp-name' }, [short(id)]),
@@ -14505,7 +14509,7 @@ function showSpectacle(app, m, before, onClose) {
     });
     const total = el('div', { class: 'sp-total-num' }, ['0']);
     const balFrom = before[i] || 0, balTo = balFrom + fameOf(i);
-    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].firedUp ? 'fired up +10%' : null].filter(Boolean).join(' · ');
+    const bonus = [r.sides[i].underdog ? 'underdog +20%' : null, r.sides[i].hype ? `hype +${Math.round(r.sides[i].hype * 100)}% (${r.sides[i].streak} wins in a row)` : null].filter(Boolean).join(' · ');
     const fameChip = el('div', { class: 'sp-fame' }, [`→ ${fameOf(i)} FAME`, bonus ? el('small', {}, [` · ${bonus}`]) : null]);
     const barOld = el('div', { class: 'sp-bar-old', style: { width: `${(balFrom / maxSp) * 100}%` } });
     const barNew = el('div', { class: 'sp-bar-new', style: { width: `${(balFrom / maxSp) * 100}%` } });

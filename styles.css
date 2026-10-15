@@ -377,7 +377,6 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .camp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
 .camp-card { padding: 7px 9px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column; gap: 4px; }
 .camp-card.exhausted { border-color: #ff3a3a; box-shadow: inset 0 0 14px rgba(255,58,58,.3); }
-.camp-card.fired { border-color: var(--gold); box-shadow: inset 0 0 14px rgba(255,210,63,.3); }
 .camp-top { display: flex; align-items: center; gap: 8px; }
 .camp-name { flex: 1; font: 900 13px "Arial Black", sans-serif; }
 .camp-fame { font: 900 13px "Arial Black", sans-serif; color: var(--gold); }
