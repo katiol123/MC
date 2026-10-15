@@ -221,6 +221,7 @@ export const CLIPS = {
     },
   },
   dizzy: { sample: loopSine(K.DIZZY[0], K.DIZZY[1], 64) },
+  taunt: { sample: (f, c, p, props) => keyed(p.keys, f, props) },
   victory: {
     sample: (f, c, p, props) => {
       const v = K.VICTORY[(p.variant || 0) % K.VICTORY.length];

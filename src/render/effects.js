@@ -218,6 +218,22 @@ export class Effects {
         for (let i = 0; i < 5; i++) this.parts.push({ kind: 'dust', x: f.body.x, y: 4, vx: -f.facing * (e.dir === -1 ? -1 : 1) * (1 + this.rnd() * 2.5), vy: this.rnd(), r: 5 + this.rnd() * 6, life: 24, max: 24 });
         break;
       }
+      case 'tauntDone': {
+        // the crowd goes wild for the show
+        const f = fighters?.[e.who];
+        const x = f ? f.body.x : e.x;
+        this.labels.push({ text: 'SHOWBOAT!', x, y: 360, life: 80, color: '#ffd23f', big: true, age: 0 });
+        for (let i = 0; i < 16; i++) {
+          const a = Math.PI / 2 + (this.rnd() - 0.5) * 2.2, sp = 4 + this.rnd() * 6;
+          this.parts.push({ kind: 'spark', x, y: 300, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 30, max: 30, color: i % 3 ? '#ffd23f' : '#ff4fd8', w: 3 });
+        }
+        break;
+      }
+      case 'tauntBroken': {
+        const f = fighters?.[e.who];
+        if (f) this.labels.push({ text: 'HUMBLED!', x: f.body.x, y: 340, life: 80, color: '#ff3a4a', big: true, age: 0 });
+        break;
+      }
       case 'dizzy': {
         const f = fighters?.[e.who];
         if (f) this.labels.push({ text: 'DIZZY!', x: f.body.x, y: 300, life: 60, color: '#ffd23f' });

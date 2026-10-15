@@ -11,11 +11,13 @@ import { buildHurtboxes, buildHitboxes } from '../combat/boxes.js';
 import { SPECIAL_ORDER } from '../data/moves.js';
 import { sequenceStep } from '../anim/clips.js';
 import { STAGE } from '../config/constants.js';
+import { TAUNTS, TAUNT_FRAMES, TAUNT_METER } from '../data/taunts.js';
 
 export const ACTIONABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'run']);
 const BLOCKABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'blockstun', 'land']);
 const CAN_TURN = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'land', 'intro']);
 const NORMAL_ORDER = ['hk', 'hp', 'lk', 'lp'];
+const TAUNT_BREAKERS = new Set(['hitstun', 'juggle', 'knockdown', 'ko', 'thrown', 'stagger', 'dazed']);
 
 /** Cosmetic mark each fighter's super leaves on the opponent (Roxy's boot soles stack per kick). */
 const SUPER_MARKS = { cinder: 'char', bruno: 'bump', brick: 'shiner', vellaro: 'collar' };
@@ -118,6 +120,8 @@ export class Fighter {
   }
 
   setState(name, data = {}, clip = null, clipOpts = {}) {
+    // knocked out of a showboat before it was over: the crowd laughs at the show-off
+    if (this.state === 'taunt' && !this.sd.done && TAUNT_BREAKERS.has(name)) this.emit({ type: 'tauntBroken', who: this.index });
     this.state = name;
     this.stateFrame = 0;
     this.sd = data;
@@ -263,6 +267,8 @@ export class Fighter {
       case 'getup':
         if (this.stateFrame >= this.sd.duration) this.recoverToNeutral();
         return;
+      case 'taunt':
+        return this.updateTaunt();
       case 'dizzy':
         if (this.stateFrame >= this.sd.duration) {
           this.stun = 0;
@@ -288,10 +294,44 @@ export class Fighter {
     else this.setState('idle', {}, 'idle', { blend: 7 });
   }
 
+  /** Showboating: only to a dizzy opponent (see data/taunts.js). */
+  startTaunt() {
+    const def = TAUNTS[this.def.id];
+    this.setState('taunt', { def }, 'taunt', { blend: 6, params: { keys: def.keys } });
+    this.emit({ type: 'taunt', who: this.index, name: def.name });
+    this.cueTaunt();
+  }
+
+  updateTaunt() {
+    this.body.steer(0, 1);
+    this.cueTaunt();
+    if (this.stateFrame < TAUNT_FRAMES) return;
+    this.sd.done = true;
+    this.gainMeter(TAUNT_METER);
+    this.emit({ type: 'tauntDone', who: this.index, name: this.sd.def.name, x: this.body.x });
+    this.recoverToNeutral();
+  }
+
+  /** Sounds and effects of the showboat that fall on this frame. */
+  cueTaunt() {
+    for (const c of this.sd.def.cues || []) {
+      if (c.at !== this.stateFrame) continue;
+      if (c.sfx) this.emit({ type: 'sfx', kind: c.sfx });
+      if (c.fx) {
+        const { dx = 0, y = 0, ...rest } = c.fx;
+        this.emit({ type: 'fx', ...rest, x: this.body.x + this.facing * dx, y });
+      }
+    }
+  }
+
   /** Free movement on the ground: attacks, jumps, dashes, crouch, walk, block. */
   groundControl(opp, fromLanding = false) {
     const inp = this.input;
     const b = this.body;
+    if (inp.pressed('taunt')) {
+      inp.consume('taunt');
+      if (opp?.state === 'dizzy' && b.onGround && TAUNTS[this.def.id]) return this.startTaunt();
+    }
     if (this.tryAttack(opp, 'ground')) return;
     if (inp.pressed('stance')) {
       inp.consume('stance');

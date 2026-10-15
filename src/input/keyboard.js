@@ -4,11 +4,11 @@ import { emptyRaw } from './inputBuffer.js';
 export const BINDINGS = [
   {
     up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
-    lp: ['KeyF'], hp: ['KeyG'], lk: ['KeyV'], hk: ['KeyB'], stance: ['KeyR'],
+    lp: ['KeyF'], hp: ['KeyG'], lk: ['KeyV'], hk: ['KeyB'], stance: ['KeyR'], taunt: ['KeyH'],
   },
   {
     up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    lp: ['KeyI', 'Numpad4'], hp: ['KeyO', 'Numpad5'], lk: ['KeyK', 'Numpad1'], hk: ['KeyL', 'Numpad2'], stance: ['KeyP', 'Numpad0'],
+    lp: ['KeyI', 'Numpad4'], hp: ['KeyO', 'Numpad5'], lk: ['KeyK', 'Numpad1'], hk: ['KeyL', 'Numpad2'], stance: ['KeyP', 'Numpad0'], taunt: ['Semicolon', 'Numpad3'],
   },
 ];
 

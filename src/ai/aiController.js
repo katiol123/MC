@@ -24,6 +24,24 @@ const M = {
 /** Share of won matches the CPU finishes with a fatality (1 = always; lower it after play-testing). */
 export const AI_FATALITY_CHANCE = 1;
 
+/**
+ * Chance that the CPU showboats at a dizzy opponent instead of punishing: the bigger the health
+ * lead and the higher the morale the likelier; aggressive characters love it, cunning ones don't.
+ */
+export function showboatChance(me, op) {
+  const lead = Math.max(0, me.health / me.maxHealth - op.health / op.maxHealth);
+  const morale = me.def.cond?.morale ?? 75;
+  const p = me.def.ai || {};
+  const v = SHOWBOAT.base + SHOWBOAT.lead * lead + SHOWBOAT.morale * ((morale - 60) / 40)
+    + SHOWBOAT.aggression * ((p.aggression ?? 0.5) - 0.5) - SHOWBOAT.cunning * ((p.cunning ?? 0.5) - 0.5);
+  return Math.max(0.02, Math.min(0.8, v));
+}
+export const SHOWBOAT = {
+  base: 0.08, lead: 0.7, morale: 0.25, aggression: 0.3, cunning: 0.35,
+  // frames the CPU milks the moment before it starts: a late start lets the rival wake up mid-show
+  delay: [5, 65],
+};
+
 /** How each fighter likes to use its signature move: [min distance, max distance]. */
 const SIGNATURE_RANGE = {
   brick: [110, 230], rattigan: [280, 700], smiles: [120, 330], jax: [260, 700],
@@ -126,6 +144,8 @@ export class AIController {
       return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
     }
     if (me.state === 'blockstun') this.lastBlockstun = match.frame;
+    const sb = this.showboat(match, me);
+    if (sb) return sb;
     const aa = this.antiAirWatch(match, me, seen);
     if (aa) return aa;
     // Run the current macro.
@@ -184,6 +204,22 @@ export class AIController {
     }
     // waiting for the window: guard (a planned anti-air never leaves the CPU wide open)
     return this.toRaw('b', null, me.facing);
+  }
+
+  /** Dizzy opponent: once per dizzy decide whether to play to the crowd, then wait and do it. */
+  showboat(match, me) {
+    const op = match.fighters[1 - this.index];
+    if (op.state !== 'dizzy') { this.sbPlan = null; return null; }
+    const id = match.frame - op.stateFrame;
+    if (this.sbDizzy !== id) {
+      this.sbDizzy = id;
+      this.sbPlan = this.rng.chance(showboatChance(me, op)) ? match.frame + this.rng.int(SHOWBOAT.delay[0], SHOWBOAT.delay[1]) : null;
+      if (this.sbPlan !== null) { this.macro = []; this.step = 0; this.hold = null; }
+    }
+    if (this.sbPlan === null) return null;
+    if (match.frame < this.sbPlan || !me.actionable || !me.body.onGround) return emptyRaw(); // savouring it
+    this.sbPlan = null;
+    return { ...emptyRaw(), taunt: true };
   }
 
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
@@ -286,6 +322,12 @@ export class AIController {
         this.cooldown = this.hold.n;
         return;
       }
+    }
+    // A showboating rival is wide open: make them pay.
+    if (opF.state === 'taunt' && dist < 260 && r.chance(cfg.punish)) {
+      if (dist < 150) this.queue(r.chance(0.5) ? press('hp') : M.s1);
+      else this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }, { d: '', n: Math.max(2, Math.round(12 - me.stats.dash)) }, ...press('hp')]);
+      return;
     }
     // Broken guard (Tao's flurry): punish the stagger.
     if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {

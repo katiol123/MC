@@ -76,6 +76,7 @@ export class TitleScene {
           ['Light kick', 'V', 'K  (Num1)'],
           ['Heavy kick', 'B', 'L  (Num2)'],
           ['Switch stance', 'R', 'P  (Num0)'],
+          ['Showboat (rival dizzy)', 'H', ';  (Num3)'],
           ['Block', 'hold back (crouch-back for lows)', ''],
           ['Dash / run', 'double-tap forward (hold to run), double-tap back', ''],
           ['Surge Fist', '↓ ↘ → + punch', ''],

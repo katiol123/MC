@@ -289,6 +289,7 @@ export class FighterPainter {
     push(6.5, (p) => this.drawCoatSkirt(ctx, p, J, A, 'front', opts.chains));
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
+    if (this.prop?.type === 'guitarPlay') push(7.6, (p) => this.drawPlayedGuitar(ctx, p, J));
     push(8, (p) => (p === 'outline' ? this.taperedOutline(ctx, sF, () => this.drawArm(ctx, p, J, A, 'F')) : this.drawArm(ctx, p, J, A, 'F')));
     // Fixed depth order: far arm < far leg < torso < near leg < near arm. Attack animations do not
     // re-layer limbs: switching layers mid-move makes a limb "pop" over the body for a frame and
@@ -411,6 +412,7 @@ export class FighterPainter {
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     if (this.prop?.type === 'guitar' && this.prop.hand === side) this.drawGuitar(ctx, pass, E, H, depth);
     if (this.prop?.type === 'glove' && this.prop.hand === side) this.drawSpringGlove(ctx, pass, E, H);
+    if (this.prop?.type === 'knife' && this.prop.hand === side) this.drawKnife(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
     if (this.flurry && pass === 'fill') {
@@ -548,6 +550,35 @@ export class FighterPainter {
   }
 
   /** Sobby's boxing glove on a spring: springExt (0..1) shoots it out past the fist. */
+  /** Bruno's butcher knife (showboat): wooden handle, wide steel blade pointing up out of the fist. */
+  drawKnife(ctx, pass, E, H, depth) {
+    const t = this.tint;
+    // the blade continues the forearm, cocked up like a held chef's knife
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + 0.9;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    const blade = [at(10, -5), at(52, -4), at(60, 1), at(52, 7), at(10, 7)];
+    const poly = (pts) => { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-12), at(10), 5, 5);
+      this.outlineFill(ctx);
+      poly(blade);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      return;
+    }
+    ctx.beginPath();
+    limbPath(ctx, at(-12), at(10), 3.4, 3.4);
+    ctx.fillStyle = this.mat(darken('#3b2416', depth), t).base;
+    ctx.fill();
+    poly(blade);
+    ctx.fillStyle = this.mat(darken('#c9ced6', depth), t).base;
+    ctx.fill();
+    this.line(ctx, [at(14, -3.4), at(52, -2.6)], 1.4, rgba('#ffffff', 0.8), 1);
+  }
+
   drawSpringGlove(ctx, pass, E, H) {
     const a0 = Math.atan2(H.y - E.y, H.x - E.x);
     const dx = Math.cos(a0), dy = Math.sin(a0);
@@ -587,10 +618,23 @@ export class FighterPainter {
     ctx.fill();
   }
 
+  /** Chuy's guitar played (showboat): body against the belly, neck running out to the fretting hand. */
+  drawPlayedGuitar(ctx, pass, J) {
+    const g = this.look.guitar || { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' };
+    const H = J.handF, hip = J.hipF, sh = J.shoulderF;
+    const belly = { x: hip.x * 0.75 + sh.x * 0.25 + 16, y: hip.y * 0.75 + sh.y * 0.25 };
+    const ang = Math.atan2(belly.y - H.y, belly.x - H.x);
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const L = Math.hypot(belly.x - H.x, belly.y - H.y);
+    const o = L - 66; // the guitar body sits on the belly whatever the arm's reach
+    const at = (k, n = 0) => ({ x: H.x + dx * (k + o) - dy * n, y: H.y + dy * (k + o) + dx * n });
+    this.guitarShape(ctx, pass, at, ang, g, 0);
+  }
+
   /** Chuy's guitar slung on his back (hidden while it is in his hands). */
   drawBackGuitar(ctx, pass, J, A) {
     const g = this.look.guitar;
-    if (!g || this.prop?.type === 'guitar') return;
+    if (!g || this.prop?.type === 'guitar' || this.prop?.type === 'guitarPlay') return;
     const F = this.torsoFrame(J, A);
     const base = P2(F.W, F.fS, -F.ww * 1.1, F.uS, -6);
     const top = P2(F.N, F.fC, -F.cw * 0.9, F.uC, 34);

@@ -27,7 +27,7 @@ export const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 export const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 5;
+const VERSION = 6;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 export function roundRobin(ids) {

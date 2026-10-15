@@ -130,6 +130,10 @@ export class AudioSystem {
       case 'chord': for (const f of [110, 138.6, 164.8]) this.tone(1.4, { freq: f, to: f * 0.98, type: 'sawtooth', gain: 0.16 }); this.noise(0.6, { freq: 1500, gain: 0.2 }); break;
       case 'snore': this.tone(0.9, { freq: 90, to: 140, type: 'sawtooth', gain: 0.1 }); break;
       case 'kiss': this.tone(0.1, { freq: 1400, to: 2600, type: 'sine', gain: 0.15 }); break;
+      case 'shing': this.noise(0.22, { freq: 4000, q: 3, gain: 0.25, sweep: 1.8, attack: 0.03 }); this.tone(0.3, { freq: 2600, to: 3200, type: 'triangle', gain: 0.05 }); break;
+      case 'roar': this.noise(1.1, { freq: 260, q: 0.9, gain: 0.8, sweep: 0.3, attack: 0.08 }); this.tone(1.0, { freq: 95, to: 60, type: 'sawtooth', gain: 0.35 }); break;
+      case 'cheer': this.noise(1.8, { freq: 1100, q: 0.4, gain: 0.45, sweep: 0.8, attack: 0.25 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.2 }); break;
+      case 'boo': this.noise(1.3, { freq: 380, q: 0.6, gain: 0.45, sweep: 0.7, attack: 0.2 }); this.tone(1.1, { freq: 140, to: 110, type: 'sawtooth', gain: 0.1 }); break;
       case 'laugh': for (let i = 0; i < 4; i++) setTimeout(() => this.tone(0.12, { freq: 520 - i * 30, to: 420 - i * 30, type: 'triangle', gain: 0.12 }), i * 140); break;
       default: this.tone(0.2, { freq: 300, to: 200, gain: 0.2 });
     }
@@ -236,6 +240,12 @@ export class AudioSystem {
         break;
       case 'teleport':
         this.tone(0.3, { freq: 200, to: 1600, type: 'sine', gain: 0.2 });
+        break;
+      case 'tauntDone':
+        this.sfx('cheer');
+        break;
+      case 'tauntBroken':
+        this.sfx('boo');
         break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });

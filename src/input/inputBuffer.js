@@ -4,10 +4,10 @@
 // until a game action consumes them, so a held button never repeats an attack by itself.
 import { TUNING } from '../config/tuning.js';
 
-export const BUTTONS = ['lp', 'hp', 'lk', 'hk', 'stance'];
+export const BUTTONS = ['lp', 'hp', 'lk', 'hk', 'stance', 'taunt'];
 const HISTORY = 40;
 
-export const emptyRaw = () => ({ up: false, down: false, left: false, right: false, lp: false, hp: false, lk: false, hk: false, stance: false });
+export const emptyRaw = () => ({ up: false, down: false, left: false, right: false, lp: false, hp: false, lk: false, hk: false, stance: false, taunt: false });
 
 export function toNumpad(raw, facing) {
   const fwd = facing > 0 ? raw.right : raw.left;

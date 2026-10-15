@@ -196,7 +196,8 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
 
   holder.contact = 'hit';
   const inStartupOrActive = snap.state === 'attack' && snap.move && snap.moveFrame <= snap.move.startup + snap.move.active;
-  const counter = inStartupOrActive && !trade && !projectile;
+  // a showboating fighter is wide open: any hit is a counter hit
+  const counter = (inStartupOrActive && !trade && !projectile) || snap.state === 'taunt';
   const punish = snap.state === 'attack' && !inStartupOrActive;
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);

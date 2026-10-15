@@ -165,11 +165,11 @@ const { emptyRaw } = __require("src/input/inputBuffer.js");
 const BINDINGS = [
   {
     up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
-    lp: ['KeyF'], hp: ['KeyG'], lk: ['KeyV'], hk: ['KeyB'], stance: ['KeyR'],
+    lp: ['KeyF'], hp: ['KeyG'], lk: ['KeyV'], hk: ['KeyB'], stance: ['KeyR'], taunt: ['KeyH'],
   },
   {
     up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    lp: ['KeyI', 'Numpad4'], hp: ['KeyO', 'Numpad5'], lk: ['KeyK', 'Numpad1'], hk: ['KeyL', 'Numpad2'], stance: ['KeyP', 'Numpad0'],
+    lp: ['KeyI', 'Numpad4'], hp: ['KeyO', 'Numpad5'], lk: ['KeyK', 'Numpad1'], hk: ['KeyL', 'Numpad2'], stance: ['KeyP', 'Numpad0'], taunt: ['Semicolon', 'Numpad3'],
   },
 ];
 
@@ -219,10 +219,10 @@ __define("src/input/inputBuffer.js", function (__exports, __require) {
 // until a game action consumes them, so a held button never repeats an attack by itself.
 const { TUNING } = __require("src/config/tuning.js");
 
-const BUTTONS = ['lp', 'hp', 'lk', 'hk', 'stance'];
+const BUTTONS = ['lp', 'hp', 'lk', 'hk', 'stance', 'taunt'];
 const HISTORY = 40;
 
-const emptyRaw = () => ({ up: false, down: false, left: false, right: false, lp: false, hp: false, lk: false, hk: false, stance: false });
+const emptyRaw = () => ({ up: false, down: false, left: false, right: false, lp: false, hp: false, lk: false, hk: false, stance: false, taunt: false });
 
 function toNumpad(raw, facing) {
   const fwd = facing > 0 ? raw.right : raw.left;
@@ -553,6 +553,10 @@ class AudioSystem {
       case 'chord': for (const f of [110, 138.6, 164.8]) this.tone(1.4, { freq: f, to: f * 0.98, type: 'sawtooth', gain: 0.16 }); this.noise(0.6, { freq: 1500, gain: 0.2 }); break;
       case 'snore': this.tone(0.9, { freq: 90, to: 140, type: 'sawtooth', gain: 0.1 }); break;
       case 'kiss': this.tone(0.1, { freq: 1400, to: 2600, type: 'sine', gain: 0.15 }); break;
+      case 'shing': this.noise(0.22, { freq: 4000, q: 3, gain: 0.25, sweep: 1.8, attack: 0.03 }); this.tone(0.3, { freq: 2600, to: 3200, type: 'triangle', gain: 0.05 }); break;
+      case 'roar': this.noise(1.1, { freq: 260, q: 0.9, gain: 0.8, sweep: 0.3, attack: 0.08 }); this.tone(1.0, { freq: 95, to: 60, type: 'sawtooth', gain: 0.35 }); break;
+      case 'cheer': this.noise(1.8, { freq: 1100, q: 0.4, gain: 0.45, sweep: 0.8, attack: 0.25 }); this.noise(1.2, { freq: 2600, q: 0.8, gain: 0.18, attack: 0.2 }); break;
+      case 'boo': this.noise(1.3, { freq: 380, q: 0.6, gain: 0.45, sweep: 0.7, attack: 0.2 }); this.tone(1.1, { freq: 140, to: 110, type: 'sawtooth', gain: 0.1 }); break;
       case 'laugh': for (let i = 0; i < 4; i++) setTimeout(() => this.tone(0.12, { freq: 520 - i * 30, to: 420 - i * 30, type: 'triangle', gain: 0.12 }), i * 140); break;
       default: this.tone(0.2, { freq: 300, to: 200, gain: 0.2 });
     }
@@ -659,6 +663,12 @@ class AudioSystem {
         break;
       case 'teleport':
         this.tone(0.3, { freq: 200, to: 1600, type: 'sine', gain: 0.2 });
+        break;
+      case 'tauntDone':
+        this.sfx('cheer');
+        break;
+      case 'tauntBroken':
+        this.sfx('boo');
         break;
       case 'announce':
         this.tone(0.35, { freq: 220, to: 440, type: 'sawtooth', gain: 0.08 });
@@ -3052,11 +3062,13 @@ const { buildHurtboxes, buildHitboxes } = __require("src/combat/boxes.js");
 const { SPECIAL_ORDER } = __require("src/data/moves.js");
 const { sequenceStep } = __require("src/anim/clips.js");
 const { STAGE } = __require("src/config/constants.js");
+const { TAUNTS, TAUNT_FRAMES, TAUNT_METER } = __require("src/data/taunts.js");
 
 const ACTIONABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'run']);
 const BLOCKABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'blockstun', 'land']);
 const CAN_TURN = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'land', 'intro']);
 const NORMAL_ORDER = ['hk', 'hp', 'lk', 'lp'];
+const TAUNT_BREAKERS = new Set(['hitstun', 'juggle', 'knockdown', 'ko', 'thrown', 'stagger', 'dazed']);
 
 /** Cosmetic mark each fighter's super leaves on the opponent (Roxy's boot soles stack per kick). */
 const SUPER_MARKS = { cinder: 'char', bruno: 'bump', brick: 'shiner', vellaro: 'collar' };
@@ -3159,6 +3171,8 @@ class Fighter {
   }
 
   setState(name, data = {}, clip = null, clipOpts = {}) {
+    // knocked out of a showboat before it was over: the crowd laughs at the show-off
+    if (this.state === 'taunt' && !this.sd.done && TAUNT_BREAKERS.has(name)) this.emit({ type: 'tauntBroken', who: this.index });
     this.state = name;
     this.stateFrame = 0;
     this.sd = data;
@@ -3304,6 +3318,8 @@ class Fighter {
       case 'getup':
         if (this.stateFrame >= this.sd.duration) this.recoverToNeutral();
         return;
+      case 'taunt':
+        return this.updateTaunt();
       case 'dizzy':
         if (this.stateFrame >= this.sd.duration) {
           this.stun = 0;
@@ -3329,10 +3345,44 @@ class Fighter {
     else this.setState('idle', {}, 'idle', { blend: 7 });
   }
 
+  /** Showboating: only to a dizzy opponent (see data/taunts.js). */
+  startTaunt() {
+    const def = TAUNTS[this.def.id];
+    this.setState('taunt', { def }, 'taunt', { blend: 6, params: { keys: def.keys } });
+    this.emit({ type: 'taunt', who: this.index, name: def.name });
+    this.cueTaunt();
+  }
+
+  updateTaunt() {
+    this.body.steer(0, 1);
+    this.cueTaunt();
+    if (this.stateFrame < TAUNT_FRAMES) return;
+    this.sd.done = true;
+    this.gainMeter(TAUNT_METER);
+    this.emit({ type: 'tauntDone', who: this.index, name: this.sd.def.name, x: this.body.x });
+    this.recoverToNeutral();
+  }
+
+  /** Sounds and effects of the showboat that fall on this frame. */
+  cueTaunt() {
+    for (const c of this.sd.def.cues || []) {
+      if (c.at !== this.stateFrame) continue;
+      if (c.sfx) this.emit({ type: 'sfx', kind: c.sfx });
+      if (c.fx) {
+        const { dx = 0, y = 0, ...rest } = c.fx;
+        this.emit({ type: 'fx', ...rest, x: this.body.x + this.facing * dx, y });
+      }
+    }
+  }
+
   /** Free movement on the ground: attacks, jumps, dashes, crouch, walk, block. */
   groundControl(opp, fromLanding = false) {
     const inp = this.input;
     const b = this.body;
+    if (inp.pressed('taunt')) {
+      inp.consume('taunt');
+      if (opp?.state === 'dizzy' && b.onGround && TAUNTS[this.def.id]) return this.startTaunt();
+    }
     if (this.tryAttack(opp, 'ground')) return;
     if (inp.pressed('stance')) {
       inp.consume('stance');
@@ -4157,6 +4207,7 @@ const CLIPS = {
     },
   },
   dizzy: { sample: loopSine(K.DIZZY[0], K.DIZZY[1], 64) },
+  taunt: { sample: (f, c, p, props) => keyed(p.keys, f, props) },
   victory: {
     sample: (f, c, p, props) => {
       const v = K.VICTORY[(p.variant || 0) % K.VICTORY.length];
@@ -4591,6 +4642,180 @@ function buildHitboxes(fighter) {
 }
 
 });
+__define("src/data/taunts.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "TAUNT_FRAMES", { enumerable: true, get: () => TAUNT_FRAMES });
+  Object.defineProperty(__exports, "TAUNT_METER", { enumerable: true, get: () => TAUNT_METER });
+  Object.defineProperty(__exports, "TAUNTS", { enumerable: true, get: () => TAUNTS });
+  Object.defineProperty(__exports, "rangeAt", { enumerable: true, get: () => rangeAt });
+// SHOWBOATING: when the opponent is dizzy a fighter may play to the crowd instead of cashing in
+// the free combo. It is a real move with a real risk: it lasts TAUNT_FRAMES (longer than most of
+// the dizzy window), the fighter cannot block, and a hit during it is a counter hit. Completed, the
+// crowd goes wild: spectacle points (fame in tournaments) and a little super meter.
+//   keys   [frame, raw pose, easing?] sampled by the 'taunt' clip
+//   cues   [{ at, sfx?, fx? }] fx positions are relative to the fighter: dx forward, y up from the floor
+//   prop / fire / bite / flurry   [from, to, value?] frame ranges for held props and render flags
+//   face   [[from, to, expression]] facial expression override (default: grin)
+const K = __require("src/anim/poses.js");
+const { ATTACK_POSES: AP } = __require("src/anim/attackPoses.js");
+
+const P = K.P;
+const S = K.STANCE;
+
+const TAUNT_FRAMES = 90;
+const TAUNT_METER = 25; // super meter for a completed showboat
+
+/** Repeats [a, b] poses from `from` to `to` every `step` frames. */
+function alt(from, to, step, a, b) {
+  const out = [];
+  for (let f = from, i = 0; f <= to; f += step, i++) out.push([f, i % 2 ? b : a]);
+  return out;
+}
+const note = (at, dx = 40, y = 210) => ({ at, fx: { kind: 'label', text: '♪', dx, y, color: '#ffd23f', life: 34 } });
+const label = (at, text, color = '#ffd23f', y = 320, life = 50) => ({ at, fx: { kind: 'label', text, dx: 0, y, color, life } });
+
+const FLEX = K.VICTORY[3], FIST_UP = K.VICTORY[0], BOW = K.VICTORY[2], CROSSED = K.VICTORY[1];
+
+const TAUNTS = {
+  // knuckle crack, then alternating biceps to both sides of the crowd
+  brick: {
+    name: 'Gun Show',
+    keys: [[0, S], [8, P(S, { fa: [72, 96, 0], ba: [82, 92, 0], lean: 10 })], [14, P(S, { fa: [78, 84, 0], ba: [86, 82, 0], lean: 12, chest: 6 })], [20, P(S, { fa: [72, 96, 0], ba: [82, 92, 0] })],
+      [32, P(S, { fa: [92, 96, 0], ba: [174, 14, 0], lean: -4, chest: -10, head: -10, y: 116 })], [46, P(S, { fa: [94, 100, 0], ba: [176, 10, 0], lean: -6, chest: -12, head: -12, y: 114 })],
+      [56, P(S, { fa: [172, 16, 0], ba: [96, 96, 0], lean: -4, chest: -10, head: -10, y: 116 })], [68, P(S, { fa: [174, 12, 0], ba: [98, 100, 0], lean: -6, chest: -12, head: -12, y: 114 })],
+      [80, P(S, { fa: [96, 104, 0], ba: [100, 100, 0], lean: 2, chest: -14, head: -8, y: 108, ff: [32, 8, 0], bf: [-32, 8, 0] })], [90, S]],
+    cues: [{ at: 9, sfx: 'snap' }, { at: 15, sfx: 'snap' }, { at: 32, sfx: 'boing' }, label(40, 'FLEX!')],
+  },
+  // tips the top hat to the crowd and bows with a flourish
+  rattigan: {
+    name: 'Hat Trick',
+    keys: [[0, S], [14, P(S, { fa: [160, 150, 20], ba: [20, 30, 0], lean: -4, y: 118, ff: [20, 8, 0], bf: [-20, 8, 0] })], [26, P(S, { fa: [170, 120, 20], ba: [20, 30, 0], head: -14, y: 118, ff: [20, 8, 0], bf: [-20, 8, 0] })],
+      [44, P(S, { fa: [96, 20, 0], ba: [-30, 20, 0], lean: 40, chest: 14, neck: 12, head: 14, y: 112, ff: [24, 8, 0], bf: [-26, 8, 0] })], [64, P(S, { fa: [96, 20, 0], ba: [-30, 20, 0], lean: 44, chest: 16, neck: 14, head: 16, y: 110, ff: [24, 8, 0], bf: [-26, 8, 0] })],
+      [80, P(CROSSED, { head: -12 })], [90, S]],
+    cues: [{ at: 26, sfx: 'ding' }, { at: 46, sfx: 'cash' }, label(50, 'MERCI!', '#ffe08a')],
+  },
+  // holds his belly and roars with laughter, head thrown back
+  smiles: {
+    name: 'Belly Laugh',
+    keys: [[0, S], ...alt(10, 74, 8, P(S, { fa: [24, 110, 0], ba: [20, 110, 0], lean: -14, chest: -10, neck: -20, head: -26, y: 116 }), P(S, { fa: [26, 100, 0], ba: [22, 100, 0], lean: 10, chest: 6, neck: 6, head: 2, y: 112 })), [90, S]],
+    cues: [{ at: 10, sfx: 'laugh' }, { at: 42, sfx: 'laugh' }, label(20, 'HA HA HA!', '#ffe08a')],
+    face: [[8, 80, 'shout']],
+  },
+  // windmill air guitar and a headbang
+  jax: {
+    name: 'Air Guitar',
+    keys: [[0, S], [8, P(S, { fa: [78, 24, 0], ba: [178, 6, 0], lean: -8, y: 112 })], [16, P(S, { fa: [78, 24, 0], ba: [36, 64, 0], lean: 14, y: 108 })],
+      [24, P(S, { fa: [80, 22, 0], ba: [178, 6, 0], lean: -8, y: 112 })], [32, P(S, { fa: [80, 22, 0], ba: [36, 64, 0], lean: 14, y: 108 })],
+      ...alt(40, 76, 6, P(S, { fa: [70, 28, 0], ba: [34, 70, 0], lean: 30, neck: 22, head: 24, y: 106 }), P(S, { fa: [88, 20, 0], ba: [44, 56, 0], lean: -6, neck: -18, head: -20, y: 110 })), [90, S]],
+    cues: [{ at: 16, sfx: 'chord' }, { at: 32, sfx: 'chord' }, note(18), note(34, 60, 230), label(50, 'ROCK!', '#ff4fd8')],
+    face: [[10, 80, 'shout']],
+  },
+  // straightens the collar, brushes off the shoulder, kisses his fingertips
+  vellaro: {
+    name: 'Smooth Operator',
+    keys: [[0, S], [12, P(S, { fa: [44, 150, 0], ba: [48, 148, 0], lean: -2, head: -12, y: 120 })], [24, P(S, { fa: [42, 152, 0], ba: [46, 150, 0], neck: -10, head: -16, y: 120 })],
+      [36, P(S, { fa: [70, 140, 0], ba: [30, 40, 0], head: -6, y: 120 })], [44, P(S, { fa: [96, 30, 0], ba: [30, 40, 0], head: -8, y: 120 })], [52, P(CROSSED, {})],
+      [66, P(S, { fa: [62, 154, 0], ba: [10, 20, 0], head: -4, y: 120 })], [76, P(S, { fa: [128, 20, 0], ba: [10, 20, 0], head: -14, y: 120 })], [90, S]],
+    cues: [{ at: 44, sfx: 'whoosh' }, { at: 70, sfx: 'kiss' }, label(72, 'BELLISSIMO', '#ffe08a')],
+  },
+  // stomp, devil horns up and a tongue-out headbang
+  roxy: {
+    name: 'Mosh Pit',
+    keys: [[0, S], [8, P(S, { ff: [36, 40, 0], fa: [60, 110, 0], y: 116 })], [14, P(S, { ff: [32, 8, 0], y: 110 })],
+      ...alt(20, 78, 7, P(S, { fa: [170, 20, 0], ba: [165, 25, 0], lean: 22, neck: 18, head: 20, y: 110 }), P(S, { fa: [175, 10, 0], ba: [170, 15, 0], lean: -8, neck: -16, head: -20, y: 114 })), [90, S]],
+    cues: [{ at: 14, sfx: 'thud' }, { at: 14, fx: { kind: 'dust', dx: 30, y: 4, n: 8 } }, { at: 22, sfx: 'chord' }, label(30, 'RIOT!', '#ff4fd8')],
+    face: [[18, 82, 'shout']],
+  },
+  // sharpens the butcher knife on his forearm, then a chef's kiss
+  bruno: {
+    name: 'Mise en Place',
+    keys: [[0, S], [10, P(S, { fa: [60, 80, 0], ba: [66, 70, 0], lean: -4, head: 10, y: 118 })],
+      ...alt(16, 58, 6, P(S, { fa: [86, 40, 0], ba: [66, 70, 0], lean: -4, head: 12, y: 118 }), P(S, { fa: [52, 92, 0], ba: [68, 68, 0], lean: -2, head: 14, y: 118 })),
+      [68, P(S, { fa: [150, 30, 0], ba: [10, 20, 0], head: -10, y: 120 })], [78, P(S, { fa: [62, 154, 0], ba: [10, 20, 0], head: -14, y: 120 })], [90, S]],
+    cues: [16, 28, 40, 52].map((at) => ({ at, sfx: 'shing' })).concat([{ at: 30, fx: { kind: 'sparks', dx: 40, y: 150, n: 6, color: '#ffe08a' } }, { at: 80, sfx: 'kiss' }, label(80, 'PERFETTO!', '#ffe08a')]),
+    prop: [[8, 70, { type: 'knife', hand: 'F' }]],
+  },
+  // salutes the sun: low crouch, then rises with both arms to the sky
+  jaguar: {
+    name: 'Sun Salute',
+    keys: [[0, S], [14, P(K.CROUCH, { fa: [10, 20, 0], ba: [6, 20, 0], lean: 40, neck: 10, head: 14 })], [30, P(K.CROUCH, { fa: [20, 30, 0], ba: [16, 30, 0], lean: 44, neck: 14, head: 18 })],
+      [46, P(S, { fa: [168, 20, 0], ba: [172, 16, 0], lean: -14, chest: -14, neck: -18, head: -26, y: 120, ff: [22, 8, 0], bf: [-22, 8, 0] })], [72, P(S, { fa: [174, 10, 0], ba: [178, 10, 0], lean: -18, chest: -16, neck: -22, head: -30, y: 122, ff: [22, 8, 0], bf: [-22, 8, 0] })], [90, S]],
+    cues: [{ at: 30, sfx: 'thud' }, { at: 46, sfx: 'boom' }, { at: 46, fx: { kind: 'ring', dx: 0, y: 260, r: 20, vr: 6, life: 30, color: '#ffd23f' } }, label(52, 'INTI!', '#ffd23f', 330, 60)],
+    face: [[40, 80, 'shout']],
+  },
+  // lights his fist and blows the flame out like a smoking gun
+  cinder: {
+    name: 'Hot Hands',
+    keys: [[0, S], [12, P(S, { fa: [96, 92, 0], ba: [20, 60, 0], head: 4, y: 118 })], [40, P(S, { fa: [98, 90, 0], ba: [20, 60, 0], head: 6, y: 118 })],
+      [52, P(S, { fa: [86, 104, 0], ba: [20, 60, 0], head: 12, neck: 8, lean: 4, y: 118 })], [64, P(S, { fa: [88, 102, 0], ba: [20, 60, 0], head: 12, neck: 8, lean: 4, y: 118 })], [78, P(CROSSED, { head: -10 })], [90, S]],
+    cues: [{ at: 12, sfx: 'fire' }, { at: 56, sfx: 'whoosh' }, { at: 58, fx: { kind: 'smoke', dx: 20, y: 230, n: 8 } }, label(60, 'TOO HOT!', '#ff8a3a')],
+    fire: [[12, 54]],
+  },
+  // throws the arms wide, claws out, and roars at the crowd
+  grizz: {
+    name: 'Big Roar',
+    keys: [[0, S], [12, P(S, { fa: [110, 60, 0], ba: [104, 64, 0], lean: -10, y: 114 })], [24, P(S, { fa: [140, 50, 0], ba: [134, 54, 0], lean: 20, chest: 10, neck: 10, head: -6, y: 104, ff: [36, 8, 0], bf: [-36, 8, 0] })],
+      [62, P(S, { fa: [146, 46, 0], ba: [140, 50, 0], lean: 24, chest: 12, neck: 12, head: -4, y: 102, ff: [36, 8, 0], bf: [-36, 8, 0] })], [76, P(S, { fa: [60, 90, 0], ba: [56, 90, 0], y: 114 })], [90, S]],
+    cues: [{ at: 24, sfx: 'roar' }, { at: 24, fx: { kind: 'shake', amount: 7 } }, label(30, 'RAWRR!', '#ffb347', 330, 60)],
+    face: [[20, 72, 'shout']],
+  },
+  // the crane: stands on one leg, wings spread, perfectly still
+  hawk: {
+    name: 'Crane Stance',
+    keys: [[0, S], [16, P(S, { fa: [104, 14, 30], ba: [-96, 14, -30], ff: [16, 72, 30], bf: [-6, 8, 0], lean: 4, y: 120, head: -6 })],
+      [70, P(S, { fa: [112, 10, 40], ba: [-104, 10, -40], ff: [18, 76, 34], bf: [-6, 8, 0], lean: 4, y: 121, head: -8 })], [80, P(BOW, {})], [90, S]],
+    cues: [{ at: 16, sfx: 'whoosh' }, { at: 40, sfx: 'ding' }, label(40, 'PATIENCE', '#bfe7ff')],
+    face: [[12, 76, 'strain']],
+  },
+  // a bow, then the classic come-on: palm up, fingers beckoning
+  tao: {
+    name: 'Come On',
+    keys: [[0, S], [10, BOW], [24, BOW], ...alt(32, 76, 6, P(S, { fa: [90, 30, 0], ba: [40, 120, 0], lean: 4, y: 116 }), P(S, { fa: [96, 70, 0], ba: [40, 120, 0], lean: 4, y: 116 })), [90, S]],
+    cues: [{ at: 12, sfx: 'snap' }, { at: 40, sfx: 'whoosh' }, label(46, 'COME ON!', '#ffffff')],
+    flurry: [[34, 74]],
+  },
+  // shiko: lifts a leg high to the side and stamps the ring, twice
+  goro: {
+    name: 'Shiko Stomp',
+    keys: [[0, S], [14, P(S, { lean: -18, x: -10, fa: [40, 60, 0], ba: [30, 60, 0], ff: [60, 110, 20], bf: [-30, 8, 0], y: 112 })], [26, P(S, { lean: 10, fa: [30, 40, 0], ba: [30, 40, 0], ff: [40, 8, 0], bf: [-34, 8, 0], y: 92 })],
+      [32, P(S, { lean: 10, fa: [30, 40, 0], ba: [30, 40, 0], ff: [40, 8, 0], bf: [-34, 8, 0], y: 90 })],
+      [48, P(S, { lean: 18, x: 8, fa: [40, 60, 0], ba: [30, 60, 0], ff: [40, 8, 0], bf: [-60, 104, -20], y: 112 })], [60, P(S, { lean: 10, fa: [30, 40, 0], ba: [30, 40, 0], ff: [40, 8, 0], bf: [-34, 8, 0], y: 92 })],
+      [76, P(S, { lean: 10, fa: [30, 40, 0], ba: [30, 40, 0], ff: [40, 8, 0], bf: [-34, 8, 0], y: 94 })], [90, S]],
+    cues: [26, 60].flatMap((at) => [{ at, sfx: 'thud' }, { at, fx: { kind: 'shake', amount: 8 } }, { at, fx: { kind: 'dust', dx: 0, y: 4, n: 14, spread: 60 } }]).concat([label(64, 'DOSUKOI!', '#ffffff')]),
+    face: [[10, 80, 'strain']],
+  },
+  // sobs into his hands... then a cheeky "ta-da!"
+  sobby: {
+    name: 'Crocodile Tears',
+    keys: [[0, S], ...alt(8, 50, 6, P(S, { fa: [48, 124, 0], ba: [54, 118, 0], lean: 22, neck: 14, head: 18, y: 112 }), P(S, { fa: [50, 120, 0], ba: [56, 114, 0], lean: 27, neck: 16, head: 20, y: 109 })),
+      [62, P(S, { fa: [130, 20, 0], ba: [-60, 20, 0], lean: -10, head: -14, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [80, P(S, { fa: [134, 16, 0], ba: [-64, 16, 0], lean: -12, head: -16, y: 120, ff: [30, 8, 0], bf: [-30, 8, 0] })], [90, S]],
+    cues: [{ at: 10, sfx: 'squeeze' }, { at: 20, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 34, fx: { kind: 'drops', dx: 20, y: 230, n: 6, color: '#7fd3ff' } }, { at: 62, sfx: 'boing' }, label(64, 'TA-DA!', '#ffe08a')],
+    face: [[8, 56, 'hurt']],
+  },
+  // arms become the jaws: three big snaps over his head
+  snapper: {
+    name: 'Jaw Snap',
+    keys: [[0, S], ...alt(10, 70, 10, P(S, { fa: [150, 20, 0], ba: [60, 20, 0], lean: -6, y: 116 }), P(S, { fa: [108, 10, 0], ba: [96, 10, 0], lean: 8, y: 114 })), [82, CROSSED], [90, S]],
+    cues: [20, 40, 60].map((at) => ({ at, sfx: 'snap' })).concat([label(42, 'SNAP!', '#9be36b')]),
+    bite: [[18, 24], [38, 44], [58, 64]],
+  },
+  // a flourish on the guitar and a grito
+  chuy: {
+    name: 'Serenata',
+    keys: [[0, S], ...alt(8, 50, 4, P(S, { y: 114, lean: -6, chest: -6, head: 8, fa: [70, 30, 0], ba: [36, 64, 0] }), P(S, { y: 114, lean: -6, chest: -6, head: 8, fa: [70, 30, 0], ba: [26, 84, 0] })),
+      [64, P(S, { fa: [160, 150, 0], ba: [150, 150, 0], neck: -10, head: -20, y: 118 })], [80, FIST_UP], [90, S]],
+    cues: [{ at: 8, sfx: 'chord' }, { at: 30, sfx: 'chord' }, note(10), note(20, 60, 240), note(32, 30, 250), { at: 64, sfx: 'cheer' }, label(66, '¡AY AY AY!', '#ffd23f')],
+    face: [[60, 84, 'shout']],
+    prop: [[6, 56, { type: 'guitarPlay', hand: 'F' }]],
+  },
+};
+
+/** Value of a frame-range list ([from, to, value?]) at frame f, or null. */
+function rangeAt(list, f) {
+  for (const [a, b, v] of list || []) if (f >= a && f < b) return v ?? true;
+  return null;
+}
+
+});
 __define("src/physics/world.js", function (__exports, __require) {
   Object.defineProperty(__exports, "resolvePushboxes", { enumerable: true, get: () => resolvePushboxes });
   Object.defineProperty(__exports, "enforceSeparation", { enumerable: true, get: () => enforceSeparation });
@@ -4867,7 +5092,8 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
 
   holder.contact = 'hit';
   const inStartupOrActive = snap.state === 'attack' && snap.move && snap.moveFrame <= snap.move.startup + snap.move.active;
-  const counter = inStartupOrActive && !trade && !projectile;
+  // a showboating fighter is wide open: any hit is a counter hit
+  const counter = (inStartupOrActive && !trade && !projectile) || snap.state === 'taunt';
   const punish = snap.state === 'attack' && !inStartupOrActive;
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
@@ -6725,6 +6951,7 @@ const { lerp } = __require("src/core/math.js");
 const { blendPoses, computeSkeleton, emptyPose, clonePose } = __require("src/anim/skeleton.js");
 const { drawFlame, drawGlow } = __require("src/render/fire.js");
 const { TALON_REACH } = __require("src/data/signatures.js");
+const { rangeAt } = __require("src/data/taunts.js");
 const { ATTACK_POSES } = __require("src/anim/attackPoses.js");
 const { FighterPainter } = __require("src/render/fighterPainter.js");
 const { SecondaryMotion } = __require("src/render/secondary.js");
@@ -6758,6 +6985,7 @@ function faceFor(f) {
     case 'dizzy': case 'dazed': return 'dizzy';
     case 'ko': return 'ko';
     case 'victory': return 'happy';
+    case 'taunt': return rangeAt(f.sd.def?.face, f.stateFrame) || 'happy';
     default: return null;
   }
 }
@@ -6916,13 +7144,14 @@ class FightRenderer {
     const expression = fx.face || faceFor(f);
     const blink = blinkAt(now / 1000 + i * 1.37, i);
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
-    const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
+    const taunt = f.state === 'taunt' ? f.sd.def : null;
+    const prop = fx.prop || (taunt && rangeAt(taunt.prop, f.stateFrame)) || (mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
       : null);
     // flaming fists only on fire moves (specials / super), never on normal attacks
-    const fire = !!(mv?.def.fire && f.state === 'attack') || !!fx.fire;
+    const fire = !!(mv?.def.fire && f.state === 'attack') || !!fx.fire || !!(taunt && rangeAt(taunt.fire, f.stateFrame));
     const claws = !!(mv?.def.claws && f.state === 'attack');
-    const flurry = !!(mv?.def.flurry && f.state === 'attack');
+    const flurry = !!(mv?.def.flurry && f.state === 'attack') || !!(taunt && rangeAt(taunt.flurry, f.stateFrame));
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
@@ -6931,7 +7160,7 @@ class FightRenderer {
       critical: f.critical,
       clawMarks: f.clawMarks || 0,
       marks: f.marks,
-      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite,
+      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite || !!(taunt && rangeAt(taunt.bite, f.stateFrame)),
       springExt: springExtension(mv, f),
       now,
       layers: f.anim.layers,
@@ -7510,6 +7739,7 @@ class FighterPainter {
     push(6.5, (p) => this.drawCoatSkirt(ctx, p, J, A, 'front', opts.chains));
     push(7, (p) => this.drawHead(ctx, p, J, A, opts));
     push(7.5, (p) => this.drawChains(ctx, p, opts.chains, 'front', J, A));
+    if (this.prop?.type === 'guitarPlay') push(7.6, (p) => this.drawPlayedGuitar(ctx, p, J));
     push(8, (p) => (p === 'outline' ? this.taperedOutline(ctx, sF, () => this.drawArm(ctx, p, J, A, 'F')) : this.drawArm(ctx, p, J, A, 'F')));
     // Fixed depth order: far arm < far leg < torso < near leg < near arm. Attack animations do not
     // re-layer limbs: switching layers mid-move makes a limb "pop" over the body for a frame and
@@ -7632,6 +7862,7 @@ class FighterPainter {
     if (this.prop?.type === 'pan' && this.prop.hand === side) this.drawPan(ctx, pass, E, H, depth);
     if (this.prop?.type === 'guitar' && this.prop.hand === side) this.drawGuitar(ctx, pass, E, H, depth);
     if (this.prop?.type === 'glove' && this.prop.hand === side) this.drawSpringGlove(ctx, pass, E, H);
+    if (this.prop?.type === 'knife' && this.prop.hand === side) this.drawKnife(ctx, pass, E, H, depth);
     this.drawFist(ctx, pass, Wr, H, side, depth);
     // flurry afterimages: translucent fists trailing ahead of the real one (Tao's barrages)
     if (this.flurry && pass === 'fill') {
@@ -7769,6 +8000,35 @@ class FighterPainter {
   }
 
   /** Sobby's boxing glove on a spring: springExt (0..1) shoots it out past the fist. */
+  /** Bruno's butcher knife (showboat): wooden handle, wide steel blade pointing up out of the fist. */
+  drawKnife(ctx, pass, E, H, depth) {
+    const t = this.tint;
+    // the blade continues the forearm, cocked up like a held chef's knife
+    const a0 = Math.atan2(H.y - E.y, H.x - E.x) + 0.9;
+    const dx = Math.cos(a0), dy = Math.sin(a0);
+    const at = (k, n = 0) => ({ x: H.x + dx * k - dy * n, y: H.y + dy * k + dx * n });
+    const blade = [at(10, -5), at(52, -4), at(60, 1), at(52, 7), at(10, 7)];
+    const poly = (pts) => { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); };
+    if (pass === 'outline') {
+      ctx.beginPath();
+      limbPath(ctx, at(-12), at(10), 5, 5);
+      this.outlineFill(ctx);
+      poly(blade);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+      return;
+    }
+    ctx.beginPath();
+    limbPath(ctx, at(-12), at(10), 3.4, 3.4);
+    ctx.fillStyle = this.mat(darken('#3b2416', depth), t).base;
+    ctx.fill();
+    poly(blade);
+    ctx.fillStyle = this.mat(darken('#c9ced6', depth), t).base;
+    ctx.fill();
+    this.line(ctx, [at(14, -3.4), at(52, -2.6)], 1.4, rgba('#ffffff', 0.8), 1);
+  }
+
   drawSpringGlove(ctx, pass, E, H) {
     const a0 = Math.atan2(H.y - E.y, H.x - E.x);
     const dx = Math.cos(a0), dy = Math.sin(a0);
@@ -7808,10 +8068,23 @@ class FighterPainter {
     ctx.fill();
   }
 
+  /** Chuy's guitar played (showboat): body against the belly, neck running out to the fretting hand. */
+  drawPlayedGuitar(ctx, pass, J) {
+    const g = this.look.guitar || { color: '#2fb8a8', dark: '#1a6a64', neck: '#3a2418', head: '#e2b440' };
+    const H = J.handF, hip = J.hipF, sh = J.shoulderF;
+    const belly = { x: hip.x * 0.75 + sh.x * 0.25 + 16, y: hip.y * 0.75 + sh.y * 0.25 };
+    const ang = Math.atan2(belly.y - H.y, belly.x - H.x);
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const L = Math.hypot(belly.x - H.x, belly.y - H.y);
+    const o = L - 66; // the guitar body sits on the belly whatever the arm's reach
+    const at = (k, n = 0) => ({ x: H.x + dx * (k + o) - dy * n, y: H.y + dy * (k + o) + dx * n });
+    this.guitarShape(ctx, pass, at, ang, g, 0);
+  }
+
   /** Chuy's guitar slung on his back (hidden while it is in his hands). */
   drawBackGuitar(ctx, pass, J, A) {
     const g = this.look.guitar;
-    if (!g || this.prop?.type === 'guitar') return;
+    if (!g || this.prop?.type === 'guitar' || this.prop?.type === 'guitarPlay') return;
     const F = this.torsoFrame(J, A);
     const base = P2(F.W, F.fS, -F.ww * 1.1, F.uS, -6);
     const top = P2(F.N, F.fC, -F.cw * 0.9, F.uC, 34);
@@ -10826,6 +11099,22 @@ class Effects {
         for (let i = 0; i < 5; i++) this.parts.push({ kind: 'dust', x: f.body.x, y: 4, vx: -f.facing * (e.dir === -1 ? -1 : 1) * (1 + this.rnd() * 2.5), vy: this.rnd(), r: 5 + this.rnd() * 6, life: 24, max: 24 });
         break;
       }
+      case 'tauntDone': {
+        // the crowd goes wild for the show
+        const f = fighters?.[e.who];
+        const x = f ? f.body.x : e.x;
+        this.labels.push({ text: 'SHOWBOAT!', x, y: 360, life: 80, color: '#ffd23f', big: true, age: 0 });
+        for (let i = 0; i < 16; i++) {
+          const a = Math.PI / 2 + (this.rnd() - 0.5) * 2.2, sp = 4 + this.rnd() * 6;
+          this.parts.push({ kind: 'spark', x, y: 300, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 30, max: 30, color: i % 3 ? '#ffd23f' : '#ff4fd8', w: 3 });
+        }
+        break;
+      }
+      case 'tauntBroken': {
+        const f = fighters?.[e.who];
+        if (f) this.labels.push({ text: 'HUMBLED!', x: f.body.x, y: 340, life: 80, color: '#ff3a4a', big: true, age: 0 });
+        break;
+      }
       case 'dizzy': {
         const f = fighters?.[e.who];
         if (f) this.labels.push({ text: 'DIZZY!', x: f.body.x, y: 300, life: 60, color: '#ffd23f' });
@@ -12094,6 +12383,8 @@ function drawDebug(ctx, match, cam, dbg) {
 __define("src/ai/aiController.js", function (__exports, __require) {
   Object.defineProperty(__exports, "AI_LEVELS", { enumerable: true, get: () => AI_LEVELS });
   Object.defineProperty(__exports, "AI_FATALITY_CHANCE", { enumerable: true, get: () => AI_FATALITY_CHANCE });
+  Object.defineProperty(__exports, "showboatChance", { enumerable: true, get: () => showboatChance });
+  Object.defineProperty(__exports, "SHOWBOAT", { enumerable: true, get: () => SHOWBOAT });
   Object.defineProperty(__exports, "AIController", { enumerable: true, get: () => AIController });
 // CPU opponent. Produces the same raw input a keyboard would (so it obeys every game rule),
 // perceives the opponent with a reaction delay, and plays footsies: spacing, pokes, blocking,
@@ -12120,6 +12411,24 @@ const M = {
 
 /** Share of won matches the CPU finishes with a fatality (1 = always; lower it after play-testing). */
 const AI_FATALITY_CHANCE = 1;
+
+/**
+ * Chance that the CPU showboats at a dizzy opponent instead of punishing: the bigger the health
+ * lead and the higher the morale the likelier; aggressive characters love it, cunning ones don't.
+ */
+function showboatChance(me, op) {
+  const lead = Math.max(0, me.health / me.maxHealth - op.health / op.maxHealth);
+  const morale = me.def.cond?.morale ?? 75;
+  const p = me.def.ai || {};
+  const v = SHOWBOAT.base + SHOWBOAT.lead * lead + SHOWBOAT.morale * ((morale - 60) / 40)
+    + SHOWBOAT.aggression * ((p.aggression ?? 0.5) - 0.5) - SHOWBOAT.cunning * ((p.cunning ?? 0.5) - 0.5);
+  return Math.max(0.02, Math.min(0.8, v));
+}
+const SHOWBOAT = {
+  base: 0.08, lead: 0.7, morale: 0.25, aggression: 0.3, cunning: 0.35,
+  // frames the CPU milks the moment before it starts: a late start lets the rival wake up mid-show
+  delay: [5, 65],
+};
 
 /** How each fighter likes to use its signature move: [min distance, max distance]. */
 const SIGNATURE_RANGE = {
@@ -12223,6 +12532,8 @@ class AIController {
       return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
     }
     if (me.state === 'blockstun') this.lastBlockstun = match.frame;
+    const sb = this.showboat(match, me);
+    if (sb) return sb;
     const aa = this.antiAirWatch(match, me, seen);
     if (aa) return aa;
     // Run the current macro.
@@ -12281,6 +12592,22 @@ class AIController {
     }
     // waiting for the window: guard (a planned anti-air never leaves the CPU wide open)
     return this.toRaw('b', null, me.facing);
+  }
+
+  /** Dizzy opponent: once per dizzy decide whether to play to the crowd, then wait and do it. */
+  showboat(match, me) {
+    const op = match.fighters[1 - this.index];
+    if (op.state !== 'dizzy') { this.sbPlan = null; return null; }
+    const id = match.frame - op.stateFrame;
+    if (this.sbDizzy !== id) {
+      this.sbDizzy = id;
+      this.sbPlan = this.rng.chance(showboatChance(me, op)) ? match.frame + this.rng.int(SHOWBOAT.delay[0], SHOWBOAT.delay[1]) : null;
+      if (this.sbPlan !== null) { this.macro = []; this.step = 0; this.hold = null; }
+    }
+    if (this.sbPlan === null) return null;
+    if (match.frame < this.sbPlan || !me.actionable || !me.body.onGround) return emptyRaw(); // savouring it
+    this.sbPlan = null;
+    return { ...emptyRaw(), taunt: true };
   }
 
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
@@ -12383,6 +12710,12 @@ class AIController {
         this.cooldown = this.hold.n;
         return;
       }
+    }
+    // A showboating rival is wide open: make them pay.
+    if (opF.state === 'taunt' && dist < 260 && r.chance(cfg.punish)) {
+      if (dist < 150) this.queue(r.chance(0.5) ? press('hp') : M.s1);
+      else this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }, { d: '', n: Math.max(2, Math.round(12 - me.stats.dash)) }, ...press('hp')]);
+      return;
     }
     // Broken guard (Tao's flurry): punish the stagger.
     if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {
@@ -12499,7 +12832,7 @@ const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 5;
+const VERSION = 6;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 function roundRobin(ids) {
@@ -12829,6 +13162,8 @@ const SPECTACLE_RULES = [
   { key: 'throw', label: 'Throws', icon: '⤴', per: 4 },
   { key: 'parry', label: 'Parries', icon: '🛡', per: 5 },
   { key: 'dizzy', label: 'Dizzied the rival', icon: '💫', per: 8 },
+  { key: 'showboat', label: 'Showboating', icon: '🎭', per: 15, hint: 'played to the crowd while the rival was dizzy' },
+  { key: 'humble', label: 'Humbled a show-off', icon: '👊', per: 8, hint: 'hit the rival while they showboated' },
   { key: 'injury', label: 'Injured the rival', icon: '🩹', per: 15 },
   { key: 'fastKo', label: 'Quick K.O. (< 20 s)', icon: '⏱', per: 8 },
   { key: 'perfect', label: 'Perfect round', icon: '💎', per: 20 },
@@ -12845,7 +13180,7 @@ const side = () => ({
   hits: 0, damageDealt: 0, damageTaken: 0,
   combos: 0, longestCombo: 0, biggestCombo: 0, comboPoints: 0,
   moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
-  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, injuredWith: null,
+  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, showboat: 0, humble: 0, injuredWith: null,
   koTimes: [], // seconds of fighting before each K.O. this fighter scored
 });
 
@@ -12902,6 +13237,12 @@ class MatchStats {
         S[e.by].injury++;
         S[e.who].injuredWith = e.kind;
         break;
+      case 'tauntDone':
+        S[e.who].showboat++;
+        break;
+      case 'tauntBroken':
+        S[1 - e.who].humble++;
+        break;
       case 'parry':
         S[e.who].parry++;
         break;
@@ -12937,7 +13278,7 @@ class MatchStats {
       const won = winner === i;
       const counts = {
         combo: st.combos, variety: st.moves.size, special: st.special, super: st.super, counter: st.counter,
-        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, injury: st.injury, fastKo: st.fastKo,
+        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, injury: st.injury, showboat: st.showboat, humble: st.humble, fastKo: st.fastKo,
         perfect: st.perfect, comeback: st.comeback, fatality: st.fatality,
         win: won ? 1 : 0, flawless: won && match.wins[1 - i] === 0 ? 1 : 0,
       };
@@ -13443,6 +13784,7 @@ class TitleScene {
           ['Light kick', 'V', 'K  (Num1)'],
           ['Heavy kick', 'B', 'L  (Num2)'],
           ['Switch stance', 'R', 'P  (Num0)'],
+          ['Showboat (rival dizzy)', 'H', ';  (Num3)'],
           ['Block', 'hold back (crouch-back for lows)', ''],
           ['Dash / run', 'double-tap forward (hold to run), double-tap back', ''],
           ['Surge Fist', '↓ ↘ → + punch', ''],

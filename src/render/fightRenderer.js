@@ -5,6 +5,7 @@ import { lerp } from '../core/math.js';
 import { blendPoses, computeSkeleton, emptyPose, clonePose } from '../anim/skeleton.js';
 import { drawFlame, drawGlow } from './fire.js';
 import { TALON_REACH } from '../data/signatures.js';
+import { rangeAt } from '../data/taunts.js';
 import { ATTACK_POSES } from '../anim/attackPoses.js';
 import { FighterPainter } from './fighterPainter.js';
 import { SecondaryMotion } from './secondary.js';
@@ -38,6 +39,7 @@ function faceFor(f) {
     case 'dizzy': case 'dazed': return 'dizzy';
     case 'ko': return 'ko';
     case 'victory': return 'happy';
+    case 'taunt': return rangeAt(f.sd.def?.face, f.stateFrame) || 'happy';
     default: return null;
   }
 }
@@ -196,13 +198,14 @@ export class FightRenderer {
     const expression = fx.face || faceFor(f);
     const blink = blinkAt(now / 1000 + i * 1.37, i);
     // held prop (Bruno's frying pan during his super); stance mirroring swaps the hand like hitboxes
-    const prop = fx.prop || (mv?.def.prop && f.state === 'attack'
+    const taunt = f.state === 'taunt' ? f.sd.def : null;
+    const prop = fx.prop || (taunt && rangeAt(taunt.prop, f.stateFrame)) || (mv?.def.prop && f.state === 'attack'
       ? { type: mv.def.prop.type, hand: f.stance === 1 ? (mv.def.prop.hand === 'F' ? 'B' : 'F') : mv.def.prop.hand }
       : null);
     // flaming fists only on fire moves (specials / super), never on normal attacks
-    const fire = !!(mv?.def.fire && f.state === 'attack') || !!fx.fire;
+    const fire = !!(mv?.def.fire && f.state === 'attack') || !!fx.fire || !!(taunt && rangeAt(taunt.fire, f.stateFrame));
     const claws = !!(mv?.def.claws && f.state === 'attack');
-    const flurry = !!(mv?.def.flurry && f.state === 'attack');
+    const flurry = !!(mv?.def.flurry && f.state === 'attack') || !!(taunt && rangeAt(taunt.flurry, f.stateFrame));
     this.painters[i].draw(ctx, skel, {
       prop,
       fire,
@@ -211,7 +214,7 @@ export class FightRenderer {
       critical: f.critical,
       clawMarks: f.clawMarks || 0,
       marks: f.marks,
-      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite,
+      bite: !!(mv?.def.bite && f.state === 'attack') || !!fx.bite || !!(taunt && rangeAt(taunt.bite, f.stateFrame)),
       springExt: springExtension(mv, f),
       now,
       layers: f.anim.layers,
