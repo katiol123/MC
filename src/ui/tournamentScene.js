@@ -9,6 +9,12 @@ import {
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
 import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
+import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } from '../tournament/injuries.js';
+import { ATTRIBUTES } from '../data/attributes.js';
+
+const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
+const ATTR_LABEL = Object.fromEntries(ATTRIBUTES.map((a) => [a.id, a.label]));
+const boughtIcon = (b) => (b === 'treat' ? '🩺' : b.startsWith('up:') ? '⬆' : SHOP.find((x) => x.id === b)?.icon || '');
 import { FightScene } from './fightScene.js';
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -100,7 +106,7 @@ export class TournamentScene {
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
       el('span', { class: 'tface', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }),
-      el('span', { class: 'tname' }, [NAME[r.id]]),
+      el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
       el('span', { class: 'tnum' }, [String(r.lost)]),
@@ -329,6 +335,8 @@ export class TournamentScene {
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
           el('span', { class: 'camp-name' }, [short(id)]),
+          el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
+            el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
           el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
         ]),
         meter('STAMINA', f.stamina, 'sta', `body ${fx(f.stamina, 'stamina')}`),
@@ -337,10 +345,14 @@ export class TournamentScene {
           class: 'camp-item', disabled: f.fame < it.cost ? '' : null, title: `${it.label}: ${it.desc}`,
           onclick: () => { if (buy(t, id, it.id)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
         }, [it.icon, el('small', {}, [String(it.cost)])]))),
-        el('label', { class: 'camp-auto' }, [
-          el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }),
-          'auto manager',
-          bought.length ? el('span', { class: 'camp-bought' }, [`bought: ${bought.map((b) => SHOP.find((x) => x.id === b).icon).join('')}`]) : null,
+        el('div', { class: 'camp-inj' }, [
+          ...(f.injuries.length ? f.injuries.map((i) => el('button', {
+            class: 'inj-chip', disabled: f.fame < INJ.treatCost ? '' : null,
+            title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc}. ${i.games} more match(es). Click: treat −1 round for ★${INJ.treatCost}`,
+            onclick: () => { if (treatInjury(t, id, i.kind)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
+          }, [INJURIES[i.kind].icon, el('b', {}, [String(i.games)])])) : [el('span', { class: 'inj-none' }, ['no injuries'])]),
+          bought.length ? el('span', { class: 'camp-bought', title: 'bought by the manager after the last round' }, [bought.map(boughtIcon).join('')]) : null,
+          el('button', { class: 'tbtn mini up-btn', onclick: () => this.showUpgrades(id) }, ['⬆ UPGRADE']),
         ]),
       ]);
     };
@@ -350,9 +362,9 @@ export class TournamentScene {
       el('div', { class: 'camp-panel' }, [
         el('div', { class: 'camp-head' }, [
           el('div', { class: 'awards-title small' }, ['TRAINING CAMP']),
-          el('div', { class: 'camp-legend' }, SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} — ${it.desc} · ★${it.cost}`]))),
+          el('div', { class: 'camp-legend' }, [...SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} ${it.desc} ★${it.cost}`])), el('span', {}, [`🩺 treat −1 round ★${INJ.treatCost}`])]),
         ]),
-        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers show the bar shift ×10). Both also decide how often a winner goes for the fatality. Managers on "auto" buy after every round.`]),
+        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers = bar shift ×10). Injury chips: matches left — click to treat (−1 round, ★${INJ.treatCost}). AUTO managers buy after every round.`]),
         el('div', { class: 'camp-grid' }, order.map(card)),
         btn('DONE', close, 'big'),
       ]),
@@ -361,6 +373,48 @@ export class TournamentScene {
     this.modal = true;
     this.unsubCamp?.();
     const unsub = this.unsubCamp = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'Enter') close(); });
+    document.getElementById('ui').appendChild(wrap);
+  }
+
+  /** Upgrade shop of one fighter: +0.1 bar in any attribute; shows base, upgrades and injury damage. */
+  showUpgrades(id) {
+    const t = this.t, f = t.fighters[id];
+    const base = BASE_PROFILE[id];
+    const row = (a) => {
+      const b = base[a] ?? 0.5, perm = f.perm[a] || 0;
+      const up = (f.upLevels[a] || 0) * INJ.upgradeStep, hurt = perm - up;
+      const cost = upgradeCost(f, a);
+      const pct = (v) => `${Math.max(0, Math.min(140, v * 100)) / 1.4}%`;
+      return el('div', { class: `up-row ${ATTRIBUTES.find((x) => x.id === a).group}` }, [
+        el('span', { class: 'up-label' }, [ATTR_LABEL[a]]),
+        el('span', { class: 'up-bar' }, [
+          el('b', { class: 'base', style: { width: pct(Math.min(b, b + perm)) } }),
+          perm > 0 ? el('b', { class: 'gain', style: { left: pct(b), width: pct(perm) } }) : null,
+          perm < 0 ? el('b', { class: 'loss', style: { left: pct(b + perm), width: pct(-perm) } }) : null,
+          el('i', { style: { left: pct(1) } }),
+        ]),
+        el('span', { class: 'up-num' }, [`${up ? `+${up.toFixed(1)}` : ''}${hurt < -0.001 ? ` ${hurt.toFixed(2)}` : ''}`]),
+        el('button', { class: 'tbtn mini', disabled: f.fame < cost ? '' : null, onclick: () => { if (buyUpgrade(t, id, a)) { this.app.audio.ui('confirm'); save(t); close(); this.showUpgrades(id); } } }, [`+0.1  ★${cost}`]),
+      ]);
+    };
+    const close = () => { wrap.remove(); unsub(); this.showCamp(); };
+    const wrap = el('div', { class: 'menu-overlay upgrades' }, [
+      el('div', { class: 'up-panel' }, [
+        el('div', { class: 'up-head' }, [
+          el('span', { class: 'sp-portrait', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+        ]),
+        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
+        el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
+        el('div', { class: 'up-inj' }, f.injuryLog.length
+          ? f.injuryLog.map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${ATTR_LABEL[a].toLowerCase()} ${v.toFixed(2)}`).join(', ')}`]))
+          : [el('span', {}, ['No injuries so far.'])]),
+        btn('BACK TO CAMP', close, 'big'),
+      ]),
+    ]);
+    this.campEl?.remove();
+    this.unsubCamp?.();
+    const unsub = this.app.keyboard.onPress((code) => { if (code === 'Escape') close(); });
     document.getElementById('ui').appendChild(wrap);
   }
 

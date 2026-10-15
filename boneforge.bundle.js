@@ -587,6 +587,11 @@ class AudioSystem {
         }
         break;
       }
+      case 'injury':
+        // bone crack: a sharp click + a dull thud
+        this.noise(0.06, { freq: 3800, q: 6, gain: 0.6 });
+        this.tone(0.3, { freq: 130, to: 50, gain: 0.55 });
+        break;
       case 'block':
         if (e.guardBreak) { this.noise(0.35, { freq: 2600, q: 0.8, gain: 0.5, sweep: 0.5 }); this.tone(0.3, { freq: 220, to: 70, gain: 0.5 }); break; }
         this.noise(0.08, { freq: 3200, q: 3, gain: 0.35 });
@@ -2720,6 +2725,7 @@ class Match {
 
   restart() {
     for (const f of this.fighters) f.meter = 0;
+    this.injured = [null, null]; // tournament injury suffered this match (kind)
     this.wins = [0, 0];
     this.round = 0;
     this.winner = null;
@@ -2830,21 +2836,53 @@ class Match {
     for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
-    if (this.phase === 'fight') this.updateBurn();
+    if (this.phase === 'fight') { this.updateBurn(); this.updateInjuries(); }
+    this.rollInjuries();
     this.updateCritical();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /**
+   * Tournament injuries: an injury rolled on a hit is announced ("INJURY!") and leaves the battered
+   * look for the rest of the match; a broken nose bleeds a little while fighting.
+   */
+  updateInjuries() {
+    for (const f of this.fighters) {
+      if (f.injFx.has('bleeding') && f.health > 1 && this.phaseTick % 90 === 89) f.health = Math.max(1, f.health - 5);
+    }
+  }
+
+  rollInjuries() {
+    const roll = this.opts.injuryRoll;
+    if (!roll) return;
+    for (const e of this.events.slice()) {
+      const kind = roll(this, e);
+      if (!kind) continue;
+      const v = this.fighters[e.target];
+      this.injured[e.target] = kind;
+      this.events.push({ type: 'injury', who: e.target, by: e.who, kind, x: e.x, y: e.y });
+      this.makeBattered(v);
+    }
+  }
+
+  makeBattered(f) {
+    if (f.critical) return;
+    f.critical = true;
+    const head = f.skel.j.head;
+    this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
   }
 
   /** Low health: the fighter turns battered once per round (a prop flies off, heavy breathing). */
   updateCritical() {
     for (const f of this.fighters) {
       const share = f.health / f.maxHealth;
-      if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
+      if (this.injured[f.index] && !f.critical && f.health > 0) f.critical = true; // injured: stays battered (no second pop)
+      else if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
         f.critical = true;
         const head = f.skel.j.head;
         this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
-      } else if (f.critical && share > 0.6) f.critical = false; // training refill
+      } else if (f.critical && share > 0.6 && !this.injured[f.index]) f.critical = false; // training refill
     }
   }
 
@@ -3037,6 +3075,8 @@ class Fighter {
     this.maxHealth = def.stats.health;
     // MOBILITY also means agility: quicker landings and wake-ups (1 = roster average)
     this.agility = def.stats.agility ?? 1;
+    // tournament injuries carried into this match (unusual debuffs, see tournament/injuries.js)
+    this.injFx = new Set(def.injuryFx || []);
     this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
     this.spawnProjectile = null; // set by the match
@@ -3053,7 +3093,7 @@ class Fighter {
     this.facing = facing;
     this.stance = 0;
     this.health = this.maxHealth;
-    this.stun = 0;
+    this.stun = this.injFx?.has('groggy') ? Math.round(this.stats.stunMax * 0.4) : 0; // concussion: starts the round groggy
     this.sinceHit = 0;
     this.hitstop = 0;
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
@@ -3147,6 +3187,7 @@ class Fighter {
   /** Adds super meter unless the post-super cooldown is running. */
   gainMeter(n) {
     if (this.superLock > 0 || !(n > 0)) return;
+    if (this.injFx.has('slowMeter')) n *= 0.5; // torn shoulder
     this.meter = Math.min(TUNING.superCost, this.meter + n);
   }
 
@@ -3305,11 +3346,11 @@ class Fighter {
       this.setState('prejump', { dir, fromRun: this.state === 'run' }, 'prejump', { blend: 2 });
       return;
     }
-    if (this.state !== 'run' && inp.doubleTap(6)) {
+    if (this.state !== 'run' && inp.doubleTap(6) && !this.injFx.has('noDash')) {
       this.emit({ type: 'dash', who: this.index, dir: 1 });
       return this.setState('dashF', { duration: 16 }, 'dashF', { blend: 3, params: { duration: 16 } });
     }
-    if (inp.doubleTap(4)) {
+    if (inp.doubleTap(4) && !this.injFx.has('noDash')) {
       this.emit({ type: 'dash', who: this.index, dir: -1 });
       return this.setState('dashB', { duration: 18 }, 'dashB', { blend: 3, params: { duration: 18 } });
     }
@@ -3596,7 +3637,7 @@ class Fighter {
     this.hitstop = hitstop;
     this.flash = 6;
     this.health = Math.max(0, this.health - damage);
-    this.stun += m.stun * (counter ? 1.25 : 1);
+    this.stun += m.stun * (counter ? 1.25 : 1) * (this.injFx.has('groggy') ? 1.3 : 1);
     this.sinceHit = 0;
     if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
     if (m.pie) this.marks.pie = m.pie; // cream pie over the face (ticks, render-only)
@@ -4634,6 +4675,8 @@ __define("src/combat/hitResolver.js", function (__exports, __require) {
 // Also resolves throws (grab / tech / release), projectiles and counter-stance parries.
 const { TUNING } = __require("src/config/tuning.js");
 const { capsulesOverlap, capsulePenetration, lerp, clamp } = __require("src/core/math.js");
+
+const PUNCHES = new Set(['lp', 'hp', 'clp', 'chp', 'jp']);
 const { STAGE } = __require("src/config/constants.js");
 
 const PART_ORDER = { head: 0, torso: 1, limb: 2 };
@@ -4828,7 +4871,9 @@ function applyStrike(att, def, spec, res, snap, { trade = false, holder, project
   const punish = snap.state === 'attack' && !inStartupOrActive;
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
-  const partMul = TUNING.partDamage[res.part] ?? 1;
+  // tournament injuries: cracked ribs take more on the body, broken knuckles punch softer
+  const partMul = (TUNING.partDamage[res.part] ?? 1) * (res.part === 'torso' && def.injFx?.has('fragileBody') ? 1.25 : 1)
+    * (att.injFx?.has('weakPunches') && PUNCHES.has(spec.id) ? 0.75 : 1);
   const dmgMul = (att.stats.damage ?? 1) * (att.focus > 0 ? TUNING.focusDamage : 1);
   const damage = Math.max(1, Math.round(spec.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
   const decay = spec.comboExempt ? 0 : Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
@@ -10716,6 +10761,20 @@ class Effects {
         }
         break;
       }
+      case 'injury': {
+        // a tournament injury: crack lines, a red burst and a big slammed "INJURY!" over the victim
+        const v = fighters?.[e.who];
+        const x = v ? v.body.x : e.x, y = v ? v.body.y + 270 : e.y + 90;
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 9, life: 18, max: 18, color: '#ff3a4a' });
+        for (let i = 0; i < 14; i++) {
+          const a = this.rnd() * Math.PI * 2, sp = 3 + this.rnd() * 6;
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 20, max: 20, color: i % 2 ? '#ff3a4a' : '#ffffff', w: 3 });
+        }
+        this.labels.push({ text: 'INJURY!', x, y, life: 90, color: '#ff3a4a', big: true, age: 0 });
+        this.shake = Math.max(this.shake, 9);
+        this.flash = Math.max(this.flash, 0.25);
+        break;
+      }
       case 'critical': {
         // battered: the fighter's signature item flies off with a pop
         const f = fighters?.[e.who];
@@ -10812,7 +10871,7 @@ class Effects {
       else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
-    for (const l of this.labels) { l.life--; l.y += 0.8; }
+    for (const l of this.labels) { l.life--; l.y += l.big ? 0.25 : 0.8; }
     this.labels = this.labels.filter((l) => l.life > 0);
     this.shake *= 0.82;
     if (this.shake < 0.2) this.shake = 0;
@@ -10976,6 +11035,28 @@ class Effects {
     ctx.textAlign = 'center';
     for (const l of this.labels) {
       const s = cam.toScreen(l.x, l.y);
+      if (l.big) {
+        // slams in large, settles, shakes a little
+        const age = (l.age = (l.age || 0) + 1);
+        const pop = age < 8 ? 2.2 - (age / 8) * 1.2 : 1;
+        const jit = age < 30 ? Math.sin(age * 1.7) * 3 : 0;
+        ctx.save();
+        ctx.translate(s.x + jit, s.y);
+        ctx.rotate(-0.08);
+        ctx.scale(pop, pop);
+        ctx.font = `900 ${Math.round(44 * cam.zoom)}px "Arial Black", Impact, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = rgba('#140a18', Math.min(1, l.life / 20));
+        ctx.strokeText(l.text, 0, 0);
+        ctx.fillStyle = rgba(l.color, Math.min(1, l.life / 20));
+        ctx.fillText(l.text, 0, 0);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = rgba('#ffffff', Math.min(0.8, l.life / 25));
+        ctx.strokeText(l.text, 0, 0);
+        ctx.restore();
+        continue;
+      }
       ctx.font = `900 ${Math.round(26 * cam.zoom)}px "Arial Black", Impact, sans-serif`;
       ctx.lineWidth = 6;
       ctx.strokeStyle = rgba('#140a18', Math.min(1, l.life / 20));
@@ -12403,6 +12484,9 @@ const { ROSTER } = __require("src/data/fighters.js");
 const { Rng } = __require("src/core/rng.js");
 const { MatchStats } = __require("src/tournament/stats.js");
 const { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } = __require("src/tournament/condition.js");
+const { initInjuries, profileShift, activeEffects, injuryRoller, addInjury, tickInjuries, autoInvest, leagueDrift } = __require("src/tournament/injuries.js");
+
+const BASE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
 
 const TOURNAMENT_RULES = { roundsToWin: 2, roundTime: 99 };
 /**
@@ -12415,7 +12499,7 @@ const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 3;
+const VERSION = 4;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 function roundRobin(ids) {
@@ -12448,6 +12532,7 @@ function createTournament({ ids = ROSTER.map((f) => f.id), level = 'normal', see
     fighters: Object.fromEntries(ids.map((id) => {
       const f = { overrides: {}, sp: 0, fame: 0, fameEarned: 0 };
       initCondition(f);
+      initInjuries(f);
       return [id, f];
     })),
     camp: [], // per round: what each manager bought after it
@@ -12477,13 +12562,18 @@ function currentRound(t) {
 function snapshotOverrides(t, m) {
   return [m.a, m.b].map((id) => {
     const f = t.fighters[id];
-    return conditionOverrides(id, f?.overrides || {}, f || COND.start);
+    // the bars as they are now: base + upgrades − injury damage + active injury debuffs
+    const shift = profileShift(f);
+    const profile = Object.fromEntries(Object.entries(shift).map(([a, d]) => [a, (BASE[id][a] ?? 0.5) + d]));
+    const extra = { ...(f.overrides || {}), profile: { ...profile, ...(f.overrides?.profile || {}) }, injuryFx: activeEffects(f), injuryKinds: f.injuries.map((i) => i.kind) };
+    return conditionOverrides(id, extra, f);
   });
 }
 
 /** A fresh Match + AI pair for a scheduled match (used for live viewing, simulation and replays). */
 function setupMatch(t, m, overrides = m.result?.overrides || snapshotOverrides(t, m)) {
-  const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], ...TOURNAMENT_RULES });
+  const injuryRoll = injuryRoller(m.seed, [overrides[0].injuryKinds || [], overrides[1].injuryKinds || []]);
+  const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], injuryRoll, ...TOURNAMENT_RULES });
   const ai = [new AIController(0, { level: t.level, seed: m.seed }), new AIController(1, { level: t.level, seed: m.seed * 7 + 3 })];
   for (const a of ai) a.fatalityChance = fatalityChance;
   return { match, ai, overrides };
@@ -12530,6 +12620,13 @@ function recordResult(t, m, match, stats, overrides) {
   m.result = { ...rep, overrides, playedAt: Date.now() };
   m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
+  // injuries: the ones carried into this match count down, a new one starts
+  const drift = leagueDrift(t);
+  m.result.injuries = ids.map((id, i) => {
+    tickInjuries(t.fighters[id]);
+    const kind = rep.sides[i].injuredWith;
+    return kind ? addInjury(t, id, kind, drift) : null;
+  });
   rep.sides.forEach((s, i) => {
     const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
     const under = underdog.has(ids[i]);
@@ -12546,7 +12643,7 @@ function recordResult(t, m, match, stats, overrides) {
       t.roundAwards[ri] = grantAwards(t, awards(t, ri));
       // the camp between rounds: everyone rests, then the managers spend fame on recovery
       restRound(t);
-      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, autoManage(t, id)]));
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, [...autoManage(t, id), ...autoInvest(t, id, BASE[id])]]));
     }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
@@ -12573,7 +12670,7 @@ function grantAwards(t, list) {
 
 /** League table with tie-breaks: points, head-to-head, round difference, damage dealt, perfects. */
 function standings(t) {
-  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale });
+  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale, injuries: t.fighters[id].injuries });
   const rows = Object.fromEntries(t.ids.map((id) => [id, row(id)]));
   const h2h = {};
   for (const { m } of allMatches(t)) {
@@ -12709,6 +12806,7 @@ const SPECTACLE_RULES = [
   { key: 'throw', label: 'Throws', icon: '⤴', per: 4 },
   { key: 'parry', label: 'Parries', icon: '🛡', per: 5 },
   { key: 'dizzy', label: 'Dizzied the rival', icon: '💫', per: 8 },
+  { key: 'injury', label: 'Injured the rival', icon: '🩹', per: 15 },
   { key: 'fastKo', label: 'Quick K.O. (< 20 s)', icon: '⏱', per: 8 },
   { key: 'perfect', label: 'Perfect round', icon: '💎', per: 20 },
   { key: 'comeback', label: 'Comeback round', icon: '🔥', per: 12, hint: 'won with less than 15 % health' },
@@ -12724,7 +12822,7 @@ const side = () => ({
   hits: 0, damageDealt: 0, damageTaken: 0,
   combos: 0, longestCombo: 0, comboPoints: 0,
   moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
-  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0,
+  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, injuredWith: null,
   koTimes: [], // seconds of fighting before each K.O. this fighter scored
 });
 
@@ -12776,6 +12874,10 @@ class MatchStats {
         }
         break;
       }
+      case 'injury':
+        S[e.by].injury++;
+        S[e.who].injuredWith = e.kind;
+        break;
       case 'parry':
         S[e.who].parry++;
         break;
@@ -12811,7 +12913,7 @@ class MatchStats {
       const won = winner === i;
       const counts = {
         combo: st.combos, variety: st.moves.size, special: st.special, super: st.super, counter: st.counter,
-        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, fastKo: st.fastKo,
+        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, injury: st.injury, fastKo: st.fastKo,
         perfect: st.perfect, comeback: st.comeback, fatality: st.fatality,
         win: won ? 1 : 0, flawless: won && match.wins[1 - i] === 0 ? 1 : 0,
       };
@@ -12826,7 +12928,7 @@ class MatchStats {
       return {
         hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
         combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
-        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i],
+        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i], injuredWith: st.injuredWith,
         spectacle: { total, items },
       };
     });
@@ -13018,6 +13120,219 @@ function autoManage(t, id) {
     bought.push(pick);
   }
   return bought;
+}
+
+});
+__define("src/tournament/injuries.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "ATTR_IDS", { enumerable: true, get: () => ATTR_IDS });
+  Object.defineProperty(__exports, "INJURIES", { enumerable: true, get: () => INJURIES });
+  Object.defineProperty(__exports, "INJURY_KINDS", { enumerable: true, get: () => INJURY_KINDS });
+  Object.defineProperty(__exports, "INJ", { enumerable: true, get: () => INJ });
+  Object.defineProperty(__exports, "upgradeCost", { enumerable: true, get: () => upgradeCost });
+  Object.defineProperty(__exports, "leagueDrift", { enumerable: true, get: () => leagueDrift });
+  Object.defineProperty(__exports, "initInjuries", { enumerable: true, get: () => initInjuries });
+  Object.defineProperty(__exports, "profileShift", { enumerable: true, get: () => profileShift });
+  Object.defineProperty(__exports, "activeEffects", { enumerable: true, get: () => activeEffects });
+  Object.defineProperty(__exports, "injuryRoller", { enumerable: true, get: () => injuryRoller });
+  Object.defineProperty(__exports, "addInjury", { enumerable: true, get: () => addInjury });
+  Object.defineProperty(__exports, "tickInjuries", { enumerable: true, get: () => tickInjuries });
+  Object.defineProperty(__exports, "buyUpgrade", { enumerable: true, get: () => buyUpgrade });
+  Object.defineProperty(__exports, "treatInjury", { enumerable: true, get: () => treatInjury });
+  Object.defineProperty(__exports, "autoInvest", { enumerable: true, get: () => autoInvest });
+// Tournament INJURIES and UPGRADES: the two forces that make the fighters' bars drift during a
+// tournament (on top of stamina / morale).
+//
+//   UPGRADES: fame buys +0.1 of a bar in any attribute (price grows with each level of that attribute).
+//   INJURIES: a heavy blow can injure the opponent during a fight ("INJURY!", the battered look). An
+//     injury takes a permanent bite out of some bars AND gives an unusual debuff for the next 1-3
+//     matches (no dashes, a bleeding nose, a weak super...). A fighter can carry several injuries,
+//     never two of the same kind. Fame can shorten an injury by one round.
+//
+// Balance: over a tournament the roster average stays about the same. Upgrades and injuries are
+// tuned to cancel out (tools/tourney.mjs), and as a safety valve injuries bite harder when the league
+// as a whole has gained (LEAGUE_REG), softer when it has lost.
+const { Rng } = __require("src/core/rng.js");
+const { ATTRIBUTES } = __require("src/data/attributes.js");
+
+const ATTR_IDS = ATTRIBUTES.map((a) => a.id);
+
+/**
+ * Injury kinds. perm: permanent bar losses; temp: bar losses while active; games: how many of the
+ * fighter's next matches it lasts; effect: the unusual debuff (handled by the fight systems).
+ */
+const INJURIES = {
+  nose: {
+    label: 'Broken nose', icon: '👃', games: 2, effect: 'bleeding',
+    desc: 'bleeds during fights (loses health slowly)',
+    perm: { toughness: -0.12, reaction: -0.06 }, temp: { reaction: -0.25 },
+  },
+  ankle: {
+    label: 'Sprained ankle', icon: '🦶', games: 3, effect: 'noDash',
+    desc: 'cannot dash, slower on the feet',
+    perm: { mobility: -0.18 }, temp: { mobility: -0.45 },
+  },
+  ribs: {
+    label: 'Cracked ribs', icon: '🩻', games: 2, effect: 'fragileBody',
+    desc: 'body hits deal +25 % damage to him',
+    perm: { health: -0.14, toughness: -0.06 }, temp: { health: -0.3 },
+  },
+  knuckles: {
+    label: 'Broken knuckles', icon: '🤜', games: 2, effect: 'weakPunches',
+    desc: 'punches deal −25 % damage',
+    perm: { power: -0.18 }, temp: { power: -0.2 },
+  },
+  concussion: {
+    label: 'Concussion', icon: '💫', games: 3, effect: 'groggy',
+    desc: 'starts every round 40 % dizzy, gets dizzy faster',
+    perm: { reaction: -0.08, combo: -0.06, cunning: -0.04 }, temp: { reaction: -0.25, combo: -0.2 },
+  },
+  shoulder: {
+    label: 'Torn shoulder', icon: '💪', games: 1, effect: 'slowMeter',
+    desc: 'super meter fills half as fast',
+    perm: { speed: -0.14, power: -0.04 }, temp: { speed: -0.35 },
+  },
+  shaken: {
+    label: 'Shell-shocked', icon: '😨', games: 2, effect: 'timid',
+    desc: 'timid: hangs back, rarely presses',
+    perm: { aggression: -0.12, antiAir: -0.06 }, temp: { aggression: -0.5, cunning: -0.2 },
+  },
+};
+const INJURY_KINDS = Object.keys(INJURIES);
+
+const INJ = {
+  chance: 0.0105, // per qualifying hit, before the multipliers below
+  minDamage: 50, // qualifying hit: this much damage, or a super / throw / counter hit
+  superMul: 1.6, throwMul: 1.4,
+  // the attacker's aggression (0..1) and the victim's fatigue raise the odds
+  aggrBase: 0.5, fatigueBase: 0.4, fatigueMul: 1.6,
+  perMatch: 1, // at most one new injury per fighter per match
+  spectacle: 15, // spectacle points for injuring the opponent
+  treatCost: 90, // fame to shorten an injury by one round
+  upgradeStep: 0.1, // bars per upgrade
+  upgradeCost: 150, upgradeCostGrowth: 0.35, // 150, 203, 255, ... per level of that attribute
+  permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
+  leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
+};
+
+function upgradeCost(f, attr) {
+  const lvl = f.upLevels?.[attr] || 0;
+  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * lvl));
+}
+
+/** Average permanent bar shift over the whole league (upgrades minus injury damage). */
+function leagueDrift(t) {
+  let s = 0, n = 0;
+  for (const id of t.ids) for (const a of ATTR_IDS) { s += t.fighters[id].perm?.[a] || 0; n++; }
+  return n ? s / n : 0;
+}
+
+function initInjuries(rec) {
+  Object.assign(rec, { perm: {}, upLevels: {}, injuries: [], injuryLog: [] });
+}
+
+/** Profile shift (bars) from permanent changes and active injuries. */
+function profileShift(rec) {
+  const out = {};
+  for (const a of ATTR_IDS) out[a] = rec.perm?.[a] || 0;
+  for (const inj of rec.injuries || []) for (const [a, v] of Object.entries(INJURIES[inj.kind].temp)) out[a] += v;
+  return out;
+}
+
+/** Effects of the active injuries, for the fight systems. */
+function activeEffects(rec) {
+  return (rec.injuries || []).map((i) => INJURIES[i.kind].effect);
+}
+
+/**
+ * In-fight injury roller for one match (deterministic: seeded by the match). Returns the injury kind
+ * a hit causes, or null. cond: [{stamina, morale}] of both fighters; carried: kinds each already has.
+ */
+function injuryRoller(seed, carried) {
+  const rng = new Rng(seed ^ 0x5eed);
+  const done = [0, 0];
+  return (match, e) => {
+    if (e.type !== 'hit' || e.target === undefined) return null;
+    const vi = e.target, at = e.who;
+    if (done[vi] >= INJ.perMatch) return null;
+    const qualifies = e.damage >= INJ.minDamage || e.super || e.throw || e.counter;
+    if (!qualifies) return null;
+    const A = match.fighters[at], V = match.fighters[vi];
+    const aggr = A.def.ai?.aggression ?? 0.5;
+    const st = V.def.cond?.stamina ?? 100;
+    let p = INJ.chance * (INJ.aggrBase + aggr) * (INJ.fatigueBase + INJ.fatigueMul * (1 - st / 100));
+    if (e.super) p *= INJ.superMul;
+    if (e.throw) p *= INJ.throwMul;
+    if (!rng.chance(p)) return null;
+    const free = INJURY_KINDS.filter((k) => !carried[vi].includes(k));
+    if (!free.length) return null;
+    done[vi]++;
+    return rng.pick(free);
+  };
+}
+
+/** Adds an injury after the match: permanent damage (league-regulated) + the debuff for N games. */
+function addInjury(t, id, kind, drift = leagueDrift(t)) {
+  const f = t.fighters[id], inj = INJURIES[kind];
+  const sev = INJ.permScale * Math.max(0.4, Math.min(3, 1 + INJ.leagueReg * drift));
+  const perm = {};
+  for (const [a, v] of Object.entries(inj.perm)) {
+    const d = Math.round(v * sev * 1000) / 1000;
+    f.perm[a] = (f.perm[a] || 0) + d;
+    perm[a] = d;
+  }
+  f.injuries = f.injuries.filter((i) => i.kind !== kind);
+  f.injuries.push({ kind, games: inj.games });
+  f.injuryLog.push({ kind, perm });
+  return { kind, games: inj.games, perm };
+}
+
+/** After a match: the injuries the fighter carried into it count down one game. */
+function tickInjuries(rec) {
+  for (const i of rec.injuries) i.games--;
+  rec.injuries = rec.injuries.filter((i) => i.games > 0);
+}
+
+function buyUpgrade(t, id, attr) {
+  const f = t.fighters[id], cost = upgradeCost(f, attr);
+  if (!ATTR_IDS.includes(attr) || f.fame < cost) return false;
+  f.fame -= cost;
+  f.spentFame += cost;
+  f.spentUpgrades = (f.spentUpgrades || 0) + cost;
+  f.upLevels[attr] = (f.upLevels[attr] || 0) + 1;
+  f.perm[attr] = (f.perm[attr] || 0) + INJ.upgradeStep;
+  return true;
+}
+
+function treatInjury(t, id, kind) {
+  const f = t.fighters[id], inj = f.injuries.find((i) => i.kind === kind);
+  if (!inj || f.fame < INJ.treatCost) return false;
+  f.fame -= INJ.treatCost;
+  f.spentFame += INJ.treatCost;
+  inj.games--;
+  f.injuries = f.injuries.filter((i) => i.games > 0);
+  return true;
+}
+
+/**
+ * Automatic manager, second pass (after recovery): treats a long injury, then upgrades. Specialists
+ * (cunning) sharpen their best bars, everyone else patches the weakest one. Keeps a fame reserve.
+ */
+function autoInvest(t, id, baseProfile) {
+  const f = t.fighters[id];
+  if (!f.auto) return [];
+  const reserve = 30 + 40 * (baseProfile.cunning ?? 0.5);
+  const out = [];
+  const long = f.injuries.filter((i) => i.games >= 2).sort((a, b) => b.games - a.games)[0];
+  if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind)) out.push('treat');
+  const specialist = (baseProfile.cunning ?? 0.5) >= 0.6;
+  for (let n = 0; n < 2; n++) {
+    const cur = (a) => (baseProfile[a] ?? 0.5) + (f.perm[a] || 0);
+    const cand = ATTR_IDS.slice().sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)) || upgradeCost(f, a) - upgradeCost(f, b));
+    const pick = cand.find((a) => cur(a) < 1.3);
+    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick)) break;
+    out.push(`up:${pick}`);
+  }
+  return out;
 }
 
 });
@@ -13508,6 +13823,12 @@ const { el, clearUI } = __require("src/ui/dom.js");
 const { createTournament, load, save, clearSaved, standings, awards, tournamentAwards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
 const { showSpectacle } = __require("src/ui/spectacle.js");
 const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
+const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } = __require("src/tournament/injuries.js");
+const { ATTRIBUTES } = __require("src/data/attributes.js");
+
+const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
+const ATTR_LABEL = Object.fromEntries(ATTRIBUTES.map((a) => [a.id, a.label]));
+const boughtIcon = (b) => (b === 'treat' ? '🩺' : b.startsWith('up:') ? '⬆' : SHOP.find((x) => x.id === b)?.icon || '');
 const { FightScene } = __require("src/ui/fightScene.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
@@ -13599,7 +13920,7 @@ class TournamentScene {
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
       el('span', { class: 'tface', style: { backgroundImage: `url(${this.app.portraitURL(r.id)})` } }),
-      el('span', { class: 'tname' }, [NAME[r.id]]),
+      el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
       el('span', { class: 'tnum' }, [String(r.lost)]),
@@ -13828,6 +14149,8 @@ class TournamentScene {
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
           el('span', { class: 'camp-name' }, [short(id)]),
+          el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
+            el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
           el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
         ]),
         meter('STAMINA', f.stamina, 'sta', `body ${fx(f.stamina, 'stamina')}`),
@@ -13836,10 +14159,14 @@ class TournamentScene {
           class: 'camp-item', disabled: f.fame < it.cost ? '' : null, title: `${it.label}: ${it.desc}`,
           onclick: () => { if (buy(t, id, it.id)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
         }, [it.icon, el('small', {}, [String(it.cost)])]))),
-        el('label', { class: 'camp-auto' }, [
-          el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }),
-          'auto manager',
-          bought.length ? el('span', { class: 'camp-bought' }, [`bought: ${bought.map((b) => SHOP.find((x) => x.id === b).icon).join('')}`]) : null,
+        el('div', { class: 'camp-inj' }, [
+          ...(f.injuries.length ? f.injuries.map((i) => el('button', {
+            class: 'inj-chip', disabled: f.fame < INJ.treatCost ? '' : null,
+            title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc}. ${i.games} more match(es). Click: treat −1 round for ★${INJ.treatCost}`,
+            onclick: () => { if (treatInjury(t, id, i.kind)) { this.app.audio.ui('confirm'); save(t); this.showCamp(); } },
+          }, [INJURIES[i.kind].icon, el('b', {}, [String(i.games)])])) : [el('span', { class: 'inj-none' }, ['no injuries'])]),
+          bought.length ? el('span', { class: 'camp-bought', title: 'bought by the manager after the last round' }, [bought.map(boughtIcon).join('')]) : null,
+          el('button', { class: 'tbtn mini up-btn', onclick: () => this.showUpgrades(id) }, ['⬆ UPGRADE']),
         ]),
       ]);
     };
@@ -13849,9 +14176,9 @@ class TournamentScene {
       el('div', { class: 'camp-panel' }, [
         el('div', { class: 'camp-head' }, [
           el('div', { class: 'awards-title small' }, ['TRAINING CAMP']),
-          el('div', { class: 'camp-legend' }, SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} — ${it.desc} · ★${it.cost}`]))),
+          el('div', { class: 'camp-legend' }, [...SHOP.map((it) => el('span', {}, [`${it.icon} ${it.label} ${it.desc} ★${it.cost}`])), el('span', {}, [`🩺 treat −1 round ★${INJ.treatCost}`])]),
         ]),
-        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers show the bar shift ×10). Both also decide how often a winner goes for the fatality. Managers on "auto" buy after every round.`]),
+        el('div', { class: 'camp-note' }, [`Stamina drives the BODY bars, morale the CHARACTER bars (75 = match fit; numbers = bar shift ×10). Injury chips: matches left — click to treat (−1 round, ★${INJ.treatCost}). AUTO managers buy after every round.`]),
         el('div', { class: 'camp-grid' }, order.map(card)),
         btn('DONE', close, 'big'),
       ]),
@@ -13860,6 +14187,48 @@ class TournamentScene {
     this.modal = true;
     this.unsubCamp?.();
     const unsub = this.unsubCamp = this.app.keyboard.onPress((code) => { if (code === 'Escape' || code === 'Enter') close(); });
+    document.getElementById('ui').appendChild(wrap);
+  }
+
+  /** Upgrade shop of one fighter: +0.1 bar in any attribute; shows base, upgrades and injury damage. */
+  showUpgrades(id) {
+    const t = this.t, f = t.fighters[id];
+    const base = BASE_PROFILE[id];
+    const row = (a) => {
+      const b = base[a] ?? 0.5, perm = f.perm[a] || 0;
+      const up = (f.upLevels[a] || 0) * INJ.upgradeStep, hurt = perm - up;
+      const cost = upgradeCost(f, a);
+      const pct = (v) => `${Math.max(0, Math.min(140, v * 100)) / 1.4}%`;
+      return el('div', { class: `up-row ${ATTRIBUTES.find((x) => x.id === a).group}` }, [
+        el('span', { class: 'up-label' }, [ATTR_LABEL[a]]),
+        el('span', { class: 'up-bar' }, [
+          el('b', { class: 'base', style: { width: pct(Math.min(b, b + perm)) } }),
+          perm > 0 ? el('b', { class: 'gain', style: { left: pct(b), width: pct(perm) } }) : null,
+          perm < 0 ? el('b', { class: 'loss', style: { left: pct(b + perm), width: pct(-perm) } }) : null,
+          el('i', { style: { left: pct(1) } }),
+        ]),
+        el('span', { class: 'up-num' }, [`${up ? `+${up.toFixed(1)}` : ''}${hurt < -0.001 ? ` ${hurt.toFixed(2)}` : ''}`]),
+        el('button', { class: 'tbtn mini', disabled: f.fame < cost ? '' : null, onclick: () => { if (buyUpgrade(t, id, a)) { this.app.audio.ui('confirm'); save(t); close(); this.showUpgrades(id); } } }, [`+0.1  ★${cost}`]),
+      ]);
+    };
+    const close = () => { wrap.remove(); unsub(); this.showCamp(); };
+    const wrap = el('div', { class: 'menu-overlay upgrades' }, [
+      el('div', { class: 'up-panel' }, [
+        el('div', { class: 'up-head' }, [
+          el('span', { class: 'sp-portrait', style: { backgroundImage: `url(${this.app.portraitURL(id)})` } }),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+        ]),
+        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
+        el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
+        el('div', { class: 'up-inj' }, f.injuryLog.length
+          ? f.injuryLog.map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${ATTR_LABEL[a].toLowerCase()} ${v.toFixed(2)}`).join(', ')}`]))
+          : [el('span', {}, ['No injuries so far.'])]),
+        btn('BACK TO CAMP', close, 'big'),
+      ]),
+    ]);
+    this.campEl?.remove();
+    this.unsubCamp?.();
+    const unsub = this.app.keyboard.onPress((code) => { if (code === 'Escape') close(); });
     document.getElementById('ui').appendChild(wrap);
   }
 
@@ -13968,6 +14337,7 @@ __define("src/ui/spectacle.js", function (__exports, __require) {
 const { ROSTER } = __require("src/data/fighters.js");
 const { SPECTACLE_RULES } = __require("src/tournament/stats.js");
 const { el } = __require("src/ui/dom.js");
+const { INJURIES } = __require("src/tournament/injuries.js");
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const HINT = Object.fromEntries(SPECTACLE_RULES.map((r) => [r.key, r.hint || (r.per ? `${r.per} pts each` : '')]));
@@ -13990,6 +14360,17 @@ function condBlock(c) {
   const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
     .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
   return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+}
+
+/** A new injury from this match: what it is, how long, and the permanent damage. */
+function injBlock(inj) {
+  if (!inj) return null;
+  const k = INJURIES[inj.kind];
+  return el('div', { class: 'sp-inj' }, [
+    el('b', {}, ['INJURED']),
+    el('span', {}, [`${k.icon} ${k.label} — ${k.desc}, ${inj.games} match${inj.games > 1 ? 'es' : ''}`]),
+    el('small', {}, [`permanent: ${Object.entries(inj.perm).map(([a, v]) => `${a} ${v.toFixed(2)}`).join(', ')}`]),
+  ]);
 }
 
 function showSpectacle(app, m, before, onClose) {
@@ -14050,6 +14431,7 @@ function showSpectacle(app, m, before, onClose) {
         el('div', { class: 'sp-bar' }, [barOld, barNew]),
       ]),
       condBlock(r.condition?.[i]),
+      injBlock(r.injuries?.[i]),
     ]);
     return { col, rows, total, s, barNew, balNum, balFrom, balTo, won };
   });

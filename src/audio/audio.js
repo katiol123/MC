@@ -164,6 +164,11 @@ export class AudioSystem {
         }
         break;
       }
+      case 'injury':
+        // bone crack: a sharp click + a dull thud
+        this.noise(0.06, { freq: 3800, q: 6, gain: 0.6 });
+        this.tone(0.3, { freq: 130, to: 50, gain: 0.55 });
+        break;
       case 'block':
         if (e.guardBreak) { this.noise(0.35, { freq: 2600, q: 0.8, gain: 0.5, sweep: 0.5 }); this.tone(0.3, { freq: 220, to: 70, gain: 0.5 }); break; }
         this.noise(0.08, { freq: 3200, q: 3, gain: 0.35 });

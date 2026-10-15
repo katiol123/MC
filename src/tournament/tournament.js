@@ -12,6 +12,9 @@ import { ROSTER } from '../data/fighters.js';
 import { Rng } from '../core/rng.js';
 import { MatchStats } from './stats.js';
 import { initCondition, conditionOverrides, fatalityChance, applyMatch, restRound, autoManage, COND } from './condition.js';
+import { initInjuries, profileShift, activeEffects, injuryRoller, addInjury, tickInjuries, autoInvest, leagueDrift } from './injuries.js';
+
+const BASE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
 
 export const TOURNAMENT_RULES = { roundsToWin: 2, roundTime: 99 };
 /**
@@ -24,7 +27,7 @@ export const AWARD_FAME = 30;
 /** League points by final score (winner's rounds : loser's rounds). */
 export const POINTS = { win20: 3, win21: 2, loss12: 1, loss02: 0, draw: 1 };
 const STORAGE_KEY = 'boneforge.tournament';
-const VERSION = 3;
+const VERSION = 4;
 
 /** Circle-method round robin: n-1 rounds (n even), every pair meets exactly once. */
 export function roundRobin(ids) {
@@ -57,6 +60,7 @@ export function createTournament({ ids = ROSTER.map((f) => f.id), level = 'norma
     fighters: Object.fromEntries(ids.map((id) => {
       const f = { overrides: {}, sp: 0, fame: 0, fameEarned: 0 };
       initCondition(f);
+      initInjuries(f);
       return [id, f];
     })),
     camp: [], // per round: what each manager bought after it
@@ -86,13 +90,18 @@ export function currentRound(t) {
 export function snapshotOverrides(t, m) {
   return [m.a, m.b].map((id) => {
     const f = t.fighters[id];
-    return conditionOverrides(id, f?.overrides || {}, f || COND.start);
+    // the bars as they are now: base + upgrades − injury damage + active injury debuffs
+    const shift = profileShift(f);
+    const profile = Object.fromEntries(Object.entries(shift).map(([a, d]) => [a, (BASE[id][a] ?? 0.5) + d]));
+    const extra = { ...(f.overrides || {}), profile: { ...profile, ...(f.overrides?.profile || {}) }, injuryFx: activeEffects(f), injuryKinds: f.injuries.map((i) => i.kind) };
+    return conditionOverrides(id, extra, f);
   });
 }
 
 /** A fresh Match + AI pair for a scheduled match (used for live viewing, simulation and replays). */
 export function setupMatch(t, m, overrides = m.result?.overrides || snapshotOverrides(t, m)) {
-  const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], ...TOURNAMENT_RULES });
+  const injuryRoll = injuryRoller(m.seed, [overrides[0].injuryKinds || [], overrides[1].injuryKinds || []]);
+  const match = new Match({ p1: m.a, p2: m.b, o1: overrides[0], o2: overrides[1], injuryRoll, ...TOURNAMENT_RULES });
   const ai = [new AIController(0, { level: t.level, seed: m.seed }), new AIController(1, { level: t.level, seed: m.seed * 7 + 3 })];
   for (const a of ai) a.fatalityChance = fatalityChance;
   return { match, ai, overrides };
@@ -139,6 +148,13 @@ export function recordResult(t, m, match, stats, overrides) {
   m.result = { ...rep, overrides, playedAt: Date.now() };
   m.result.condition = applyMatch(t, m, m.result, tableBefore);
   const ids = [m.a, m.b];
+  // injuries: the ones carried into this match count down, a new one starts
+  const drift = leagueDrift(t);
+  m.result.injuries = ids.map((id, i) => {
+    tickInjuries(t.fighters[id]);
+    const kind = rep.sides[i].injuredWith;
+    return kind ? addInjury(t, id, kind, drift) : null;
+  });
   rep.sides.forEach((s, i) => {
     const firedUp = m.result.condition[i].morale[0] >= COND.firedUp; // morale going into the match
     const under = underdog.has(ids[i]);
@@ -155,7 +171,7 @@ export function recordResult(t, m, match, stats, overrides) {
       t.roundAwards[ri] = grantAwards(t, awards(t, ri));
       // the camp between rounds: everyone rests, then the managers spend fame on recovery
       restRound(t);
-      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, autoManage(t, id)]));
+      t.camp[ri] = Object.fromEntries(t.ids.map((id) => [id, [...autoManage(t, id), ...autoInvest(t, id, BASE[id])]]));
     }
   });
   if (!t.finalAwards && isFinished(t)) t.finalAwards = grantAwards(t, tournamentAwards(t));
@@ -182,7 +198,7 @@ function grantAwards(t, list) {
 
 /** League table with tie-breaks: points, head-to-head, round difference, damage dealt, perfects. */
 export function standings(t) {
-  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale });
+  const row = (id) => ({ id, played: 0, won: 0, lost: 0, drawn: 0, rf: 0, ra: 0, pts: 0, dmg: 0, taken: 0, perfect: 0, form: [], sp: t.fighters[id].sp, fame: t.fighters[id].fame, stamina: t.fighters[id].stamina, morale: t.fighters[id].morale, injuries: t.fighters[id].injuries });
   const rows = Object.fromEntries(t.ids.map((id) => [id, row(id)]));
   const h2h = {};
   for (const { m } of allMatches(t)) {

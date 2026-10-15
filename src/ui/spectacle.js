@@ -7,6 +7,7 @@
 import { ROSTER } from '../data/fighters.js';
 import { SPECTACLE_RULES } from '../tournament/stats.js';
 import { el } from './dom.js';
+import { INJURIES } from '../tournament/injuries.js';
 
 const NAME = Object.fromEntries(ROSTER.map((f) => [f.id, f.name]));
 const HINT = Object.fromEntries(SPECTACLE_RULES.map((r) => [r.key, r.hint || (r.per ? `${r.per} pts each` : '')]));
@@ -29,6 +30,17 @@ function condBlock(c) {
   const notes = c.notes.filter((n) => n.morale || n.stamina).slice(0, 5)
     .map((n) => el('span', { class: (n.morale || n.stamina) < 0 ? 'neg' : 'pos' }, [`${n.label} ${(n.morale || n.stamina) > 0 ? '+' : ''}${n.morale || n.stamina}`]));
   return el('div', { class: 'sp-condbox' }, [row('STAMINA', c.stamina, 'sta'), row('MORALE', c.morale, 'mor'), el('div', { class: 'sp-notes' }, notes)]);
+}
+
+/** A new injury from this match: what it is, how long, and the permanent damage. */
+function injBlock(inj) {
+  if (!inj) return null;
+  const k = INJURIES[inj.kind];
+  return el('div', { class: 'sp-inj' }, [
+    el('b', {}, ['INJURED']),
+    el('span', {}, [`${k.icon} ${k.label} — ${k.desc}, ${inj.games} match${inj.games > 1 ? 'es' : ''}`]),
+    el('small', {}, [`permanent: ${Object.entries(inj.perm).map(([a, v]) => `${a} ${v.toFixed(2)}`).join(', ')}`]),
+  ]);
 }
 
 export function showSpectacle(app, m, before, onClose) {
@@ -89,6 +101,7 @@ export function showSpectacle(app, m, before, onClose) {
         el('div', { class: 'sp-bar' }, [barOld, barNew]),
       ]),
       condBlock(r.condition?.[i]),
+      injBlock(r.injuries?.[i]),
     ]);
     return { col, rows, total, s, barNew, balNum, balFrom, balTo, won };
   });

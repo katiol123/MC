@@ -34,6 +34,8 @@ export class Fighter {
     this.maxHealth = def.stats.health;
     // MOBILITY also means agility: quicker landings and wake-ups (1 = roster average)
     this.agility = def.stats.agility ?? 1;
+    // tournament injuries carried into this match (unusual debuffs, see tournament/injuries.js)
+    this.injFx = new Set(def.injuryFx || []);
     this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
     this.spawnProjectile = null; // set by the match
@@ -50,7 +52,7 @@ export class Fighter {
     this.facing = facing;
     this.stance = 0;
     this.health = this.maxHealth;
-    this.stun = 0;
+    this.stun = this.injFx?.has('groggy') ? Math.round(this.stats.stunMax * 0.4) : 0; // concussion: starts the round groggy
     this.sinceHit = 0;
     this.hitstop = 0;
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
@@ -144,6 +146,7 @@ export class Fighter {
   /** Adds super meter unless the post-super cooldown is running. */
   gainMeter(n) {
     if (this.superLock > 0 || !(n > 0)) return;
+    if (this.injFx.has('slowMeter')) n *= 0.5; // torn shoulder
     this.meter = Math.min(TUNING.superCost, this.meter + n);
   }
 
@@ -302,11 +305,11 @@ export class Fighter {
       this.setState('prejump', { dir, fromRun: this.state === 'run' }, 'prejump', { blend: 2 });
       return;
     }
-    if (this.state !== 'run' && inp.doubleTap(6)) {
+    if (this.state !== 'run' && inp.doubleTap(6) && !this.injFx.has('noDash')) {
       this.emit({ type: 'dash', who: this.index, dir: 1 });
       return this.setState('dashF', { duration: 16 }, 'dashF', { blend: 3, params: { duration: 16 } });
     }
-    if (inp.doubleTap(4)) {
+    if (inp.doubleTap(4) && !this.injFx.has('noDash')) {
       this.emit({ type: 'dash', who: this.index, dir: -1 });
       return this.setState('dashB', { duration: 18 }, 'dashB', { blend: 3, params: { duration: 18 } });
     }
@@ -593,7 +596,7 @@ export class Fighter {
     this.hitstop = hitstop;
     this.flash = 6;
     this.health = Math.max(0, this.health - damage);
-    this.stun += m.stun * (counter ? 1.25 : 1);
+    this.stun += m.stun * (counter ? 1.25 : 1) * (this.injFx.has('groggy') ? 1.3 : 1);
     this.sinceHit = 0;
     if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
     if (m.pie) this.marks.pie = m.pie; // cream pie over the face (ticks, render-only)

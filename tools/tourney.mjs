@@ -31,7 +31,17 @@ async function runOne({ seed, policy }) {
     perRound.push({ st: avg('stamina'), mo: avg('morale'), fame: avg('fame'), spent: avg('spentFame'), buys, minSt: Math.min(...fs.map((f) => f.stamina)), minMo: Math.min(...fs.map((f) => f.morale)) });
   });
   const ranks = Object.fromEntries(T.standings(t).map((r, i) => [r.id, i + 1]));
-  return { perRound, fat, finishes, condWins, condGames, ranks };
+  const I = await import('../src/tournament/injuries.js');
+  let injuries = 0, upgrades = 0, upSpent = 0, permUp = 0, permDown = 0;
+  for (const id of t.ids) {
+    const f = t.fighters[id];
+    injuries += f.injuryLog.length;
+    for (const l of f.injuryLog) for (const v of Object.values(l.perm)) permDown += v;
+    for (const lv of Object.values(f.upLevels)) { upgrades += lv; permUp += lv * I.INJ.upgradeStep; }
+    upSpent += f.spentUpgrades || 0;
+  }
+  const drift = I.leagueDrift(t); // average bar shift per attribute
+  return { perRound, fat, finishes, condWins, condGames, ranks, inj: { injuries, upgrades, upSpent, permUp, permDown, drift, fame: t.ids.reduce((a, id) => a + t.fighters[id].fameEarned, 0) } };
 }
 
 if (process.argv[2] === '--worker') {
@@ -56,5 +66,7 @@ if (process.argv[2] === '--worker') {
   const ids = Object.keys(out[0].ranks);
   const avgRank = ids.map((id) => [id, out.reduce((s, o) => s + o.ranks[id], 0) / out.length]).sort((a, b) => a[1] - b[1]);
   console.log('avg final place: ' + avgRank.map(([id, r]) => `${id} ${r.toFixed(1)}`).join(', '));
+  const A = (k) => out.reduce((a, o) => a + o.inj[k], 0) / out.length;
+  console.log(`per tournament: injuries ${A('injuries').toFixed(1)} (${(A('injuries') / 16).toFixed(2)}/fighter), upgrades ${A('upgrades').toFixed(1)} (fame ${A('upSpent').toFixed(0)} of ${A('fame').toFixed(0)} earned), bars +${A('permUp').toFixed(2)} / ${A('permDown').toFixed(2)}, league drift ${(A('drift') * 100).toFixed(1)} % of a bar per attribute (${out.map((o) => (o.inj.drift * 100).toFixed(1)).join(' ')})`);
   console.log(`fatality rate ${(100 * fat / fin).toFixed(0)}%   better condition (≥30 pts) wins ${(100 * cw / Math.max(1, cg)).toFixed(0)}% of ${cg} matches   ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 }

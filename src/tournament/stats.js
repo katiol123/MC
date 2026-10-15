@@ -14,6 +14,7 @@ export const SPECTACLE_RULES = [
   { key: 'throw', label: 'Throws', icon: '⤴', per: 4 },
   { key: 'parry', label: 'Parries', icon: '🛡', per: 5 },
   { key: 'dizzy', label: 'Dizzied the rival', icon: '💫', per: 8 },
+  { key: 'injury', label: 'Injured the rival', icon: '🩹', per: 15 },
   { key: 'fastKo', label: 'Quick K.O. (< 20 s)', icon: '⏱', per: 8 },
   { key: 'perfect', label: 'Perfect round', icon: '💎', per: 20 },
   { key: 'comeback', label: 'Comeback round', icon: '🔥', per: 12, hint: 'won with less than 15 % health' },
@@ -29,7 +30,7 @@ const side = () => ({
   hits: 0, damageDealt: 0, damageTaken: 0,
   combos: 0, longestCombo: 0, comboPoints: 0,
   moves: new Set(), special: 0, super: 0, counter: 0, punish: 0, throw: 0, parry: 0, dizzy: 0,
-  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0,
+  fastKo: 0, perfect: 0, comeback: 0, fatality: 0, roundsWon: 0, injury: 0, injuredWith: null,
   koTimes: [], // seconds of fighting before each K.O. this fighter scored
 });
 
@@ -81,6 +82,10 @@ export class MatchStats {
         }
         break;
       }
+      case 'injury':
+        S[e.by].injury++;
+        S[e.who].injuredWith = e.kind;
+        break;
       case 'parry':
         S[e.who].parry++;
         break;
@@ -116,7 +121,7 @@ export class MatchStats {
       const won = winner === i;
       const counts = {
         combo: st.combos, variety: st.moves.size, special: st.special, super: st.super, counter: st.counter,
-        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, fastKo: st.fastKo,
+        punish: st.punish, throw: st.throw, parry: st.parry, dizzy: st.dizzy, injury: st.injury, fastKo: st.fastKo,
         perfect: st.perfect, comeback: st.comeback, fatality: st.fatality,
         win: won ? 1 : 0, flawless: won && match.wins[1 - i] === 0 ? 1 : 0,
       };
@@ -131,7 +136,7 @@ export class MatchStats {
       return {
         hits: st.hits, damageDealt: st.damageDealt, damageTaken: st.damageTaken, maxHealth: match.fighters[i].maxHealth,
         combos: st.combos, longestCombo: st.longestCombo, koTimes: st.koTimes,
-        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i],
+        perfect: st.perfect, fatality: st.fatality, roundsWon: match.wins[i], injuredWith: st.injuredWith,
         spectacle: { total, items },
       };
     });

@@ -47,6 +47,7 @@ export class Match {
 
   restart() {
     for (const f of this.fighters) f.meter = 0;
+    this.injured = [null, null]; // tournament injury suffered this match (kind)
     this.wins = [0, 0];
     this.round = 0;
     this.winner = null;
@@ -157,21 +158,53 @@ export class Match {
     for (const e of updateProjectiles(this.projectiles, this.fighters)) this.events.push(e);
     a.projectileOut = this.projectiles.some((p) => p.owner === 0);
     b.projectileOut = this.projectiles.some((p) => p.owner === 1);
-    if (this.phase === 'fight') this.updateBurn();
+    if (this.phase === 'fight') { this.updateBurn(); this.updateInjuries(); }
+    this.rollInjuries();
     this.updateCritical();
     const sup = this.events.find((e) => e.type === 'superStart');
     if (sup) this.freeze = { who: sup.who, name: sup.name, ticks: TUNING.superFreeze, total: TUNING.superFreeze };
+  }
+
+  /**
+   * Tournament injuries: an injury rolled on a hit is announced ("INJURY!") and leaves the battered
+   * look for the rest of the match; a broken nose bleeds a little while fighting.
+   */
+  updateInjuries() {
+    for (const f of this.fighters) {
+      if (f.injFx.has('bleeding') && f.health > 1 && this.phaseTick % 90 === 89) f.health = Math.max(1, f.health - 5);
+    }
+  }
+
+  rollInjuries() {
+    const roll = this.opts.injuryRoll;
+    if (!roll) return;
+    for (const e of this.events.slice()) {
+      const kind = roll(this, e);
+      if (!kind) continue;
+      const v = this.fighters[e.target];
+      this.injured[e.target] = kind;
+      this.events.push({ type: 'injury', who: e.target, by: e.who, kind, x: e.x, y: e.y });
+      this.makeBattered(v);
+    }
+  }
+
+  makeBattered(f) {
+    if (f.critical) return;
+    f.critical = true;
+    const head = f.skel.j.head;
+    this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
   }
 
   /** Low health: the fighter turns battered once per round (a prop flies off, heavy breathing). */
   updateCritical() {
     for (const f of this.fighters) {
       const share = f.health / f.maxHealth;
-      if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
+      if (this.injured[f.index] && !f.critical && f.health > 0) f.critical = true; // injured: stays battered (no second pop)
+      else if (!f.critical && f.health > 0 && share <= TUNING.criticalHealth) {
         f.critical = true;
         const head = f.skel.j.head;
         this.events.push({ type: 'critical', who: f.index, x: f.body.x + f.facing * head.x, y: f.body.y + head.y, facing: f.facing });
-      } else if (f.critical && share > 0.6) f.critical = false; // training refill
+      } else if (f.critical && share > 0.6 && !this.injured[f.index]) f.critical = false; // training refill
     }
   }
 

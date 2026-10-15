@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTournament, allMatches, roundRobin, MatchRunner, standings, awards, roundComplete, setupMatch, AWARD_FAME } from '../src/tournament/tournament.js';
+import { createTournament, allMatches, roundRobin, MatchRunner, standings, snapshotOverrides, awards, roundComplete, setupMatch, AWARD_FAME } from '../src/tournament/tournament.js';
 
 test('round robin: every pair meets exactly once, everyone plays once per round', () => {
   const ids = Array.from({ length: 16 }, (_, i) => `f${i}`);
@@ -87,4 +87,65 @@ test('condition: matches drain stamina, results move morale, fame buys recovery,
   const fake = (morale, stamina, hp) => ({ wins: [2, 1], fighters: [{ def: { cond: { morale, stamina } }, health: hp, maxHealth: 1000 }, {}] });
   assert.ok(fatalityChance(fake(100, 100, 900), 0) > fatalityChance(fake(20, 20, 900), 0) + 0.3);
   assert.ok(fatalityChance(fake(70, 70, 950), 0) > fatalityChance(fake(70, 70, 50), 0));
+});
+
+test('injuries: rolled in the fight (deterministic), permanent damage + timed debuff, one per kind, treatable', async () => {
+  const I = await import('../src/tournament/injuries.js');
+  const t = createTournament({ seed: 1, ids: ['roxy', 'bruno'] });
+  for (const id of t.ids) t.fighters[id].stamina = 20;
+  const m = allMatches(t)[0].m;
+  const play = () => {
+    const { match, ai } = setupMatch(t, m);
+    const evs = [];
+    while (match.phase !== 'over') evs.push(...match.tick([ai[0].input(match), ai[1].input(match)]).filter((e) => e.type === 'injury'));
+    return evs;
+  };
+  const a = play(), b = play();
+  assert.ok(a.length >= 1, 'an injury happens with seed 1 and tired fighters');
+  assert.deepEqual(a, b, 'same seed, same injuries');
+  const r = new MatchRunner(t, m);
+  r.finish();
+  const res = r.record();
+  const i = res.injuries.findIndex(Boolean);
+  const id = [m.a, m.b][i], f = t.fighters[id], inj = res.injuries[i];
+  assert.ok(res.sides[1 - i].spectacle.items.some((x) => x.key === 'injury'), 'spectacle bonus for the attacker');
+  assert.equal(f.injuries[0].kind, inj.kind);
+  assert.ok(Object.values(f.perm).every((v) => v < 0), 'permanent damage');
+  // second injury of the same kind replaces, a different kind stacks
+  I.addInjury(t, id, inj.kind);
+  assert.equal(f.injuries.filter((x) => x.kind === inj.kind).length, 1);
+  const other = I.INJURY_KINDS.find((k) => k !== inj.kind);
+  I.addInjury(t, id, other);
+  assert.equal(f.injuries.length, 2);
+  // treatment shortens by one round; debuffs end when the counter runs out
+  f.fame = 1000;
+  const g = f.injuries.find((x) => x.kind === other).games;
+  assert.ok(I.treatInjury(t, id, other));
+  assert.equal(f.injuries.find((x) => x.kind === other)?.games ?? 0, g - 1);
+  for (let k = 0; k < 5; k++) I.tickInjuries(f);
+  assert.equal(f.injuries.length, 0);
+});
+
+test('upgrades: any attribute, rising price, raise the bars the fighter fights with', async () => {
+  const I = await import('../src/tournament/injuries.js');
+  const { buildFighterDef } = await import('../src/data/fighters.js');
+  const t = createTournament({ seed: 2, ids: ['brick', 'jax'] });
+  const f = t.fighters.brick;
+  f.fame = 10000;
+  const before = buildFighterDef('brick', snapshotOverrides(t, allMatches(t)[0].m)[allMatches(t)[0].m.a === 'brick' ? 0 : 1]).attrs.power;
+  const c1 = I.upgradeCost(f, 'power');
+  assert.ok(I.buyUpgrade(t, 'brick', 'power'));
+  assert.ok(I.upgradeCost(f, 'power') > c1);
+  for (const a of I.ATTR_IDS) assert.ok(I.buyUpgrade(t, 'brick', a), a);
+  const after = buildFighterDef('brick', snapshotOverrides(t, allMatches(t)[0].m)[allMatches(t)[0].m.a === 'brick' ? 0 : 1]).attrs.power;
+  assert.ok(after > before);
+});
+
+test('injury debuffs act in the fight: no dashes with a sprained ankle, weaker meter with a torn shoulder', async () => {
+  const { Match } = await import('../src/game/match.js');
+  const m = new Match({ p1: 'brick', p2: 'jax', o1: { injuryFx: ['noDash', 'slowMeter'] } });
+  const f = m.fighters[0];
+  assert.ok(f.injFx.has('noDash'));
+  f.gainMeter(20);
+  assert.equal(f.meter, 10);
 });

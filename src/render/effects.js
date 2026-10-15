@@ -153,6 +153,20 @@ export class Effects {
         }
         break;
       }
+      case 'injury': {
+        // a tournament injury: crack lines, a red burst and a big slammed "INJURY!" over the victim
+        const v = fighters?.[e.who];
+        const x = v ? v.body.x : e.x, y = v ? v.body.y + 270 : e.y + 90;
+        this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 10, vr: 9, life: 18, max: 18, color: '#ff3a4a' });
+        for (let i = 0; i < 14; i++) {
+          const a = this.rnd() * Math.PI * 2, sp = 3 + this.rnd() * 6;
+          this.parts.push({ kind: 'spark', x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 20, max: 20, color: i % 2 ? '#ff3a4a' : '#ffffff', w: 3 });
+        }
+        this.labels.push({ text: 'INJURY!', x, y, life: 90, color: '#ff3a4a', big: true, age: 0 });
+        this.shake = Math.max(this.shake, 9);
+        this.flash = Math.max(this.flash, 0.25);
+        break;
+      }
       case 'critical': {
         // battered: the fighter's signature item flies off with a pop
         const f = fighters?.[e.who];
@@ -249,7 +263,7 @@ export class Effects {
       else if (p.kind === 'mote') { const k = 0.12 + (1 - p.life / p.max) * 0.2; p.x += (p.tx - p.x) * k + Math.sin(p.life * 0.5 + p.w * 6) * 3; p.y += (p.ty - p.y) * k; }
     }
     this.parts = this.parts.filter((p) => p.life > 0);
-    for (const l of this.labels) { l.life--; l.y += 0.8; }
+    for (const l of this.labels) { l.life--; l.y += l.big ? 0.25 : 0.8; }
     this.labels = this.labels.filter((l) => l.life > 0);
     this.shake *= 0.82;
     if (this.shake < 0.2) this.shake = 0;
@@ -413,6 +427,28 @@ export class Effects {
     ctx.textAlign = 'center';
     for (const l of this.labels) {
       const s = cam.toScreen(l.x, l.y);
+      if (l.big) {
+        // slams in large, settles, shakes a little
+        const age = (l.age = (l.age || 0) + 1);
+        const pop = age < 8 ? 2.2 - (age / 8) * 1.2 : 1;
+        const jit = age < 30 ? Math.sin(age * 1.7) * 3 : 0;
+        ctx.save();
+        ctx.translate(s.x + jit, s.y);
+        ctx.rotate(-0.08);
+        ctx.scale(pop, pop);
+        ctx.font = `900 ${Math.round(44 * cam.zoom)}px "Arial Black", Impact, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = rgba('#140a18', Math.min(1, l.life / 20));
+        ctx.strokeText(l.text, 0, 0);
+        ctx.fillStyle = rgba(l.color, Math.min(1, l.life / 20));
+        ctx.fillText(l.text, 0, 0);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = rgba('#ffffff', Math.min(0.8, l.life / 25));
+        ctx.strokeText(l.text, 0, 0);
+        ctx.restore();
+        continue;
+      }
       ctx.font = `900 ${Math.round(26 * cam.zoom)}px "Arial Black", Impact, sans-serif`;
       ctx.lineWidth = 6;
       ctx.strokeStyle = rgba('#140a18', Math.min(1, l.life / 20));

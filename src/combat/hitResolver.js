@@ -4,6 +4,8 @@
 // Also resolves throws (grab / tech / release), projectiles and counter-stance parries.
 import { TUNING } from '../config/tuning.js';
 import { capsulesOverlap, capsulePenetration, lerp, clamp } from '../core/math.js';
+
+const PUNCHES = new Set(['lp', 'hp', 'clp', 'chp', 'jp']);
 import { STAGE } from '../config/constants.js';
 
 const PART_ORDER = { head: 0, torso: 1, limb: 2 };
@@ -198,7 +200,9 @@ export function applyStrike(att, def, spec, res, snap, { trade = false, holder, 
   const punish = snap.state === 'attack' && !inStartupOrActive;
   const hitN = def.combo.hits + 1;
   const scale = spec.super ? Math.max(0.6, damageScale(hitN)) : damageScale(hitN);
-  const partMul = TUNING.partDamage[res.part] ?? 1;
+  // tournament injuries: cracked ribs take more on the body, broken knuckles punch softer
+  const partMul = (TUNING.partDamage[res.part] ?? 1) * (res.part === 'torso' && def.injFx?.has('fragileBody') ? 1.25 : 1)
+    * (att.injFx?.has('weakPunches') && PUNCHES.has(spec.id) ? 0.75 : 1);
   const dmgMul = (att.stats.damage ?? 1) * (att.focus > 0 ? TUNING.focusDamage : 1);
   const damage = Math.max(1, Math.round(spec.damage * partMul * scale * dmgMul * (counter ? TUNING.counterHitDamage : 1)));
   const decay = spec.comboExempt ? 0 : Math.max(0, hitN - TUNING.hitstunDecayStart) * TUNING.hitstunDecayPerHit;
