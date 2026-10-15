@@ -61,7 +61,7 @@ export class FightRenderer {
   render(ctx, alpha, { debug = null, now = 0 } = {}) {
     const fs = this.match.fighters;
     const fat = this.match.fatality;
-    this.cam.update(fs, alpha, this.effects.shake, fat ? { x: (fat.ax + fat.vx) / 2, zoom: fat.camZoom || 1.34 } : null);
+    this.cam.update(fs, alpha, this.effects.shake, fat ? { x: fat.camX ?? (fat.ax + fat.vx) / 2, y: fat.camY || 0, zoom: fat.camZoom || 1.34 } : null);
     ctx.save();
     this.arena.drawBack(ctx, this.cam);
     if (fat) {

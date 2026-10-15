@@ -10,7 +10,10 @@ import { ease, clamp } from '../core/math.js';
 import { drawFlame, drawGlow } from '../render/fire.js';
 import { rgba, darken, lighten } from '../render/color.js';
 
+import { VIEW } from '../config/constants.js';
+
 const P = K.P;
+const VIEW_W = VIEW.width;
 const OUT = '#140c10';
 const TAU = Math.PI * 2;
 
@@ -775,69 +778,177 @@ export const FATALITIES = {
     },
   },
 
-  // --- ROXY VOLTA: Rock Bottom -------------------------------------------------------------------
+  // --- ROXY: Encore Flip ------------------------------------------------------------------------
+  // a backflip kick launches the victim; while they hang in the air she corkscrews over them, lands
+  // a bicycle kick from behind and sends them out of the screen (and into the sky: *ping*)
   roxy: {
-    name: 'ROCK BOTTOM',
-    duration: 270,
+    name: 'ENCORE FLIP',
+    duration: 290,
     run(d, t) {
       const { A, V, s } = d;
-      const pull = P(STAND, { y: 114, lean: -6, fa: [200, 60, 0], ba: [210, 50, 0] });
+      const dir = d.dir;
+      const xKick = d.vx - dir * Math.max(104, d.gap * 0.85); // where the first kick is thrown from
+      // where she comes down behind the floating victim: right under their head, so the bicycle kick
+      // connects whatever the victim's size (measured when she takes off)
+      if (t === 92) { const h = d.joint(V, 'head'); s.tgt = { x: h.x + dir * 58, y: Math.max(90, h.y - 200) }; }
+      const xBehind = s.tgt ? s.tgt.x : d.vx + dir * 125;
+      const yBehind = s.tgt ? s.tgt.y : 140;
+      // --- poses ---
+      const point = P(STAND, { y: 116, lean: -6, chest: -8, neck: -8, head: -10, fa: [96, 4, 0], ba: [30, 140, 10] });
+      const kickUp = P(K.ROOT || STAND, { x: 0, y: 100, lean: -12, chest: -10, neck: 8, head: 10, fa: [-50, 30, 0], ba: [-70, 24, 0], fl: [104, 2, 30], bl: [26, 70, 10], ff: null, bf: null });
+      const tuck = K.AIR_TUCK;
+      const reach = P(K.AIR_RISE, { lean: -6, chest: -10, neck: -10, head: -12, fa: [175, 10, 0], ba: [170, 14, 0], fl: [10, 6, 10], bl: [-6, 10, 10] });
+      // the signature shape of the corkscrew: wide open "star" at the top, arms and legs split
+      const star = P(K.AIR_FALL, { lean: 0, chest: -6, neck: -6, head: -8, fa: [140, 6, 0], ba: [-130, 6, 0], fl: [62, 2, 20], bl: [-58, 2, 20] });
+      const ready = P(K.AIR_FALL, { lean: 10, chest: 6, neck: -14, head: -18, fa: [70, 60, 0], ba: [40, 80, 0], fl: [70, 100, 10], bl: [30, 70, 10] });
+      const bicycle = P(K.AIR_FALL, { lean: -14, chest: -10, neck: 16, head: 16, fa: [-60, 20, 0], ba: [-90, 20, 0], fl: [96, 2, 30], bl: [40, 90, 10] });
       const horns = P(STAND, { y: 116, lean: -10, neck: -12, head: -16, fa: [170, 30, 0], ba: [40, 120, 0] });
-      d.keys(A, t, [[0, STAND], [20, pull], [40, P(STAND, { fa: [90, 90, 0], ba: [60, 100, 0] })], [60, AP.chop.windup], [78, AP.chop.contact], [100, AP.chop.contact], [130, STAND], [140, K.AIR_RISE], [154, K.LAND], [166, horns], [270, horns]]);
-      d.at(A, d.ax - d.dir * 90 * d.span(t, 134, 152), 30 * Math.sin(d.span(t, 134, 152) * Math.PI));
-      s.guitar = t >= 26 && t < 78;
-      s.hand = d.joint(A, 'handF');
-      s.handB = d.joint(A, 'handB');
-      if (t === 30) d.sfx('twang');
-      if (t === 78) {
-        d.sfx('crash'); d.sfx('twang');
+
+      // ================= Roxy =================
+      let rot = 0;
+      A.facing = dir;
+      A.fx.sx = 1;
+      if (t < 30) {
+        d.at(A, d.ax);
+        d.keys(A, t, [[0, STAND], [10, point], [30, point]]);
+      } else if (t < 44) {
+        // two quick steps in, then load up
+        const k = d.span(t, 30, 40);
+        d.at(A, d.ax + (xKick - d.ax) * k, 6 * Math.abs(Math.sin(k * Math.PI * 2)));
+        d.keys(A, t, [[30, point], [36, STAND], [44, K.PREJUMP]]);
+      } else if (t < 78) {
+        // FLIP KICK: the leg whips up through the chin, the body keeps rotating into a full backflip
+        const k = d.span(t, 46, 76, (x) => x);
+        d.at(A, xKick - dir * 22 * k, t < 46 ? 0 : 120 * Math.sin(k * Math.PI));
+        d.keys(A, t, [[44, K.PREJUMP], [50, kickUp], [55, kickUp], [62, tuck], [70, tuck], [76, K.AIR_FALL], [78, K.LAND]]);
+        rot = d.num(t, [[46, 0], [51, 34, ease.outQuad], [56, 80], [70, 320], [76, 360]]);
+      } else if (t < 92) {
+        d.at(A, xKick - dir * 22);
+        d.keys(A, t, [[78, K.LAND], [84, LOOK_UP], [88, K.PREJUMP], [92, K.PREJUMP]]);
+      } else if (t < 128) {
+        // CORKSCREW: a high forward somersault over the floating victim with a half twist,
+        // opening into a split "star" at the top and landing behind them facing back
+        const k = d.span(t, 92, 128, (x) => x);
+        const x0 = xKick - dir * 22;
+        const top = yBehind + 300;
+        const y = k < 0.55 ? top * Math.sin((k / 0.55) * Math.PI / 2) : top - (top - yBehind) * ((k - 0.55) / 0.45) ** 2;
+        d.at(A, x0 + (xBehind - x0) * ease.inOutSine(clamp(k / 0.72, 0, 1)), y); // over first, then drop down
+        d.keys(A, t, [[92, K.PREJUMP], [96, reach], [102, tuck], [108, tuck], [113, star], [117, star], [122, tuck], [128, ready]]);
+        rot = -720 * ease.inOutSine(k);
+        const tw = clamp((k - 0.4) / 0.3, 0, 1); // half twist across the top
+        A.fx.sx = Math.max(0.12, Math.abs(Math.cos(tw * Math.PI)));
+        A.facing = tw < 0.5 ? dir : -dir;
+      } else if (t < 162) {
+        // BICYCLE KICK from behind, then the rest of the backflip down to the floor
+        A.facing = -dir;
+        const k = d.span(t, 128, 158, ease.inQuad);
+        d.at(A, xBehind + dir * 26 * d.span(t, 128, 158), Math.max(0, yBehind * (1 - k) + 40 * Math.sin(d.span(t, 128, 140) * Math.PI)));
+        d.keys(A, t, [[128, ready], [133, bicycle], [138, bicycle], [146, tuck], [154, K.AIR_FALL], [158, K.LAND], [162, K.LAND]]);
+        rot = d.num(t, [[128, 0], [134, 62, ease.outQuad], [140, 150], [154, 340], [158, 360]]);
+      } else {
+        // stands up, turns to where the victim went, rock horns
+        d.at(A, xBehind + dir * 26);
+        A.facing = t < 176 ? -dir : dir;
+        d.keys(A, t, [[162, K.LAND], [170, STAND], [176, K.TURN], [182, STAND], [196, horns], [290, horns]]);
+      }
+      if (rot) A.scriptPose.rot = (A.scriptPose.rot || 0) + rot;
+
+      // ================= victim =================
+      V.fx.stars = t > 60 && t < 134;
+      if (t < 51) {
+        d.at(V, d.vx);
+        daze(d, V, t);
+      } else if (t < 134) {
+        // launched by the first kick, then hangs face-up in the air
+        const k = d.span(t, 51, 92, ease.outCubic);
+        const bob = t > 92 ? Math.sin((t - 92) * 0.12) * 6 : 0;
+        d.at(V, d.vx + dir * 14 * k, 230 * k + bob);
+        const r = d.num(t, [[51, 0], [60, 40, ease.outQuad], [92, 92], [134, 104]]);
+        d.pose(V, spin(t < 60 ? K.AIR_HIT : LIMP_AIR, r));
+        s.hang = { x: V.body.x, y: V.body.y };
+      } else {
+        // the bicycle kick: gone over her head, out of the screen and into the sky
+        const k = t - 134;
+        d.at(V, s.hang.x + dir * k * 30, s.hang.y + k * 13 - k * k * 0.04);
+        d.pose(V, spin(FLAIL_A, 104 + k * 34));
+      }
+      V.facing = -dir;
+      V.fx.hidden = t > 166;
+
+      // ================= impacts & effects =================
+      if (t === 46 || t === 96) d.sfx('whoosh');
+      if (t === 51) {
+        d.sfx('boom');
+        d.fxEvent('flash', { amount: 0.45 });
         d.fxEvent('shake', { amount: 12 });
         const h = d.joint(V, 'head');
-        d.fxEvent('shards', { x: h.x, y: h.y, n: 22, color: '#c43a2a' });
-        d.fxEvent('prop', { prop: 'guitarneck', x: h.x, y: h.y + 20, dir: -d.dir, vx: 3, vy: 10, spin: 0.35 });
+        d.fxEvent('burst', { x: h.x, y: h.y, r: 46 });
+        d.fxEvent('sparks', { x: h.x, y: h.y, n: 16, color: '#ff3fd0' });
+        d.fxEvent('label', { text: 'WHAM!', x: h.x - dir * 30, y: h.y + 60, color: '#ffd23f', life: 50 });
       }
-      // victim: guitar body stuck around the neck, stars, then timber! face-first
-      s.collar = t >= 78;
-      s.head = d.joint(V, 'neck');
-      V.fx.stars = t >= 80 && t < 200;
-      if (t < 160) { d.at(V, d.vx); daze(d, V, t); }
-      else {
-        const k = d.span(t, 160, 196, ease.inQuad);
-        const hp = 112 * V.props.posScale;
-        d.at(V, d.vx - d.dir * Math.sin(k * Math.PI / 2) * hp, (Math.cos(k * Math.PI / 2) - 1) * hp * 0.9);
-        d.pose(V, spin(P(STAND, { ff: null, bf: null, fl: [4, 2, 0], bl: [-4, 2, 0], fa: [6, 10, 0], ba: [4, 10, 0] }), -90 * k));
+      if (t === 113) d.fxEvent('label', { text: '★', x: A.body.x, y: A.body.y + 230, color: '#ff3fd0', life: 30 });
+      if (t === 134) {
+        d.sfx('crash');
+        d.sfx('chord');
+        d.fxEvent('flash', { amount: 0.7 });
+        d.fxEvent('shake', { amount: 18 });
+        const h = d.joint(V, 'neck');
+        d.fxEvent('burst', { x: h.x, y: h.y, r: 60 });
+        for (let i = 0; i < 3; i++) d.fxEvent('ring', { x: h.x, y: h.y, r: 10 + i * 14, vr: 9 + i * 3, life: 22, color: i % 2 ? '#ff3fd0' : '#ffffff' });
+        d.fxEvent('sparks', { x: h.x, y: h.y, n: 24, speed: 10, color: '#ffd23f' });
+        d.fxEvent('label', { text: 'KA-BOOM!', x: h.x + dir * 40, y: h.y + 70, color: '#ff3fd0', life: 60 });
       }
-      if (t === 196) { d.sfx('thud'); d.fxEvent('dust', { x: d.vx - d.dir * 60, y: 4, n: 20, spread: 70 }); }
-      if (t === 210) d.fxEvent('label', { text: 'ENCORE!', x: d.ax, y: 300, color: '#ff3fd0', life: 60 });
+      if (t === 158) { d.sfx('thud'); d.fxEvent('dust', { x: A.body.x, y: 4, n: 12, spread: 40 }); }
+      if (t === 192) d.sfx('ding');
+      if (t === 214) d.fxEvent('label', { text: 'ENCORE!', x: A.body.x, y: 300, color: '#ff3fd0', life: 70 });
+
+      // motion trails: the kicking foot during both kicks, the hips during the corkscrew
+      s.trail = s.trail || [];
+      const tracking = (t >= 47 && t <= 62) || (t >= 129 && t <= 146) ? 'toeF' : t >= 94 && t <= 130 ? 'pelvis' : null;
+      if (tracking) s.trail.push({ ...d.joint(A, tracking), t, j: tracking, w: tracking === 'toeF' ? 1 : 1.6 });
+      s.trail = s.trail.filter((p) => t - p.t < 10);
+      s.rim = A.def.look.rim;
+      s.ping = t >= 186 && t < 214 ? t - 186 : -1;
+
+      // camera: wider and higher while the victim is in the air
+      const cx = (d.ax + d.vx + dir * 125) / 2;
+      d.camX = cx + (xBehind + dir * 26 - cx) * d.span(t, 160, 200);
+      d.camZoom = d.num(t, [[0, 1.34], [44, 1.3], [60, 1.06], [150, 1.06], [190, 1.2]]);
+      d.camY = d.num(t, [[0, 0], [44, 0], [60, 70], [150, 70], [190, 0]]);
     },
-    draw(ctx, d, cam, layer) {
+    draw(ctx, d, cam, layer, alpha) {
       const { s } = d;
       if (layer !== 'front') return;
       const z = cam.zoom;
-      if (s.guitar && s.hand) {
-        const a = S(cam, s.hand.x, s.hand.y), b = S(cam, s.handB.x, s.handB.y);
-        const ang = Math.atan2(a.y - b.y, a.x - b.x);
+      // neon trail ribbon
+      const tr = s.trail || [];
+      if (tr.length > 1) {
         ctx.save();
-        ctx.translate(a.x, a.y);
-        ctx.rotate(ang);
-        // neck + body (body beyond the hands, held like an axe)
-        ctx.beginPath(); ctx.rect(-8 * z, -4 * z, 70 * z, 8 * z); ink(ctx, '#3a2a20', 2);
-        ctx.beginPath();
-        ctx.ellipse(86 * z, 0, 30 * z, 22 * z, 0, 0, TAU);
-        ink(ctx, '#c43a2a', 3);
-        ctx.beginPath(); ctx.arc(80 * z, 0, 6 * z, 0, TAU); ctx.fillStyle = OUT; ctx.fill();
+        ctx.lineCap = 'round';
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 1; i < tr.length; i++) {
+          if (tr[i].t - tr[i - 1].t > 1 || tr[i].j !== tr[i - 1].j) continue;
+          const a = S(cam, tr[i - 1].x, tr[i - 1].y), b = S(cam, tr[i].x, tr[i].y);
+          const k = i / tr.length;
+          ctx.strokeStyle = rgba(s.rim || '#ff3fd0', 0.55 * k);
+          ctx.lineWidth = (6 + 16 * k) * z * tr[i].w;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          ctx.strokeStyle = `rgba(255,255,255,${0.6 * k})`;
+          ctx.lineWidth = (2 + 5 * k) * z * tr[i].w;
+          ctx.stroke();
+        }
         ctx.restore();
       }
-      if (s.collar && s.head) {
-        const h = S(cam, s.head.x, s.head.y);
-        ctx.beginPath();
-        ctx.ellipse(h.x, h.y + 4 * z, 30 * z, 9 * z, 0, 0, TAU);
-        ctx.lineWidth = 12 * z;
-        ctx.strokeStyle = OUT;
-        ctx.stroke();
-        ctx.lineWidth = 8 * z;
-        ctx.strokeStyle = '#c43a2a';
-        ctx.stroke();
+      // the victim twinkles out in the sky, cartoon style
+      if (s.ping >= 0) {
+        const tt = s.ping + alpha;
+        const x = d.dir > 0 ? VIEW_W - 150 : 150, y = 110;
+        const k = Math.sin(Math.min(1, tt / 28) * Math.PI);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        star(ctx, x, y, 34 * k, tt * 0.05, '#ffffff');
+        star(ctx, x, y, 18 * k, -tt * 0.08, '#ffd23f');
+        ctx.restore();
       }
     },
   },

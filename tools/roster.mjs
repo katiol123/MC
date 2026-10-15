@@ -1,6 +1,8 @@
 // Round robin of the whole roster (CPU vs CPU, every pairing, both sides): per-fighter win rate
 // next to the sum of its attribute bars. Used to balance the roster after attribute calibration.
-//   node tools/roster.mjs [gamesPerSidePerPair=4] [level=normal]
+//   node tools/roster.mjs [gamesPerSidePerPair=4] [level=normal] ['{"id":"bruno","o":{...defOverrides}}']
+// With the third argument only the pairings of that fighter are played, with the overrides applied
+// to it (kit / hidden-stat experiments).
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -11,7 +13,7 @@ async function play(games) {
   const { Match } = await import('../src/game/match.js');
   const { AIController } = await import('../src/ai/aiController.js');
   return games.map((g) => {
-    const m = new Match({ p1: g.a, p2: g.b, roundsToWin: 2 });
+    const m = new Match({ p1: g.a, p2: g.b, o1: g.oa, o2: g.ob, roundsToWin: 2 });
     const ai = [new AIController(0, { level: g.level, seed: g.seed }), new AIController(1, { level: g.level, seed: g.seed * 7 + 3 })];
     for (const a of ai) a.fatalityChoice = false;
     let t = 0;
@@ -27,8 +29,13 @@ if (process.argv[2] === '--worker') {
   const level = process.argv[3] || 'normal';
   const { ROSTER, buildFighterDef } = await import('../src/data/fighters.js');
   const ids = ROSTER.map((r) => r.id);
+  const only = process.argv[4] ? JSON.parse(process.argv[4]) : null;
   const list = [];
-  for (const a of ids) for (const b of ids) if (a !== b) for (let i = 0; i < n; i++) list.push({ a, b, level, seed: 500 + i * 31 + a.length * 7 + b.length * 3 });
+  for (const a of ids) for (const b of ids) {
+    if (a === b || (only && a !== only.id && b !== only.id)) continue;
+    const oa = a === only?.id ? only.o : undefined, ob = b === only?.id ? only.o : undefined;
+    for (let i = 0; i < n; i++) list.push({ a, b, oa, ob, level, seed: 500 + i * 31 + a.length * 7 + b.length * 3 });
+  }
   const k = Math.min(os.cpus().length, 4);
   const chunks = Array.from({ length: k }, (_, i) => list.filter((_, j) => j % k === i));
   const t0 = Date.now();
@@ -38,7 +45,7 @@ if (process.argv[2] === '--worker') {
     st[r.a].n++; st[r.b].n++;
     if (r.w === 0) st[r.a].w++; else if (r.w === 1) st[r.b].w++; else { st[r.a].w += 0.5; st[r.b].w += 0.5; }
   }
-  const rows = ids.map((id) => {
+  const rows = ids.filter((id) => st[id].n).map((id) => {
     const p = ROSTER.find((r) => r.id === id).profile || {};
     const sum = Object.values(p).reduce((a, b) => a + b, 0);
     return { id, wr: st[id].w / st[id].n, n: st[id].n, sum };

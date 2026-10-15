@@ -23,7 +23,7 @@ export class Camera {
     const half = VIEW.width / 2 / this.zoom;
     const tx = clamp(mid, STAGE.left + half, STAGE.right - half);
     this.x = lerp(this.x, tx, 0.18);
-    const ty = Math.max(0, Math.max(...ys) - 160) * 0.5;
+    const ty = focus ? focus.y || 0 : Math.max(0, Math.max(...ys) - 160) * 0.5;
     this.y = lerp(this.y, ty, 0.1);
     this.sx = shake ? (Math.sin(this.t * 2.3) + Math.sin(this.t * 3.7)) * shake * 0.5 : 0;
     this.sy = shake ? (Math.cos(this.t * 2.9)) * shake * 0.5 : 0;

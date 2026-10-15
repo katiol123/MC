@@ -18,7 +18,7 @@ export const ROSTER = [
     body: { height: 1.02, bulk: 1.22, arms: 1.0, legs: 0.97, head: 1.05, torso: 1.02, shoulders: 1.2, armBulk: 1.15, waist: 1.05 },
     stats: { health: 1080, walkF: 3.0, walkB: 2.4, run: 6.4, dash: 9, jumpVY: 15.8, jumpVX: 3.8, mass: 1.15, stunMax: 680, pushW: 37 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.85, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.7, reaction: 0.4, aggression: 0.85, combo: 0.55, antiAir: 0.4, cunning: 0.0 },
+    profile: { power: 0.9, speed: 0.6, mobility: 0.55, health: 0.8, toughness: 0.8, reaction: 0.65, aggression: 0.9, combo: 0.75, antiAir: 0.65, cunning: 0 },
     look: {
       skin: '#c88a5e', outline: '#1b1012', rim: '#ff4fd8',
       eyes: '#3fd29a', brows: 'thick', mouth: 'grin',
@@ -47,7 +47,7 @@ export const ROSTER = [
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.0, speed: 0.8, mobility: 0.9, health: 0.15, toughness: 0.2, reaction: 0.7, aggression: 0.35, combo: 0.45, antiAir: 0.55, cunning: 1.0 },
+    profile: { power: 0, speed: 0.55, mobility: 0.6, health: 0.1, toughness: 0.15, reaction: 0.45, aggression: 0.25, combo: 0.3, antiAir: 0.35, cunning: 1 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -78,7 +78,7 @@ export const ROSTER = [
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.55, speed: 0.4, mobility: 0.5, health: 0.55, toughness: 0.5, reaction: 0.45, aggression: 0.5, combo: 0.7, antiAir: 0.9, cunning: 0.4 },
+    profile: { power: 0.5, speed: 0.35, mobility: 0.45, health: 0.5, toughness: 0.45, reaction: 0.4, aggression: 0.45, combo: 0.65, antiAir: 0.85, cunning: 0.35 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -108,7 +108,7 @@ export const ROSTER = [
     body: { height: 0.98, bulk: 1.0, arms: 1.0, legs: 1.0, head: 1.08, torso: 0.98, shoulders: 1.04 },
     stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 590, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.4, speed: 0.7, mobility: 0.75, health: 0.35, toughness: 0.3, reaction: 0.55, aggression: 0.95, combo: 0.6, antiAir: 0.2, cunning: 0.5 },
+    profile: { power: 0.35, speed: 0.6, mobility: 0.65, health: 0.35, toughness: 0.3, reaction: 0.45, aggression: 0.85, combo: 0.5, antiAir: 0.2, cunning: 0.45 },
     look: {
       skin: '#e3a27e', outline: '#1d1216', rim: '#2ee6d6',
       eyes: '#b04fd6', brows: 'angry', mouth: 'teeth', freckles: true,
@@ -137,7 +137,7 @@ export const ROSTER = [
     body: { height: 1.06, bulk: 0.94, arms: 1.08, legs: 1.04, head: 1.0, torso: 1.04, shoulders: 1.0 },
     stats: { health: 1020, walkF: 3.0, walkB: 2.6, run: 6.5, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.04, stunMax: 650, pushW: 34 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.6, speed: 0.5, mobility: 0.25, health: 0.6, toughness: 0.6, reaction: 0.95, aggression: 0.25, combo: 0.55, antiAir: 0.45, cunning: 0.65 },
+    profile: { power: 0.6, speed: 0.55, mobility: 0.35, health: 0.6, toughness: 0.6, reaction: 0.9, aggression: 0.35, combo: 0.6, antiAir: 0.5, cunning: 0.65 },
     look: {
       skin: '#b98256', outline: '#1a1012', rim: '#ff47d6',
       eyes: '#b34be0', brows: 'angry', mouth: 'snarl',
@@ -166,7 +166,7 @@ export const ROSTER = [
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
     stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 560, pushW: 31 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.3, speed: 1.0, mobility: 1.0, health: 0.0, toughness: 0.0, reaction: 0.6, aggression: 1.0, combo: 0.8, antiAir: 0.0, cunning: 0.4 },
+    profile: { power: 0.4, speed: 1, mobility: 1, health: 0, toughness: 0, reaction: 0.65, aggression: 1, combo: 0.85, antiAir: 0, cunning: 0.5 },
     look: {
       female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
@@ -198,7 +198,7 @@ export const ROSTER = [
     body: { height: 1.08, bulk: 1.36, arms: 1.02, legs: 0.94, head: 1.02, torso: 1.06, shoulders: 1.28, armBulk: 1.2, legBulk: 1.15, waist: 1.3, hands: 1.15 },
     stats: { health: 1200, walkF: 2.5, walkB: 2.0, run: 5.6, dash: 8, jumpVY: 14.6, jumpVX: 3.4, mass: 1.4, stunMax: 810, pushW: 42 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 1.0, speed: 0.0, mobility: 0.0, health: 1.0, toughness: 1.0, reaction: 0.0, aggression: 0.6, combo: 0.4, antiAir: 0.35, cunning: 0.7 },
+    profile: { power: 1, speed: 0, mobility: 0, health: 1, toughness: 1, reaction: 0, aggression: 1, combo: 1, antiAir: 1, cunning: 1 },
     look: {
       skin: '#b07a52', outline: '#141012', rim: '#ff47d6',
       eyes: '#b04fd6', brows: 'thick', mouth: 'grin',
@@ -214,11 +214,14 @@ export const ROSTER = [
     // low-health look: what gets knocked off (flies away as a prop) and what changes
     damaged: { look: { hat: null }, props: [{ type: 'chefhat', from: 'head', vx: -2.5, vy: 12, spin: 0.18 }] },
     moves: {
+      // heavy hits shrug off one blow (armor): the big man's answer to being slow and easy to hit
       lp: { startup: 5, damage: 38 },
-      hp: { startup: 10, damage: 108, hitstop: 13 },
+      hp: { startup: 10, damage: 108, hitstop: 13, armor: { from: 1, to: 12, hits: 1 } },
       lk: { startup: 7, damage: 54 },
-      hk: { startup: 13, damage: 112 },
-      s1: { name: 'Meat Tenderizer', damage: 135 },
+      hk: { startup: 13, damage: 112, armor: { from: 1, to: 14, hits: 1 } },
+      chp: { armor: { from: 1, to: 12, hits: 1 } },
+      chk: { armor: { from: 1, to: 12, hits: 1 } },
+      s1: { name: 'Meat Tenderizer', damage: 135, armor: { from: 1, to: 20, hits: 1 } },
     },
   },
   {
@@ -229,7 +232,7 @@ export const ROSTER = [
     body: { height: 1.0, bulk: 0.94, arms: 1.03, legs: 1.03, head: 1.0, torso: 1.0, shoulders: 1.0 },
     stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 610, pushW: 33 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.55, speed: 0.6, mobility: 0.7, health: 0.45, toughness: 0.4, reaction: 0.55, aggression: 0.7, combo: 0.4, antiAir: 0.6, cunning: 0.45 },
+    profile: { power: 0.7, speed: 0.75, mobility: 0.85, health: 0.65, toughness: 0.6, reaction: 0.7, aggression: 0.85, combo: 0.6, antiAir: 0.75, cunning: 0.65 },
     look: {
       skin: '#6a4430', outline: '#120c10', rim: '#ff3fd0',
       eyes: '#e6e23a', brows: 'none', mouth: 'none',
@@ -258,7 +261,7 @@ export const ROSTER = [
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
     stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.7, speed: 0.65, mobility: 0.6, health: 0.2, toughness: 0.25, reaction: 0.4, aggression: 0.9, combo: 0.75, antiAir: 0.4, cunning: 0.25 },
+    profile: { power: 0.45, speed: 0.4, mobility: 0.35, health: 0.1, toughness: 0.15, reaction: 0.25, aggression: 0.55, combo: 0.45, antiAir: 0.25, cunning: 0.15 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -286,7 +289,7 @@ export const ROSTER = [
     body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
     stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.8, speed: 0.2, mobility: 0.1, health: 0.9, toughness: 0.95, reaction: 0.3, aggression: 0.65, combo: 0.0, antiAir: 0.6, cunning: 0.6 },
+    profile: { power: 0.65, speed: 0.2, mobility: 0.1, health: 0.75, toughness: 0.8, reaction: 0.25, aggression: 0.55, combo: 0, antiAir: 0.5, cunning: 0.5 },
     look: {
       skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
       eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
@@ -314,7 +317,7 @@ export const ROSTER = [
     body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
     stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.35, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.75, reaction: 0.6, aggression: 0.0, combo: 0.45, antiAir: 1.0, cunning: 0.75 },
+    profile: { power: 0.3, speed: 0.3, mobility: 0.25, health: 0.65, toughness: 0.65, reaction: 0.5, aggression: 0, combo: 0.4, antiAir: 1, cunning: 0.65 },
     look: {
       skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
       eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
@@ -343,7 +346,7 @@ export const ROSTER = [
     body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
     stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
     // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
-    profile: { power: 0.4, speed: 0.75, mobility: 0.5, health: 0.25, toughness: 0.3, reaction: 1.0, aggression: 0.5, combo: 1.0, antiAir: 0.4, cunning: 0.4 },
+    profile: { power: 0.25, speed: 0.45, mobility: 0.3, health: 0.15, toughness: 0.15, reaction: 1, aggression: 0.3, combo: 1, antiAir: 0.25, cunning: 0.25 },
     look: {
       skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
       eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
