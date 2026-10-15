@@ -33,6 +33,8 @@ export const TUNING = {
   blockHitstopScale: 0.75,
   chipDamage: 0.12, // fraction of special-move damage dealt through block
 
+  pieMoveScale: 0.85, // cream pie on the face (Sobby): walking, running, dashing and jumping are 15 % slower...
+  pieStartupEvery: 5, // ...and attack start-ups stall one frame in every 5 (about 20 % slower)
   stunDecayPerTick: 0.35, // dizzy meter recovery per tick...
   stunRecoverDelay: 120, // ...once this many ticks have passed without being hit
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },

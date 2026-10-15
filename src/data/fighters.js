@@ -180,8 +180,6 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
-    // low-health look: what gets knocked off (flies away as a prop) and what changes
-    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 9, spin: 0.3 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },
@@ -386,8 +384,6 @@ export const ROSTER = [
       shoes: { type: 'wrapped', color: '#e8dcc0' },
       victory: 3,
     },
-    // low-health look: the topknot comes undone, the hair tie flies off
-    damaged: { look: { hair: { knot: false } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 10, spin: 0.3 }] },
     moves: {
       hp: { armor: { from: 1, to: 12, hits: 1 } },
       hk: { armor: { from: 1, to: 14, hits: 1 } },
@@ -445,8 +441,6 @@ export const ROSTER = [
       tail: '#6f8a2c',
       victory: 1,
     },
-    // low-health look: the padlock chain snaps off, and a tooth goes flying
-    damaged: { look: { chain: null }, props: [{ type: 'padlock', from: 'chest', vx: 2.5, vy: 7, spin: 0.4 }, { type: 'tooth', from: 'mouth', vx: 3, vy: 9, spin: 0.5 }] },
     moves: {
       s1: { name: 'Tail Lash' },
     },

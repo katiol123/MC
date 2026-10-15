@@ -250,3 +250,27 @@ test('meter builds from dealing and taking damage, but slowly (about one super p
   // dealing a full health bar of damage is roughly what one super costs
   assert.ok(TUNING.meterOnHit * 1000 >= 80 && TUNING.meterOnHit * 1000 <= 120);
 });
+
+test('Sobby: the cream pie covers the face and slows the victim down while it lasts', () => {
+  const m = fightingMatch({ p1: 'sobby', p2: 'brick' });
+  const [, o] = m.fighters;
+  place(m, 800, 1000);
+  const ev = run(m, 120, p1seq(S4));
+  assert.ok(ev.some((e) => e.type === 'hit' && e.pie), 'pie hit');
+  assert.ok(o.marks.pie > 0, 'face covered');
+  assert.equal(o.moveScale, TUNING.pieMoveScale);
+  // start-up of the same jab with and without pie on the face
+  const startupTicks = (pie) => {
+    const mm = fightingMatch({ p1: 'brick', p2: 'jax' });
+    place(mm, 800, 1100);
+    mm.fighters[0].marks.pie = pie ? 999 : 0;
+    const e2 = run(mm, 40, (i) => [raw({ hp: i === 0 }), raw()]);
+    const start = e2.find((e) => e.type === 'attackStart' && e.who === 0)?.at;
+    const swing = e2.find((e) => e.type === 'swing' && e.who === 0)?.at;
+    return swing - start;
+  };
+  assert.ok(startupTicks(true) > startupTicks(false), 'slower start-up');
+  run(m, 300);
+  assert.equal(o.marks.pie, 0, 'pie slides off after a while');
+  assert.equal(o.moveScale, 1);
+});

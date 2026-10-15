@@ -157,7 +157,7 @@ export class Effects {
         // battered: the fighter's signature item flies off with a pop
         const f = fighters?.[e.who];
         const dmg = f?.def.damaged;
-        if (!f) break;
+        if (!f || !dmg?.props?.length) break; // nothing to knock off: just the tired look
         this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 8, vr: 7, life: 14, max: 14, color: '#ffffff' });
         this.parts.push({ kind: 'burst', x: e.x, y: e.y, r: 26, life: 6, max: 6, color: '#ffffff', dir: e.facing });
         this.shake = Math.max(this.shake, 5);

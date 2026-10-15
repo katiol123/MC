@@ -119,20 +119,22 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 @keyframes stamp2 { to { opacity: 1; transform: rotate(12deg) scale(1); } }
 @keyframes flash { 0% { filter: brightness(3); } 100% { filter: none; } }
 
-.deck { position: absolute; left: 50%; bottom: 40px; width: 0; height: 0; }
-.card { --a: calc((var(--i) - (var(--n) - 1) / 2) * min(4.1deg, calc(34deg / (var(--n) - 1)))); position: absolute; left: -52px; bottom: 0; width: 104px; height: 158px; transform-origin: 50% 1250px;
+.deck { position: absolute; left: 50%; bottom: 72px; width: 0; height: 0; }
+/* 16 cards side by side: a gentle arc (pivot far below) and a step of ~76px at the card's base, so
+   neighbouring cards never overlap (the slanted edges are parallel, leaving a small gap) */
+.card { --a: calc((var(--i) - (var(--n) - 1) / 2) * 1.36deg); position: absolute; left: -36px; bottom: 0; width: 72px; height: 112px; transform-origin: 50% 3200px;
   transform: rotate(var(--a)); transition: transform .22s cubic-bezier(.2,1.3,.4,1), filter .2s; cursor: pointer; filter: brightness(.62) saturate(.75); }
 .card-img { position: absolute; inset: 0; background-size: cover; background-position: center 10%; border: 3px solid #1a0f22; box-shadow: 0 6px 0 rgba(0,0,0,.5); clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
 .card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(8,3,12,.92)); clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
-.card-num { position: absolute; top: 4px; left: 16px; font-size: 18px; color: var(--gold); z-index: 2; text-shadow: 2px 2px 0 var(--ink); }
-.card-name { position: absolute; bottom: 8px; left: 8px; right: 8px; font-size: 11px; line-height: 1.1; z-index: 2; text-align: center; letter-spacing: .5px; }
+.card-num { position: absolute; top: 3px; left: 12px; font-size: 14px; color: var(--gold); z-index: 2; text-shadow: 2px 2px 0 var(--ink); }
+.card-name { position: absolute; bottom: 6px; left: 5px; right: 5px; font-size: 8.5px; line-height: 1.1; z-index: 2; text-align: center; letter-spacing: .5px; }
 .card-tags { position: absolute; top: -26px; left: 0; right: 0; display: flex; justify-content: center; gap: 4px; z-index: 3; }
 .card-tags span { font-size: 13px; padding: 2px 7px; color: var(--ink); transform: skewX(-12deg); }
 .t1 { background: var(--p1); } .t2 { background: var(--p2); }
 .card.focus { transform: rotate(var(--a)) translateY(-8px); filter: none; z-index: 10; }
 /* The selected card barely moves (so it never slides out from under the mouse); instead its edges
    light up: a thick player-coloured frame, an inner bright rim and a slow glow pulse. */
-/* note: the fan pivots 1250px below the cards, so scaling the card itself would fling it upwards;
+/* note: the fan pivots 3200px below the cards, so scaling the card itself would fling it upwards;
    only the picture inside grows slightly */
 /* the picture grows by re-sampling (background-size), never by transform: a scaled layer is a
    stretched bitmap and looks blurry */

@@ -220,7 +220,7 @@ export class Fighter {
       case 'dashF': {
         const d = this.sd.duration;
         const t = this.stateFrame / d;
-        b.vx = this.facing * this.stats.dash * Math.max(0, 1 - t * t);
+        b.vx = this.facing * this.stats.dash * this.moveScale * Math.max(0, 1 - t * t);
         if (this.stateFrame > 6 && this.tryAttack(opp, 'ground')) return;
         if (this.stateFrame >= d) {
           if (inp.forward) return this.setState('run', {}, 'run', { blend: 6 });
@@ -231,7 +231,7 @@ export class Fighter {
       case 'dashB': {
         const d = this.sd.duration;
         const t = this.stateFrame / d;
-        b.vx = -this.facing * this.stats.dash * 0.85 * Math.max(0, 1 - t);
+        b.vx = -this.facing * this.stats.dash * this.moveScale * 0.85 * Math.max(0, 1 - t);
         if (this.stateFrame >= d) this.setState('idle', {}, 'idle', { blend: 6 });
         return;
       }
@@ -322,11 +322,11 @@ export class Fighter {
       const sameClip = clip === 'walk' && (this.state === 'walkF' || this.state === 'walkB');
       this.setState(next, {}, sameClip ? null : clip, { blend: next === 'crouch' || this.state === 'crouch' ? 5 : 7 });
     }
-    const st = this.stats;
+    const st = this.stats, ms = this.moveScale;
     switch (next) {
-      case 'walkF': b.steer(this.facing * st.walkF, 0.9); break;
-      case 'walkB': b.steer(-this.facing * st.walkB, 0.9); break;
-      case 'run': b.steer(this.facing * st.run, 1.2); break;
+      case 'walkF': b.steer(this.facing * st.walkF * ms, 0.9); break;
+      case 'walkB': b.steer(-this.facing * st.walkB * ms, 0.9); break;
+      case 'run': b.steer(this.facing * st.run * ms, 1.2); break;
       default: b.steer(0, this.state === 'run' ? 0.5 : 1.1);
     }
   }
@@ -343,7 +343,7 @@ export class Fighter {
     const dir = this.sd.dir;
     const run = this.sd.fromRun ? 1.35 : 1;
     this.body.launch(this.stats.jumpVY);
-    this.body.vx = dir * this.facing * this.stats.jumpVX * run;
+    this.body.vx = dir * this.facing * this.stats.jumpVX * this.moveScale * run;
     this.airDir = dir;
     this.airAttackUsed = false;
     this.emit({ type: 'jump', who: this.index });
@@ -411,7 +411,7 @@ export class Fighter {
   startMove(m, isChain = false, isCancel = isChain) {
     this.chainLen = isChain ? this.chainLen + 1 : 0;
     // frame 1 is the tick the button was pressed on (frame data counts from the press)
-    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null };
+    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null, pieTicks: 0 };
     if (m.stance === 'air') this.airAttackUsed = true;
     if (m.super) {
       this.meter -= m.cost ?? TUNING.superCost;
@@ -432,6 +432,8 @@ export class Fighter {
     const mv = this.move;
     const m = mv.def;
     const b = this.body;
+    // a cream pie in the face (Sobby) makes start-ups sluggish: every few ticks the wind-up stalls
+    if (this.marks.pie > 0 && mv.frame > 0 && mv.frame < m.startup && ++mv.pieTicks % TUNING.pieStartupEvery === 0) return;
     mv.frame++;
     const total = m.startup + m.active + m.recovery;
     // Kara-throw: light punch/kick followed 1-2 frames later by the other button becomes a throw.
@@ -497,6 +499,11 @@ export class Fighter {
       this.move = null;
       this.recoverToNeutral();
     }
+  }
+
+  /** Movement speed multiplier (a cream pie in the face slows everything down). */
+  get moveScale() {
+    return this.marks?.pie > 0 ? TUNING.pieMoveScale : 1;
   }
 
   /** Vanish and reappear behind the opponent (used by sequence steps with `teleport`). */

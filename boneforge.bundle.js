@@ -381,6 +381,8 @@ const TUNING = {
   blockHitstopScale: 0.75,
   chipDamage: 0.12, // fraction of special-move damage dealt through block
 
+  pieMoveScale: 0.85, // cream pie on the face (Sobby): walking, running, dashing and jumping are 15 % slower...
+  pieStartupEvery: 5, // ...and attack start-ups stall one frame in every 5 (about 20 % slower)
   stunDecayPerTick: 0.35, // dizzy meter recovery per tick...
   stunRecoverDelay: 120, // ...once this many ticks have passed without being hit
   partDamage: { head: 1.1, torso: 1, limb: 0.9 },
@@ -841,8 +843,6 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
-    // low-health look: what gets knocked off (flies away as a prop) and what changes
-    damaged: { look: { hair: { style: 'swept' } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 9, spin: 0.3 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },
@@ -1047,8 +1047,6 @@ const ROSTER = [
       shoes: { type: 'wrapped', color: '#e8dcc0' },
       victory: 3,
     },
-    // low-health look: the topknot comes undone, the hair tie flies off
-    damaged: { look: { hair: { knot: false } }, props: [{ type: 'hairtie', from: 'head', vx: -2, vy: 10, spin: 0.3 }] },
     moves: {
       hp: { armor: { from: 1, to: 12, hits: 1 } },
       hk: { armor: { from: 1, to: 14, hits: 1 } },
@@ -1106,8 +1104,6 @@ const ROSTER = [
       tail: '#6f8a2c',
       victory: 1,
     },
-    // low-health look: the padlock chain snaps off, and a tooth goes flying
-    damaged: { look: { chain: null }, props: [{ type: 'padlock', from: 'chest', vx: 2.5, vy: 7, spin: 0.4 }, { type: 'tooth', from: 'mouth', vx: 3, vy: 9, spin: 0.5 }] },
     moves: {
       s1: { name: 'Tail Lash' },
     },
@@ -3196,7 +3192,7 @@ class Fighter {
       case 'dashF': {
         const d = this.sd.duration;
         const t = this.stateFrame / d;
-        b.vx = this.facing * this.stats.dash * Math.max(0, 1 - t * t);
+        b.vx = this.facing * this.stats.dash * this.moveScale * Math.max(0, 1 - t * t);
         if (this.stateFrame > 6 && this.tryAttack(opp, 'ground')) return;
         if (this.stateFrame >= d) {
           if (inp.forward) return this.setState('run', {}, 'run', { blend: 6 });
@@ -3207,7 +3203,7 @@ class Fighter {
       case 'dashB': {
         const d = this.sd.duration;
         const t = this.stateFrame / d;
-        b.vx = -this.facing * this.stats.dash * 0.85 * Math.max(0, 1 - t);
+        b.vx = -this.facing * this.stats.dash * this.moveScale * 0.85 * Math.max(0, 1 - t);
         if (this.stateFrame >= d) this.setState('idle', {}, 'idle', { blend: 6 });
         return;
       }
@@ -3298,11 +3294,11 @@ class Fighter {
       const sameClip = clip === 'walk' && (this.state === 'walkF' || this.state === 'walkB');
       this.setState(next, {}, sameClip ? null : clip, { blend: next === 'crouch' || this.state === 'crouch' ? 5 : 7 });
     }
-    const st = this.stats;
+    const st = this.stats, ms = this.moveScale;
     switch (next) {
-      case 'walkF': b.steer(this.facing * st.walkF, 0.9); break;
-      case 'walkB': b.steer(-this.facing * st.walkB, 0.9); break;
-      case 'run': b.steer(this.facing * st.run, 1.2); break;
+      case 'walkF': b.steer(this.facing * st.walkF * ms, 0.9); break;
+      case 'walkB': b.steer(-this.facing * st.walkB * ms, 0.9); break;
+      case 'run': b.steer(this.facing * st.run * ms, 1.2); break;
       default: b.steer(0, this.state === 'run' ? 0.5 : 1.1);
     }
   }
@@ -3319,7 +3315,7 @@ class Fighter {
     const dir = this.sd.dir;
     const run = this.sd.fromRun ? 1.35 : 1;
     this.body.launch(this.stats.jumpVY);
-    this.body.vx = dir * this.facing * this.stats.jumpVX * run;
+    this.body.vx = dir * this.facing * this.stats.jumpVX * this.moveScale * run;
     this.airDir = dir;
     this.airAttackUsed = false;
     this.emit({ type: 'jump', who: this.index });
@@ -3387,7 +3383,7 @@ class Fighter {
   startMove(m, isChain = false, isCancel = isChain) {
     this.chainLen = isChain ? this.chainLen + 1 : 0;
     // frame 1 is the tick the button was pressed on (frame data counts from the press)
-    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null };
+    this.move = { def: m, frame: 1, hitIds: new Set(), hits: 0, contact: null, step: null, pieTicks: 0 };
     if (m.stance === 'air') this.airAttackUsed = true;
     if (m.super) {
       this.meter -= m.cost ?? TUNING.superCost;
@@ -3408,6 +3404,8 @@ class Fighter {
     const mv = this.move;
     const m = mv.def;
     const b = this.body;
+    // a cream pie in the face (Sobby) makes start-ups sluggish: every few ticks the wind-up stalls
+    if (this.marks.pie > 0 && mv.frame > 0 && mv.frame < m.startup && ++mv.pieTicks % TUNING.pieStartupEvery === 0) return;
     mv.frame++;
     const total = m.startup + m.active + m.recovery;
     // Kara-throw: light punch/kick followed 1-2 frames later by the other button becomes a throw.
@@ -3473,6 +3471,11 @@ class Fighter {
       this.move = null;
       this.recoverToNeutral();
     }
+  }
+
+  /** Movement speed multiplier (a cream pie in the face slows everything down). */
+  get moveScale() {
+    return this.marks?.pie > 0 ? TUNING.pieMoveScale : 1;
   }
 
   /** Vanish and reappear behind the opponent (used by sequence steps with `teleport`). */
@@ -10573,7 +10576,7 @@ class Effects {
         // battered: the fighter's signature item flies off with a pop
         const f = fighters?.[e.who];
         const dmg = f?.def.damaged;
-        if (!f) break;
+        if (!f || !dmg?.props?.length) break; // nothing to knock off: just the tired look
         this.parts.push({ kind: 'ring', x: e.x, y: e.y, r: 8, vr: 7, life: 14, max: 14, color: '#ffffff' });
         this.parts.push({ kind: 'burst', x: e.x, y: e.y, r: 26, life: 6, max: 6, color: '#ffffff', dir: e.facing });
         this.shake = Math.max(this.shake, 5);
