@@ -17,6 +17,9 @@ const BLOCKABLE = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'gua
 const CAN_TURN = new Set(['idle', 'walkF', 'walkB', 'crouch', 'guardHigh', 'guardLow', 'land', 'intro']);
 const NORMAL_ORDER = ['hk', 'hp', 'lk', 'lp'];
 
+/** Cosmetic mark each fighter's super leaves on the opponent (Roxy's boot soles stack per kick). */
+const SUPER_MARKS = { cinder: 'char', bruno: 'bump', brick: 'shiner', vellaro: 'collar' };
+
 export class Fighter {
   constructor(def, index, x, facing) {
     this.def = def;
@@ -54,6 +57,7 @@ export class Fighter {
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
     this.clawMarks = 0; // claw scratches left on the body by Grizz's super (cosmetic, until the round ends)
+    this.marks = {}; // other cosmetic super aftermath (char, bump, shiner, soles, collar), until the round ends
     this.pulled = null; // being reeled in by a pull
     this.focus = 0; // ticks of Focus left (+damage)
     this.finishable = false; // losing this round loses the match: a lethal hit leaves them dazed (FINISH HIM)
@@ -584,6 +588,12 @@ export class Fighter {
     this.stun += m.stun * (counter ? 1.25 : 1);
     this.sinceHit = 0;
     if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
+    if (m.super) {
+      // a super leaves its signature mark on the victim (render-only)
+      const mk = this.marks, id = att.def.id;
+      if (id === 'roxy') mk.soles = Math.min(3, (mk.soles || 0) + 1);
+      else if (SUPER_MARKS[id]) mk[SUPER_MARKS[id]] = 1;
+    }
     if (this.state === 'dizzy') this.stun = 0;
     else if (this.stun >= this.stats.stunMax) this.dizzyPending = true;
 

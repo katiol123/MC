@@ -239,6 +239,7 @@ export class FighterPainter {
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
     this.clawMarks = opts.clawMarks || 0;
+    this.marks = opts.marks || {};
     this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
@@ -387,6 +388,11 @@ export class FighterPainter {
       limbPath(ctx, c0, c1, rf1 + 2.4, rf1 + 2.4);
       ctx.fillStyle = this.mat(darken(top.color2 || top.color, depth + 0.1), t).base;
       ctx.fill();
+    }
+    if (pass === 'fill' && this.marks.char) {
+      // Cinder's super: sleeve ends burnt
+      if (fullSleeve) this.charCuff(ctx, E, Wr, rf0 + 2.4, rf1 + 2.6, 0.97, 13, back ? 3 : 4);
+      else if (shortSleeve) this.charCuff(ctx, S, along(S, E, 0.5), ru0 + 2.2, ru0 + 2.0, 0.95, 8, back ? 5 : 6);
     }
     if (pass === 'fill' && gl.type === 'gauntlet') {
       for (const k of [0.3, 0.55, 0.8]) this.line(ctx, [along(E, Wr, k, rf0 + 1), along(E, Wr, k + 0.03, -(rf0 + 1))], 1.4, this.outline, 0.7);
@@ -624,6 +630,8 @@ export class FighterPainter {
         ctx.fillStyle = this.mat(darken(pants.color2, depth), t).base;
         ctx.fill();
       }
+      if (this.marks.char && pants.type !== 'shorts') this.charCuff(ctx, K, An, rs0 + extra * 0.8, rs1 + extra * (loose ? 1.2 : 0.4), 0.92, 12, back ? 7 : 8);
+      else if (this.marks.char) this.charCuff(ctx, Hp, along(Hp, K, 0.5), rt0 + 2.5, rt0 + 1.5, 0.95, 9, back ? 7 : 8);
       if (shoes.type === 'boots') {
         const b0 = along(K, An, 0.55);
         ctx.beginPath();
@@ -787,6 +795,12 @@ export class FighterPainter {
     this.drawTopDetails(ctx, F, J, top);
     if (!skinTop) this.drawDrape(ctx, F, J, A, baseC);
     if (this.clawMarks) this.drawClawMarks(ctx, F);
+    if (this.marks.soles) this.drawBootPrints(ctx, F, this.marks.soles, baseC);
+    if (this.marks.char) {
+      // the shirt's hem burnt to a ragged edge just above the belt
+      const { W, uS, fS, ww } = F;
+      this.charBand(ctx, P2(W, uS, -3, fS, ww * 1.4), P2(W, uS, -3, fS, -ww * 1.4), uS, 16, 1);
+    }
     this.drawBelt(ctx, F);
     // cast shadows: the head on the upper chest, the near arm across the body
     const R = this.pr.headR;
@@ -798,6 +812,141 @@ export class FighterPainter {
     smoothClosed(ctx, pts, 0.55);
     this.shadeAcross(ctx, P2(F.W, F.fS, F.cw * 1.1, F.uS, 10), P2(F.W, F.fS, -F.cw * 1.05, F.uS, -6));
     ctx.restore();
+    if (this.marks.collar) this.drawCrookedCollar(ctx, F, top);
+  }
+
+  /**
+   * Burnt edge (Cinder's super): a ragged charred band along the edge a->b, eaten `depth` into the
+   * cloth in direction `inn`, with glowing ember rims and a couple of burn holes.
+   */
+  charBand(ctx, a, b, inn, depth, seed) {
+    const n = 12;
+    const h = (i) => Math.abs(Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453) % 1;
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const k = i / n, d = depth * (i % 2 ? 0.25 + 0.35 * h(i) : 0.6 + 0.4 * h(i + 17));
+      pts.push({ x: a.x + (b.x - a.x) * k + inn.x * d, y: a.y + (b.y - a.y) * k + inn.y * d });
+    }
+    ctx.beginPath();
+    ctx.moveTo(a.x - inn.x * 4, a.y - inn.y * 4);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(b.x - inn.x * 4, b.y - inn.y * 4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(24,16,14,0.88)';
+    ctx.fill();
+    // soot fading into the cloth above the burnt edge
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    for (let i = n; i >= 0; i--) ctx.lineTo(pts[i].x + inn.x * depth * 0.7, pts[i].y + inn.y * depth * 0.7);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(30,20,18,0.28)';
+    ctx.fill();
+    // glowing ember rim
+    const glow = 0.45 + 0.25 * Math.sin(this.time * 5 + seed);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = `rgba(255,120,40,${glow})`;
+    ctx.stroke();
+    // burn holes
+    for (const k of [0.3, 0.7]) {
+      const c = { x: a.x + (b.x - a.x) * k + inn.x * depth * 1.25, y: a.y + (b.y - a.y) * k + inn.y * depth * 1.25 };
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 2.6, 1.8, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(20,12,12,0.85)';
+      ctx.fill();
+      ctx.lineWidth = 0.9;
+      ctx.strokeStyle = `rgba(255,140,50,${glow})`;
+      ctx.stroke();
+    }
+  }
+
+  /** Charred end of a sleeve / trouser leg: clipped to the limb a->b (radii r0, r1), edge at t. */
+  charCuff(ctx, a, b, r0, r1, t, depth, seed) {
+    ctx.save();
+    ctx.beginPath();
+    limbPath(ctx, a, b, r0, r1);
+    ctx.clip();
+    const r = r0 + (r1 - r0) * t + 2;
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const inn = { x: (a.x - b.x) / L, y: (a.y - b.y) / L };
+    this.charBand(ctx, along(a, b, t, r), along(a, b, t, -r), inn, depth, seed);
+    ctx.restore();
+  }
+
+  /** Dusty boot-sole prints on the torso (Roxy's super), one per kick that landed (up to three). */
+  drawBootPrints(ctx, F, n, cloth) {
+    // dusty prints: dark on light cloth, pale dust on dark cloth
+    const v = parseInt(cloth.slice(1, 3), 16) * 0.3 + parseInt(cloth.slice(3, 5), 16) * 0.59 + parseInt(cloth.slice(5, 7), 16) * 0.11;
+    const ink = v > 110 ? 'rgba(40,28,34,0.45)' : 'rgba(214,200,190,0.42)';
+    const groove = v > 110 ? 'rgba(255,255,255,0.13)' : 'rgba(20,12,16,0.3)';
+    const { W, uS, fS, up, cw } = F;
+    const spots = [
+      { c: P2(W, uS, up * 0.55, fS, cw * 0.25), a: 0.5 },
+      { c: P2(W, uS, up * 0.25, fS, -cw * 0.15), a: -0.6 },
+      { c: P2(W, uS, up * 0.8, fS, -cw * 0.3), a: 1.4 },
+    ];
+    const len = cw * 0.62, wid = len * 0.38;
+    for (let i = 0; i < Math.min(3, n); i++) {
+      const s = spots[i], ca = Math.cos(s.a), sa = Math.sin(s.a);
+      const u = { x: uS.x * ca - uS.y * sa, y: uS.x * sa + uS.y * ca }; // toe direction
+      const v = { x: -u.y, y: u.x };
+      const at = (x, y) => ({ x: s.c.x + u.x * y * len + v.x * x * wid, y: s.c.y + u.y * y * len + v.y * x * wid });
+      // ball of the foot + toe
+      ctx.beginPath();
+      smoothClosed(ctx, [at(-0.45, 0.05), at(-0.5, 0.35), at(-0.25, 0.5), at(0.2, 0.5), at(0.5, 0.32), at(0.42, 0.02), at(0.0, -0.06)], 0.45);
+      ctx.fillStyle = ink;
+      ctx.fill();
+      // heel
+      ctx.beginPath();
+      smoothClosed(ctx, [at(-0.38, -0.22), at(0.36, -0.22), at(0.34, -0.5), at(-0.36, -0.5)], 0.3);
+      ctx.fill();
+      // tread grooves
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = groove;
+      for (const y of [0.12, 0.24, 0.36, -0.3, -0.42]) {
+        ctx.beginPath();
+        const p = at(-0.42, y), q = at(0.42, y + 0.03);
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  /** Vellaro's super grabs the collar: it ends up crooked, one wing flipped up, the other twisted. */
+  drawCrookedCollar(ctx, F, top) {
+    const { N, uC, fC } = F;
+    const rn = this.pr.rNeck;
+    // the collar in the outfit's accent colour so it reads against the body
+    const c = this.mat(top.color2 || lighten(top.color || '#d8d0c0', 0.25), this.tint);
+    const wing = (pts) => {
+      ctx.beginPath();
+      smoothClosed(ctx, pts, 0.25);
+      ctx.fillStyle = c.base;
+      ctx.fill();
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = this.outline;
+      ctx.stroke();
+    };
+    // band around the neck, pulled askew
+    ctx.beginPath();
+    ctx.moveTo(P2(N, fC, -rn * 1.15, uC, 6).x, P2(N, fC, -rn * 1.15, uC, 6).y);
+    ctx.quadraticCurveTo(P2(N, fC, 0, uC, 2).x, P2(N, fC, 0, uC, 2).y, P2(N, fC, rn * 1.25, uC, -5).x, P2(N, fC, rn * 1.25, uC, -5).y);
+    ctx.lineWidth = 6.5;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = c.base;
+    ctx.stroke();
+    // front wing flipped up against the jaw, back wing twisted down
+    wing([P2(N, fC, rn * 0.5, uC, -5), P2(N, fC, rn * 2.6, uC, 9), P2(N, fC, rn * 1.7, uC, -4), P2(N, fC, rn * 1.5, uC, -12)]);
+    wing([P2(N, fC, -rn * 0.4, uC, 3), P2(N, fC, -rn * 0.1, uC, -19), P2(N, fC, -rn * 2.0, uC, -13), P2(N, fC, -rn * 1.4, uC, 2)]);
+    // crumple lines
+    this.line(ctx, [P2(N, fC, rn * 0.9, uC, -1), P2(N, fC, rn * 1.6, uC, 2)], 1, this.outline, 0.45);
+    this.line(ctx, [P2(N, fC, -rn * 0.6, uC, -4), P2(N, fC, -rn * 1.1, uC, -9)], 1, this.outline, 0.45);
   }
 
   /**
@@ -1463,11 +1612,56 @@ export class FighterPainter {
     this.drawEars(ctx, 'fill', R, weasel);
     if (masked) this.drawMask(ctx, R);
     else this.drawFace(ctx, R, opts, weasel);
+    if (masked && this.marks.shiner) this.drawShiner(ctx, R, 0.6 * R, 0.17 * R, 0.27 * R);
     this.drawHair(ctx, R);
+    if (this.marks.bump) {
+      // Bruno's pan: a cartoon bump on the crown; hats and hoods sit on top of it
+      this.drawBump(ctx, R);
+      ctx.translate(0, 0.34 * R);
+    }
     if (lk.hat) this.drawHat(ctx, R);
     if (lk.hood?.bear) this.drawBearHood(ctx, R);
     ctx.restore();
     if (lk.headphones) this.drawHeadphones(ctx, J, A);
+  }
+
+  drawBump(ctx, R) {
+    const cx = 0.08 * R, cy = 1.06 * R;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 0.44 * R, 0.4 * R, -0.1, Math.PI * 1.05, Math.PI * 1.95, true);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(cx, cy + 0.1 * R, 0, cx, cy, 0.46 * R);
+    g.addColorStop(0, mix(this.skin.base, '#ff6a7a', 0.45));
+    g.addColorStop(1, mix(this.skin.base, '#c84a5a', 0.15));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = this.outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx - 0.1 * R, cy + 0.22 * R, 0.1 * R, 0.06 * R, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fill();
+  }
+
+  /** Brick's super: a huge black eye, swollen shut for the rest of the round. */
+  drawShiner(ctx, R, ex, ey, ew) {
+    const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, ew * 1.8);
+    g.addColorStop(0, 'rgba(70,24,96,0.95)');
+    g.addColorStop(0.6, 'rgba(84,40,120,0.85)');
+    g.addColorStop(0.85, 'rgba(58,90,168,0.45)');
+    g.addColorStop(1, 'rgba(58,90,168,0)');
+    ctx.beginPath();
+    ctx.ellipse(ex - 0.02 * R, ey + 0.01 * R, ew * 1.75, ew * 1.35, 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    // puffy lids pressed together
+    ctx.beginPath();
+    ctx.ellipse(ex, ey + 0.06 * R, ew * 1.05, ew * 0.55, 0.05, Math.PI, 0, true);
+    ctx.fillStyle = 'rgba(110,56,140,0.9)';
+    ctx.fill();
+    this.line(ctx, [{ x: ex - ew * 1.05, y: ey + 0.06 * R }, { x: ex, y: ey + 0.02 * R }, { x: ex + ew, y: ey + 0.07 * R }], 2.6, this.outline);
+    this.line(ctx, [{ x: ex - ew * 0.6, y: ey + 0.2 * R }, { x: ex + ew * 0.4, y: ey + 0.22 * R }], 1.4, 'rgba(255,255,255,0.35)');
   }
 
   headShade(ctx, R) {
@@ -1606,7 +1800,7 @@ export class FighterPainter {
     let lid = typeof opts.blink === 'number' ? opts.blink : opts.blink ? 1 : 0;
     if (xp === 'attack' || xp === 'strain') lid = Math.max(lid, 0.42);
     else if (xp === 'shout') lid = Math.max(lid, 0.22);
-    const eyeMode = lk.eyesClosed ? 'closed' : hurt ? 'squeeze' : xp === 'ko' ? 'x' : xp === 'dizzy' ? 'spiral' : xp === 'happy' ? 'happy' : lid > 0.85 ? 'closed' : 'open';
+    const eyeMode = this.marks.shiner ? 'shiner' : lk.eyesClosed ? 'closed' : hurt ? 'squeeze' : xp === 'ko' ? 'x' : xp === 'dizzy' ? 'spiral' : xp === 'happy' ? 'happy' : lid > 0.85 ? 'closed' : 'open';
     const ex = weasel ? 0.66 * R : 0.6 * R, ey = weasel ? 0.3 * R : 0.17 * R;
     const ew = 0.27 * R;
     // eye socket shadow
@@ -1627,7 +1821,9 @@ export class FighterPainter {
       this.line(ctx, [{ x: ex - ew * 0.6, y: ey + 0.42 * R }, { x: ex + ew * 0.1, y: ey + 0.36 * R }], 2, '#b0202a', 0.9);
       this.line(ctx, [{ x: ex - ew * 0.35, y: ey + 0.37 * R }, { x: ex - ew * 0.3, y: ey + 0.3 * R }], 1.4, '#b0202a', 0.8);
     }
-    if (eyeMode === 'closed') {
+    if (eyeMode === 'shiner') {
+      this.drawShiner(ctx, R, ex, ey, ew);
+    } else if (eyeMode === 'closed') {
       this.line(ctx, [{ x: ex - ew, y: ey + 0.03 * R }, { x: ex, y: ey - 0.07 * R }, { x: ex + ew * 0.9, y: ey + 0.03 * R }], 2.6, outl);
     } else if (eyeMode === 'squeeze') {
       // squeezed shut, pointing at the nose, with pain wrinkles
