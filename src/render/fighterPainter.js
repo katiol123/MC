@@ -238,6 +238,7 @@ export class FighterPainter {
     this.prop = opts.prop || null;
     this.fire = !!opts.fire;
     this.claws = !!opts.claws;
+    this.clawMarks = opts.clawMarks || 0;
     this.flurry = !!opts.flurry;
     this.time = (opts.now || 0) / 1000;
     const t = this.tint;
@@ -785,6 +786,7 @@ export class FighterPainter {
     ctx.clip();
     this.drawTopDetails(ctx, F, J, top);
     if (!skinTop) this.drawDrape(ctx, F, J, A, baseC);
+    if (this.clawMarks) this.drawClawMarks(ctx, F);
     this.drawBelt(ctx, F);
     // cast shadows: the head on the upper chest, the near arm across the body
     const R = this.pr.headR;
@@ -796,6 +798,57 @@ export class FighterPainter {
     smoothClosed(ctx, pts, 0.55);
     this.shadeAcross(ctx, P2(F.W, F.fS, F.cw * 1.1, F.uS, 10), P2(F.W, F.fS, -F.cw * 1.05, F.uS, -6));
     ctx.restore();
+  }
+
+  /**
+   * Claw scratches across the torso (Grizz's super): sets of three parallel red slashes, one set per
+   * claw hit (up to three), alternating diagonals like the paws that made them. Torso-relative, so
+   * they move with the body; the torso is clipped, so they never spill past it.
+   */
+  drawClawMarks(ctx, F) {
+    const { W, uS, fS, up, cw } = F;
+    const sets = [
+      { c: P2(W, uS, up * 0.55, fS, cw * 0.15), d: { u: -0.75, f: 0.66 }, len: 1.0 },
+      { c: P2(W, uS, up * 0.38, fS, cw * 0.05), d: { u: -0.7, f: -0.72 }, len: 0.9 },
+      { c: P2(W, uS, up * 0.2, fS, cw * 0.35), d: { u: -0.82, f: 0.58 }, len: 0.75 },
+    ];
+    for (let i = 0; i < Math.min(3, this.clawMarks); i++) {
+      const s = sets[i];
+      const dx = uS.x * s.d.u + fS.x * s.d.f, dy = uS.y * s.d.u + fS.y * s.d.f;
+      const nx = -dy, ny = dx; // across the slash: spacing between the three claws
+      const half = cw * 0.75 * s.len;
+      for (let k = -1; k <= 1; k++) {
+        const o = k * cw * 0.2, l = half * (1 - Math.abs(k) * 0.15);
+        const sh = k * cw * 0.06; // the middle claw reaches a little further
+        const a = { x: s.c.x + nx * o - dx * (l - sh), y: s.c.y + ny * o - dy * (l - sh) };
+        const b = { x: s.c.x + nx * o + dx * (l + sh), y: s.c.y + ny * o + dy * (l + sh) };
+        this.scratch(ctx, a, b, 3.2);
+      }
+    }
+  }
+
+  /** One tapered slash from a to b: dark red edge, red cut, a pale highlight along it. */
+  scratch(ctx, a, b, w) {
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L;
+    const lens = (ww) => {
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo((a.x + b.x) / 2 + nx * ww, (a.y + b.y) / 2 + ny * ww, b.x, b.y);
+      ctx.quadraticCurveTo((a.x + b.x) / 2 - nx * ww, (a.y + b.y) / 2 - ny * ww, a.x, a.y);
+    };
+    lens(w + 1.4);
+    ctx.fillStyle = 'rgba(70,6,18,0.75)';
+    ctx.fill();
+    lens(w);
+    ctx.fillStyle = '#d0203a';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(a.x + dx * 0.2 + nx * w * 0.35, a.y + dy * 0.2 + ny * w * 0.35);
+    ctx.lineTo(a.x + dx * 0.7 + nx * w * 0.35, a.y + dy * 0.7 + ny * w * 0.35);
+    ctx.lineWidth = 0.9;
+    ctx.strokeStyle = 'rgba(255,170,180,0.7)';
+    ctx.stroke();
   }
 
   /** Shirt / jacket drape: folds from the armpit and creases on the inside of the waist bend. */

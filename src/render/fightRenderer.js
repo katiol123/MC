@@ -196,6 +196,7 @@ export class FightRenderer {
       claws,
       flurry,
       critical: f.critical,
+      clawMarks: f.clawMarks || 0,
       now,
       layers: f.anim.layers,
       tint: fx.tint ? fx.tint : f.flash > 0 ? 0.6 * (f.flash / 6) : 0,

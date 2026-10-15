@@ -53,6 +53,7 @@ export class Fighter {
     this.superLock = 0; // after a super, meter cannot grow for a while (anti-spam)
     this.throwProtect = 0;
     this.burn = 0; // ticks left on fire
+    this.clawMarks = 0; // claw scratches left on the body by Grizz's super (cosmetic, until the round ends)
     this.pulled = null; // being reeled in by a pull
     this.focus = 0; // ticks of Focus left (+damage)
     this.finishable = false; // losing this round loses the match: a lethal hit leaves them dazed (FINISH HIM)
@@ -582,6 +583,7 @@ export class Fighter {
     this.health = Math.max(0, this.health - damage);
     this.stun += m.stun * (counter ? 1.25 : 1);
     this.sinceHit = 0;
+    if (att.move?.def?.claws) this.clawMarks = Math.min(3, this.clawMarks + 1);
     if (this.state === 'dizzy') this.stun = 0;
     else if (this.stun >= this.stats.stunMax) this.dizzyPending = true;
 
