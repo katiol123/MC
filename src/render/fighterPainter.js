@@ -1774,17 +1774,7 @@ export class FighterPainter {
     // Back-of-head items (hat brim back half, collars) are drawn with the head.
     if (lk.hair?.style === 'pompadour' || lk.hair?.style === 'swept' || lk.hair?.style === 'spiky') this.drawHairBack(ctx, pass, R);
     if (lk.hat?.type === 'sombrero') this.drawSombrero(ctx, pass, R, 'back');
-    if (lk.hood) {
-      ctx.beginPath();
-      smoothClosed(ctx, [{ x: 0.75 * R, y: 1.25 * R }, { x: -0.2 * R, y: 1.45 * R }, { x: -1.3 * R, y: 0.6 * R }, { x: -1.4 * R, y: -1.1 * R }, { x: -0.4 * R, y: -1.5 * R }, { x: 0.1 * R, y: -0.4 * R }], 0.4);
-      if (pass === 'outline') this.outlineFill(ctx);
-      else {
-        ctx.fillStyle = this.mat(lk.hood.color, t).base;
-        ctx.fill();
-        this.shadeAcross(ctx, { x: 0.5 * R, y: R }, { x: -1.3 * R, y: -R });
-        this.line(ctx, [{ x: 0.7 * R, y: 1.2 * R }, { x: -0.1 * R, y: 1.32 * R }, { x: -1.1 * R, y: 0.6 * R }], 3, this.mat(lk.hood.lining, t).base);
-      }
-    }
+    if (lk.hood) this.drawHoodBack(ctx, pass, R);
 
     // Skull + face as one silhouette: both sub-paths share the same winding so the union fills cleanly.
     const croc = lk.species === 'croc';
@@ -2098,6 +2088,99 @@ export class FighterPainter {
     ctx.stroke();
     ctx.restore();
     ctx.restore();
+  }
+
+  /**
+   * Draws a worn item on its own, centred on the origin, exactly as it looks on the fighter (same
+   * drawing code, the fighter's undamaged look, no hit flash). Used for items knocked off at low
+   * health. Returns false for items without a matching worn drawing.
+   */
+  drawDetached(ctx, type) {
+    const saved = { look: this.look, tint: this.tint, tintColor: this.tintColor, outline: this.outline, Lh: this.Lh };
+    this.look = this.lookBase;
+    this.tint = 0;
+    this.tintColor = '#ffffff';
+    this.outline = this.look.outline || '#141014';
+    this.L = this.L || { x: 0.45, y: 0.89 };
+    this.rimC = this.rimC || this.look.rim || '#ff4fd8';
+    this.Lh = this.L;
+    const lk = this.look, R = this.pr.headR;
+    let ok = true;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    switch (type) {
+      case 'tophat':
+      case 'chefhat':
+        if (!lk.hat) { ok = false; break; }
+        ctx.translate(0, -1.45 * R);
+        this.drawHat(ctx, R);
+        break;
+      case 'cap':
+        if (!lk.hat) { ok = false; break; }
+        ctx.translate(-0.1 * R, -1.0 * R);
+        this.drawHat(ctx, R);
+        break;
+      case 'sombrero':
+        if (!lk.hat) { ok = false; break; }
+        ctx.translate(0, -1.1 * R);
+        this.drawSombrero(ctx, 'outline', R, 'back');
+        this.drawSombrero(ctx, 'fill', R, 'back');
+        this.drawSombrero(ctx, 'fill', R, 'front');
+        break;
+      case 'mask': {
+        if (!lk.mask) { ok = false; break; }
+        // the mask is the whole face silhouette in mask colour plus its markings
+        this.headPath(ctx, R);
+        this.outlineFill(ctx);
+        this.headPath(ctx, R);
+        ctx.fillStyle = this.mat(lk.mask.color, 0).base;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        this.headShade(ctx, R);
+        ctx.restore();
+        this.drawMask(ctx, R);
+        break;
+      }
+      case 'bearhood':
+        if (!lk.hood) { ok = false; break; }
+        ctx.translate(0.2 * R, 0);
+        this.drawHoodBack(ctx, 'outline', R);
+        this.drawHoodBack(ctx, 'fill', R);
+        this.drawBearHood(ctx, R);
+        break;
+      case 'feather': {
+        const hat = lk.hat;
+        if (!hat || hat.type !== 'feathers') { ok = false; break; }
+        this.drawFeather(ctx, R, R * 1.9, this.mat(hat.color, 0).base, this.mat(hat.tip, 0).base);
+        break;
+      }
+      case 'headphones':
+        if (!lk.headphones) { ok = false; break; }
+        this.drawHeadphonesAt(ctx, { x: -2, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 });
+        break;
+      default:
+        ok = false;
+    }
+    ctx.restore();
+    Object.assign(this, saved);
+    return ok;
+  }
+
+  /** The standard (human) skull + face silhouette in head space. */
+  headPath(ctx, R) {
+    const facePts = [{ x: -0.4, y: -0.45 }, { x: 0.15, y: -0.95 }, { x: 0.6, y: -1.0 }, { x: 0.88, y: -0.72 }, { x: 1.0, y: -0.36 }, { x: 1.06, y: -0.12 },
+      { x: 1.18, y: 0.04 }, { x: 1.02, y: 0.26 }, { x: 0.96, y: 0.52 }, { x: 0.6, y: 0.85 }, { x: -0.2, y: 0.5 }];
+    let area = 0;
+    for (let i = 0; i < facePts.length; i++) {
+      const p = facePts[i], q = facePts[(i + 1) % facePts.length];
+      area += p.x * q.y - q.x * p.y;
+    }
+    const pts = (area < 0 ? facePts.slice().reverse() : facePts).map((p) => ({ x: p.x * R, y: p.y * R }));
+    ctx.beginPath();
+    ctx.ellipse(-0.06 * R, 0.08 * R, 0.98 * R, 1.04 * R, 0, 0, Math.PI * 2);
+    smoothClosed(ctx, pts, 0.45);
   }
 
   drawBump(ctx, R) {
@@ -2763,6 +2846,36 @@ export class FighterPainter {
   }
 
   /** Feather headdress: a fan of feathers over the crown, a patterned headband and a gold disc. */
+  /** One headdress feather centred on the origin along +x. */
+  drawFeather(ctx, R, L, quill, tip) {
+    const outl = this.outline;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, L * 0.5, 0.24 * R, 0, 0, Math.PI * 2);
+    ctx.fillStyle = quill;
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = outl;
+    ctx.stroke();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = tip;
+    ctx.fillRect(L * 0.12, -R, L, 2 * R);
+    ctx.restore();
+    this.line(ctx, [{ x: -L * 0.5, y: 0 }, { x: L * 0.42, y: 0 }], 1, outl, 0.5);
+  }
+
+  /** Back panel of a hood (behind the skull), with its lining. */
+  drawHoodBack(ctx, pass, R) {
+    const lk = this.look, t = this.tint;
+    ctx.beginPath();
+    smoothClosed(ctx, [{ x: 0.75 * R, y: 1.25 * R }, { x: -0.2 * R, y: 1.45 * R }, { x: -1.3 * R, y: 0.6 * R }, { x: -1.4 * R, y: -1.1 * R }, { x: -0.4 * R, y: -1.5 * R }, { x: 0.1 * R, y: -0.4 * R }], 0.4);
+    if (pass === 'outline') return this.outlineFill(ctx);
+    ctx.fillStyle = this.mat(lk.hood.color, t).base;
+    ctx.fill();
+    this.shadeAcross(ctx, { x: 0.5 * R, y: R }, { x: -1.3 * R, y: -R });
+    this.line(ctx, [{ x: 0.7 * R, y: 1.2 * R }, { x: -0.1 * R, y: 1.32 * R }, { x: -1.1 * R, y: 0.6 * R }], 3, this.mat(lk.hood.lining, t).base);
+  }
+
   drawFeathers(ctx, R, hat) {
     const t = this.tint, outl = this.outline;
     const quill = this.mat(hat.color, t).base, tip = this.mat(hat.tip, t).base;
@@ -2776,19 +2889,7 @@ export class FighterPainter {
       ctx.save();
       ctx.translate(mx, my);
       ctx.rotate(a);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, L * 0.5, 0.24 * R, 0, 0, Math.PI * 2);
-      ctx.fillStyle = quill;
-      ctx.fill();
-      ctx.lineWidth = 1.6;
-      ctx.strokeStyle = outl;
-      ctx.stroke();
-      ctx.save();
-      ctx.clip();
-      ctx.fillStyle = tip;
-      ctx.fillRect(L * 0.12, -R, L, 2 * R);
-      ctx.restore();
-      this.line(ctx, [{ x: -L * 0.5, y: 0 }, { x: L * 0.42, y: 0 }], 1, outl, 0.5);
+      this.drawFeather(ctx, R, L, quill, tip);
       ctx.restore();
     }
     // headband
@@ -2944,9 +3045,12 @@ export class FighterPainter {
   }
 
   drawHeadphones(ctx, J, A) {
+    const uC = dirUp(A.chest);
+    this.drawHeadphonesAt(ctx, J.neck, uC, fwdOf(uC));
+  }
+
+  drawHeadphonesAt(ctx, N, uC, fC) {
     const c = this.mat(this.look.headphones, this.tint).base;
-    const N = J.neck;
-    const uC = dirUp(A.chest), fC = fwdOf(uC);
     const band = [P2(N, fC, -10, uC, 6), P2(N, fC, 2, uC, -6), P2(N, fC, 14, uC, 2)];
     this.line(ctx, band, 4.5, this.outline);
     this.line(ctx, band, 2.6, '#3fd2c2');

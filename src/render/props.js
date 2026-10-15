@@ -172,9 +172,16 @@ const DRAW = {
 /** Light props flutter down (feathers), heavy ones fall and bounce. */
 const FLOAT = { feather: true, belt: true };
 
-export function spawnProp(type, x, y, dir, opt, look) {
+/** Rest height of the centre of each item on the floor (big hats sit higher than a tooth). */
+const FLOOR = { tophat: 18, chefhat: 18, cap: 12, sombrero: 8, mask: 16, bearhood: 20, headphones: 10 };
+
+/**
+ * painter (optional): the owner's FighterPainter; when given, the item is drawn with the same code as
+ * on the fighter (painter.drawDetached) so it looks exactly like it did when worn.
+ */
+export function spawnProp(type, x, y, dir, opt, look, painter = null) {
   return {
-    kind: 'prop', type, look, x, y,
+    kind: 'prop', type, look, x, y, painter, facing: dir, floorY: FLOOR[type] ?? 8,
     vx: dir * (opt.vx ?? 2), vy: opt.vy ?? 8, rot: 0, vrot: dir * (opt.spin ?? 0.2),
     life: 600, max: 600, float: !!FLOAT[type], t: Math.random() * 6,
   };
@@ -194,7 +201,7 @@ export function stepProp(p) {
     p.rot += p.vrot;
   }
   p.y += p.vy;
-  const floor = p.float ? 3 : 8;
+  const floor = p.float ? 3 : p.floorY ?? 8;
   if (p.y <= floor) {
     p.y = floor;
     if (p.float) { p.vy = 0; p.vx = 0; p.rot = 1.45; p.float = false; p.vrot = 0; }
@@ -211,6 +218,12 @@ export function drawProp(ctx, p, s, zoom) {
   ctx.scale(zoom, -zoom);
   ctx.rotate(p.rot);
   ctx.lineJoin = 'round';
+  if (p.painter) {
+    // the worn item itself, facing the way its owner faced
+    ctx.scale(p.facing < 0 ? -1 : 1, 1);
+    if (p.painter.drawDetached(ctx, p.type)) { ctx.restore(); return; }
+    ctx.scale(p.facing < 0 ? -1 : 1, 1);
+  }
   (DRAW[p.type] || DRAW.tooth)(ctx, p.look || {});
   ctx.restore();
 }

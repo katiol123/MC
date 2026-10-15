@@ -163,7 +163,7 @@ export class Effects {
         this.shake = Math.max(this.shake, 5);
         for (const pr of dmg?.props || []) {
           const from = pr.from === 'chest' ? { x: e.x - e.facing * 14, y: e.y - 70 } : pr.from === 'mouth' ? { x: e.x + e.facing * 16, y: e.y - 10 } : { x: e.x, y: e.y + 18 };
-          this.parts.push(spawnProp(pr.type, from.x, from.y, e.facing, pr, f.def.look));
+          this.parts.push(spawnProp(pr.type, from.x, from.y, e.facing, pr, f.def.look, this.painters?.[e.who]));
         }
         break;
       }

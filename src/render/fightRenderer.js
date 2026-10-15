@@ -65,6 +65,7 @@ export class FightRenderer {
     this.painters = match.fighters.map((f) => new FighterPainter(f.def));
     this.secondary = match.fighters.map((f) => new SecondaryMotion(f.def));
     this.effects = new Effects();
+    this.effects.painters = this.painters; // knocked-off items are drawn by their owner's painter
     this.trails = new Trails();
     this.cam = new Camera();
     this.cam.snap(match.fighters);
