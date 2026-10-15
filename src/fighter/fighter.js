@@ -29,6 +29,8 @@ export class Fighter {
     this.input = new InputBuffer();
     this.anim = new Animator(this.props);
     this.maxHealth = def.stats.health;
+    // MOBILITY also means agility: quicker landings and wake-ups (1 = roster average)
+    this.agility = def.stats.agility ?? 1;
     this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
     this.spawnProjectile = null; // set by the match
@@ -245,7 +247,8 @@ export class Fighter {
         return; // ballistic; landing handled in onLand
       case 'knockdown':
         if (this.stateFrame >= this.sd.duration) {
-          this.setState('getup', { duration: TUNING.getupFrames }, 'getup', { blend: 4, params: { duration: TUNING.getupFrames } });
+          const gu = Math.round(TUNING.getupFrames / this.agility);
+          this.setState('getup', { duration: gu }, 'getup', { blend: 4, params: { duration: gu } });
         }
         return;
       case 'getup':
@@ -506,16 +509,17 @@ export class Fighter {
     const s = this.state;
     this.emit({ type: 'land', who: this.index, x: this.body.x, heavy: s === 'juggle' || s === 'ko' });
     if (s === 'jump') {
-      this.setState('land', { duration: TUNING.landingFrames }, 'land', { blend: 4, params: { duration: TUNING.landingFrames } });
+      const ld = Math.max(1, Math.round(TUNING.landingFrames / this.agility));
+      this.setState('land', { duration: ld }, 'land', { blend: 4, params: { duration: ld } });
     } else if (s === 'attack') {
       const m = this.move.def;
-      const lock = m.landRecovery || TUNING.airAttackLandingFrames;
+      const lock = Math.round((m.landRecovery || TUNING.airAttackLandingFrames) / this.agility);
       this.move = null;
       this.setState('land', { duration: lock, locked: true }, 'land', { blend: 5, params: { duration: lock } });
     } else if (s === 'juggle') {
       if (this.sd.knockdown) {
         this.body.vx *= 0.3;
-        this.setState('knockdown', { duration: TUNING.knockdownFrames }, 'knockdown', { blend: 6 });
+        this.setState('knockdown', { duration: Math.round(TUNING.knockdownFrames / this.agility) }, 'knockdown', { blend: 6 });
       } else {
         this.setState('land', { duration: 10, locked: true }, 'land', { blend: 9, params: { duration: 10 } });
       }
@@ -531,7 +535,7 @@ export class Fighter {
   invulnerability() {
     if (this.state === 'knockdown' || this.state === 'getup' || this.state === 'intro' || this.state === 'victory') return 'all';
     if (this.state === 'ko' || this.state === 'thrown' || this.state === 'throwing') return 'all';
-    if (this.state === 'dashB' && this.stateFrame <= 5) return 'all';
+    if (this.state === 'dashB' && this.stateFrame <= Math.round(5 * this.agility)) return 'all'; // agile back dashes slip out longer
     if (this.state === 'attack' && this.move?.def.invuln) {
       const parts = new Set();
       for (const iv of this.move.def.invuln) {
@@ -563,7 +567,7 @@ export class Fighter {
     this.move = null;
     this.hitstop = hitstop;
     this.body.vx = dir * m.push.block;
-    const dur = m.blockstun;
+    const dur = Math.max(2, Math.round(m.blockstun / this.agility)); // agile fighters recover from blocking sooner
     this.setState('blockstun', { duration: dur, low }, low ? 'blockLow' : 'blockHigh', { blend: 3, params: { duration: dur } });
     if (m.isSpecial || m.chip) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
   }

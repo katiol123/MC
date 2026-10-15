@@ -658,6 +658,7 @@ const { MOVES } = __require("src/data/moves.js");
 const { SIGNATURES } = __require("src/data/signatures.js");
 const { compileMove } = __require("src/data/compileMove.js");
 const { buildProportions } = __require("src/anim/skeleton.js");
+const { ATTRIBUTES, ATTR_DEFAULTS, MOBILITY_RATIOS, AGILITY_EXP, rawAverageDamage, averageStartup, attrsFromProfile } = __require("src/data/attributes.js");
 
 const ROSTER = [
   {
@@ -667,6 +668,8 @@ const ROSTER = [
     blurb: 'Dock-yard brawler. Heavy hands, heavy grin, heavier follow-through.',
     body: { height: 1.02, bulk: 1.22, arms: 1.0, legs: 0.97, head: 1.05, torso: 1.02, shoulders: 1.2, armBulk: 1.15, waist: 1.05 },
     stats: { health: 1080, walkF: 3.0, walkB: 2.4, run: 6.4, dash: 9, jumpVY: 15.8, jumpVX: 3.8, mass: 1.15, stunMax: 680, pushW: 37 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.85, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.7, reaction: 0.4, aggression: 0.85, combo: 0.55, antiAir: 0.4, cunning: 0.0 },
     look: {
       skin: '#c88a5e', outline: '#1b1012', rim: '#ff4fd8',
       eyes: '#3fd29a', brows: 'thick', mouth: 'grin',
@@ -694,6 +697,8 @@ const ROSTER = [
     blurb: 'A gentleman thief with goggles, a sharp tie and sharper teeth. Quick and slippery.',
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.0, speed: 0.8, mobility: 0.9, health: 0.15, toughness: 0.2, reaction: 0.7, aggression: 0.35, combo: 0.45, antiAir: 0.55, cunning: 1.0 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -723,6 +728,8 @@ const ROSTER = [
     blurb: 'Tall, bald and always laughing. Long legs make his kicks reach across the street.',
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.55, speed: 0.4, mobility: 0.5, health: 0.55, toughness: 0.5, reaction: 0.45, aggression: 0.5, combo: 0.7, antiAir: 0.9, cunning: 0.4 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -751,6 +758,8 @@ const ROSTER = [
     blurb: 'Freckles, piercings and a jacket full of patches. Never stops coming forward.',
     body: { height: 0.98, bulk: 1.0, arms: 1.0, legs: 1.0, head: 1.08, torso: 0.98, shoulders: 1.04 },
     stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 590, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.4, speed: 0.7, mobility: 0.75, health: 0.35, toughness: 0.3, reaction: 0.55, aggression: 0.95, combo: 0.6, antiAir: 0.2, cunning: 0.5 },
     look: {
       skin: '#e3a27e', outline: '#1d1216', rim: '#2ee6d6',
       eyes: '#b04fd6', brows: 'angry', mouth: 'teeth', freckles: true,
@@ -778,6 +787,8 @@ const ROSTER = [
     blurb: 'Pompadour, gold earrings and a coat that costs more than your street. Punishes everything.',
     body: { height: 1.06, bulk: 0.94, arms: 1.08, legs: 1.04, head: 1.0, torso: 1.04, shoulders: 1.0 },
     stats: { health: 1020, walkF: 3.0, walkB: 2.6, run: 6.5, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.04, stunMax: 650, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.6, speed: 0.5, mobility: 0.25, health: 0.6, toughness: 0.6, reaction: 0.95, aggression: 0.25, combo: 0.55, antiAir: 0.45, cunning: 0.65 },
     look: {
       skin: '#b98256', outline: '#1a1012', rim: '#ff47d6',
       eyes: '#b34be0', brows: 'angry', mouth: 'snarl',
@@ -805,6 +816,8 @@ const ROSTER = [
     blurb: 'Street-punk kickboxer with a spiked pauldron and a bad attitude. Fastest legs in the district.',
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
     stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 560, pushW: 31 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.3, speed: 1.0, mobility: 1.0, health: 0.0, toughness: 0.0, reaction: 0.6, aggression: 1.0, combo: 0.8, antiAir: 0.0, cunning: 0.4 },
     look: {
       female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
@@ -835,6 +848,8 @@ const ROSTER = [
     blurb: 'Runs the meanest kitchen on the docks. Slow, enormous, and every hit is a cleaver.',
     body: { height: 1.08, bulk: 1.36, arms: 1.02, legs: 0.94, head: 1.02, torso: 1.06, shoulders: 1.28, armBulk: 1.2, legBulk: 1.15, waist: 1.3, hands: 1.15 },
     stats: { health: 1200, walkF: 2.5, walkB: 2.0, run: 5.6, dash: 8, jumpVY: 14.6, jumpVX: 3.4, mass: 1.4, stunMax: 810, pushW: 42 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 1.0, speed: 0.0, mobility: 0.0, health: 1.0, toughness: 1.0, reaction: 0.0, aggression: 0.6, combo: 0.4, antiAir: 0.35, cunning: 0.7 },
     look: {
       skin: '#b07a52', outline: '#141012', rim: '#ff47d6',
       eyes: '#b04fd6', brows: 'thick', mouth: 'grin',
@@ -864,6 +879,8 @@ const ROSTER = [
     blurb: 'A luchador-shaman in a golden jaguar mask. Patient, precise, and terrifyingly flexible.',
     body: { height: 1.0, bulk: 0.94, arms: 1.03, legs: 1.03, head: 1.0, torso: 1.0, shoulders: 1.0 },
     stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 610, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.55, speed: 0.6, mobility: 0.7, health: 0.45, toughness: 0.4, reaction: 0.55, aggression: 0.7, combo: 0.4, antiAir: 0.6, cunning: 0.45 },
     look: {
       skin: '#6a4430', outline: '#120c10', rim: '#ff3fd0',
       eyes: '#e6e23a', brows: 'none', mouth: 'none',
@@ -891,6 +908,8 @@ const ROSTER = [
     blurb: 'Moody street kid with fire in his fists. Keeps it caged until the bar is full, then lets it burn.',
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
     stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.7, speed: 0.65, mobility: 0.6, health: 0.2, toughness: 0.25, reaction: 0.4, aggression: 0.9, combo: 0.75, antiAir: 0.4, cunning: 0.25 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -917,6 +936,8 @@ const ROSTER = [
     blurb: 'Lost a bet, kept the bear suit. Shrugs off a punch mid-charge and mauls whoever threw it.',
     body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
     stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.8, speed: 0.2, mobility: 0.1, health: 0.9, toughness: 0.95, reaction: 0.3, aggression: 0.65, combo: 0.0, antiAir: 0.6, cunning: 0.6 },
     look: {
       skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
       eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
@@ -943,6 +964,8 @@ const ROSTER = [
     blurb: 'Thirty years of dock fights and still standing. Once he hooks you in, you stay for the whole lesson.',
     body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
     stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.75, reaction: 0.6, aggression: 0.0, combo: 0.45, antiAir: 1.0, cunning: 0.75 },
     look: {
       skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
       eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
@@ -970,6 +993,8 @@ const ROSTER = [
     blurb: 'Shaved head, wrapped fists, zero small talk. Every punch he throws he has practised ten thousand times.',
     body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
     stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.4, speed: 0.75, mobility: 0.5, health: 0.25, toughness: 0.3, reaction: 1.0, aggression: 0.5, combo: 1.0, antiAir: 0.4, cunning: 0.4 },
     look: {
       skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
       eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
@@ -1004,13 +1029,29 @@ const deepMerge = (base, over) => {
 function buildFighterDef(id, overrides = {}) {
   const src = ROSTER.find((f) => f.id === id) || ROSTER[0];
   const def = deepMerge(src, overrides);
-  const moves = {};
+  // profile (0..1 inside the calibrated ranges) -> attribute values; explicit attrs override (experiments)
+  const attrs = { ...ATTR_DEFAULTS, ...(def.profile ? attrsFromProfile(def.profile) : {}), ...(def.attrs || {}) };
   const sig = SIGNATURES[def.id] || {};
+  const raw = {};
   for (const mid of new Set([...Object.keys(MOVES), ...Object.keys(sig)])) {
     const base = MOVES[mid] ? deepMerge(MOVES[mid], sig[mid] || {}) : sig[mid];
-    moves[mid] = compileMove(mid, deepMerge(base, def.moves?.[mid] || {}));
+    raw[mid] = deepMerge(base, def.moves?.[mid] || {});
   }
-  return { ...def, moves, props: buildProportions(def.body) };
+  // ATTACK SPEED: single-strike attacks are scaled so the normals average the target start-up
+  const k = attrs.speed / averageStartup(raw);
+  for (const m of Object.values(raw)) {
+    if (m && m.startup && !m.steps && !m.super && m.type !== 'throw') m.startup = Math.max(2, Math.round(m.startup * k));
+  }
+  const moves = {};
+  for (const mid in raw) moves[mid] = compileMove(mid, raw[mid]);
+  // POWER / HEALTH / TOUGHNESS / MOBILITY become the physical stats
+  const stats = { ...def.stats, health: attrs.health, stunMax: attrs.toughness, damage: attrs.power / rawAverageDamage(raw) };
+  for (const [key, r] of Object.entries(MOBILITY_RATIOS)) stats[key] = attrs.mobility * r;
+  stats.agility = Math.pow(attrs.mobility / ATTR_DEFAULTS.mobility, AGILITY_EXP);
+  // CHARACTER: 0..1 personality read by the AI controller
+  const ai = {};
+  for (const a of ATTRIBUTES) if (a.group === 'mind') ai[a.id] = attrs[a.id] / 100;
+  return { ...def, attrs, stats, ai, moves, props: buildProportions(def.body) };
 }
 
 });
@@ -1963,6 +2004,142 @@ const aabbOverlap = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 });
+__define("src/data/attributes.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "ATTRIBUTES", { enumerable: true, get: () => ATTRIBUTES });
+  Object.defineProperty(__exports, "ATTRIBUTE_GROUPS", { enumerable: true, get: () => ATTRIBUTE_GROUPS });
+  Object.defineProperty(__exports, "ATTR_RANGES", { enumerable: true, get: () => ATTR_RANGES });
+  Object.defineProperty(__exports, "attrsFromProfile", { enumerable: true, get: () => attrsFromProfile });
+  Object.defineProperty(__exports, "ATTR_DEFAULTS", { enumerable: true, get: () => ATTR_DEFAULTS });
+  Object.defineProperty(__exports, "AGILITY_EXP", { enumerable: true, get: () => AGILITY_EXP });
+  Object.defineProperty(__exports, "MOBILITY_RATIOS", { enumerable: true, get: () => MOBILITY_RATIOS });
+  Object.defineProperty(__exports, "AI_CURVES", { enumerable: true, get: () => AI_CURVES });
+  Object.defineProperty(__exports, "NORMAL_IDS", { enumerable: true, get: () => NORMAL_IDS });
+  Object.defineProperty(__exports, "moveDamage", { enumerable: true, get: () => moveDamage });
+  Object.defineProperty(__exports, "rawAverageDamage", { enumerable: true, get: () => rawAverageDamage });
+  Object.defineProperty(__exports, "averageStartup", { enumerable: true, get: () => averageStartup });
+  Object.defineProperty(__exports, "attributeValue", { enumerable: true, get: () => attributeValue });
+  Object.defineProperty(__exports, "attributeRanges", { enumerable: true, get: () => attributeRanges });
+  Object.defineProperty(__exports, "attributeFill", { enumerable: true, get: () => attributeFill });
+// Fighter attributes: ten numbers that drive the game and are shown as bars on the select screen.
+//   BODY (always shown):        power, speed, mobility, health, toughness
+//   CHARACTER (CPU vs CPU only): reaction, aggression, combo, antiAir, cunning
+// Every bar is real: buildFighterDef derives damage, startup frames, movement, health and stun
+// resistance from the body values, and the AI controller derives its behaviour from the character
+// values. Bars are scaled between the lowest and highest value in the roster.
+//
+// The ranges (and the AI response curves in AI_CURVES) are calibrated by tools/calibrate.mjs so that
+// moving any bar by the same share of its range changes the win rate by about the same amount.
+
+const ATTRIBUTES = [
+  { id: 'power', group: 'body', label: 'POWER', hint: 'average damage per attack', fmt: (v) => v.toFixed(0) },
+  { id: 'speed', group: 'body', label: 'ATTACK SPEED', hint: 'average start-up (frames, lower is faster)', fmt: (v) => `${v.toFixed(1)}f`, lowerIsBetter: true },
+  { id: 'mobility', group: 'body', label: 'MOBILITY', hint: 'walk speed (px/s); run, dash and jump scale with it', fmt: (v) => `${Math.round(v * 60)}` },
+  { id: 'health', group: 'body', label: 'HEALTH', hint: 'hit points', fmt: (v) => v.toFixed(0) },
+  { id: 'toughness', group: 'body', label: 'TOUGHNESS', hint: 'stun needed to get dizzy', fmt: (v) => v.toFixed(0) },
+  { id: 'reaction', group: 'mind', label: 'REACTION', hint: 'how quickly the CPU sees attacks and how often it blocks', fmt: (v) => v.toFixed(0) },
+  { id: 'aggression', group: 'mind', label: 'AGGRESSION', hint: 'how much the CPU presses forward and attacks', fmt: (v) => v.toFixed(0) },
+  { id: 'combo', group: 'mind', label: 'COMBO SKILL', hint: 'chance to continue combos and punish mistakes', fmt: (v) => v.toFixed(0) },
+  { id: 'antiAir', group: 'mind', label: 'ANTI-AIR', hint: 'how reliably the CPU knocks jumpers out of the air', fmt: (v) => v.toFixed(0) },
+  { id: 'cunning', group: 'mind', label: 'CUNNING', hint: 'throws, throw escapes and well-timed specials', fmt: (v) => v.toFixed(0) },
+];
+
+const ATTRIBUTE_GROUPS = [
+  { id: 'body', label: 'BODY' },
+  { id: 'mind', label: 'CHARACTER' },
+];
+
+/**
+ * Calibrated roster ranges: [worst, best] value of every attribute. A fighter's profile (0..1 per
+ * attribute, fighters.js) places it inside the range; the weakest fighter in an attribute sits at
+ * 0, the strongest at 1. See tools/calibrate.mjs for how the ranges were chosen.
+ */
+const ATTR_RANGES = {
+  power: [77.4, 81.1], speed: [6.91, 6.29], mobility: [2.4, 4.0], health: [976, 1024], toughness: [260, 1060],
+  reaction: [10, 90], aggression: [10, 90], combo: [10, 90], antiAir: [10, 90], cunning: [10, 90],
+};
+
+/** Attribute values from a 0..1 profile. */
+function attrsFromProfile(profile = {}) {
+  const out = {};
+  for (const [id, [lo, hi]] of Object.entries(ATTR_RANGES)) {
+    const k = profile[id] ?? 0.5;
+    out[id] = lo + (hi - lo) * k;
+  }
+  return out;
+}
+
+/** Neutral values (roster middle); fighters override any of them in fighters.js `attrs`. */
+const ATTR_DEFAULTS = {
+  power: 78, speed: 6.6, mobility: 3.2, health: 1000, toughness: 640,
+  reaction: 50, aggression: 50, combo: 50, antiAir: 50, cunning: 50,
+};
+
+/** Agility (wake-up / landing speed) = (mobility / average) ^ AGILITY_EXP. */
+const AGILITY_EXP = 2;
+
+/** Movement stats as multiples of the walk speed (mobility). */
+const MOBILITY_RATIOS = { walkF: 1, walkB: 0.82, run: 2.12, dash: 3.05, jumpVX: 1.28 };
+
+/**
+ * Response curves of the CPU's character, per point (0..100) relative to the difficulty level's
+ * base value: behaviour = base * lerp(lo, hi, points / 100).
+ */
+const AI_CURVES = {
+  reaction: { reactionFrames: [1.43, 0.87], block: [0.7, 1.1] },
+  aggression: { aggression: [0.875, 1.175], think: [1.105, 0.925] },
+  combo: { combo: [0.65, 1.15], punish: [0.73, 1.17] },
+  antiAir: { antiAir: [0.0, 2.4], aaGuard: [0.05, 1.0] }, // aaGuard: absolute chance to at least block a jump-in
+  cunning: { throws: [0.1, 2.4], tech: [0.1, 2.0], signature: [0.5, 1.5] },
+};
+
+const NORMAL_IDS = ['lp', 'hp', 'lk', 'hk', 'clp', 'clk', 'chp', 'chk', 'jp', 'jk'];
+const ATTACK_IDS = [...NORMAL_IDS, 's1', 's2', 's3', 's4', 'throw'];
+
+/** Total damage one use of a move can deal (sequences sum their steps, projectiles their hits). */
+function moveDamage(m, moves = {}) {
+  if (!m) return 0;
+  if (m.steps) return m.steps.reduce((a, s) => a + (s.hit?.damage || 0), 0);
+  if (m.projectile) return (m.projectile.hit?.damage || 0) * (m.projectile.hits || 1);
+  if (m.type === 'counter' && m.followup) return moveDamage(moves[m.followup], moves);
+  return m.damage || 0;
+}
+
+/** Raw (unscaled) average damage of a fighter's attack list. */
+function rawAverageDamage(moves) {
+  const v = ATTACK_IDS.map((id) => moveDamage(moves[id], moves)).filter((d) => d > 0);
+  return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+/** Average start-up of the normal attacks. */
+function averageStartup(moves) {
+  const v = NORMAL_IDS.map((id) => moves[id]?.startup).filter((s) => s > 0);
+  return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+/** Current value of an attribute for a built fighter definition. */
+function attributeValue(def, id) {
+  return def.attrs[id];
+}
+
+/** Lowest / highest value of every attribute across the given definitions. */
+function attributeRanges(defs) {
+  const out = {};
+  for (const a of ATTRIBUTES) {
+    const v = defs.map((d) => attributeValue(d, a.id));
+    out[a.id] = { min: Math.min(...v), max: Math.max(...v) };
+  }
+  return out;
+}
+
+/** 0..1 bar fill: the best value in the roster fills the bar, the worst leaves it (nearly) empty. */
+function attributeFill(a, v, range) {
+  const span = range.max - range.min;
+  if (span <= 1e-9) return 0.5;
+  const k = (v - range.min) / span;
+  return a.lowerIsBetter ? 1 - k : k;
+}
+
+});
 __define("src/ui/dom.js", function (__exports, __require) {
   Object.defineProperty(__exports, "el", { enumerable: true, get: () => el });
   Object.defineProperty(__exports, "clearUI", { enumerable: true, get: () => clearUI });
@@ -2282,8 +2459,9 @@ class Match {
    */
   constructor(opts = {}) {
     this.opts = { roundsToWin: 2, roundTime: TUNING.roundTimeSeconds, training: false, ...opts };
-    const d1 = buildFighterDef(this.opts.p1 || 'brick');
-    const d2 = buildFighterDef(this.opts.p2 || 'jax');
+    // o1 / o2: optional definition overrides (attribute experiments, balancing tools)
+    const d1 = buildFighterDef(this.opts.p1 || 'brick', this.opts.o1);
+    const d2 = buildFighterDef(this.opts.p2 || 'jax', this.opts.o2);
     this.fighters = [
       new Fighter(d1, 0, STAGE_CENTER - START_GAP, 1),
       new Fighter(d2, 1, STAGE_CENTER + START_GAP, -1),
@@ -2621,6 +2799,8 @@ class Fighter {
     this.input = new InputBuffer();
     this.anim = new Animator(this.props);
     this.maxHealth = def.stats.health;
+    // MOBILITY also means agility: quicker landings and wake-ups (1 = roster average)
+    this.agility = def.stats.agility ?? 1;
     this.meter = 0; // super meter (0..100), kept between rounds
     this.emit = () => {};
     this.spawnProjectile = null; // set by the match
@@ -2837,7 +3017,8 @@ class Fighter {
         return; // ballistic; landing handled in onLand
       case 'knockdown':
         if (this.stateFrame >= this.sd.duration) {
-          this.setState('getup', { duration: TUNING.getupFrames }, 'getup', { blend: 4, params: { duration: TUNING.getupFrames } });
+          const gu = Math.round(TUNING.getupFrames / this.agility);
+          this.setState('getup', { duration: gu }, 'getup', { blend: 4, params: { duration: gu } });
         }
         return;
       case 'getup':
@@ -3098,16 +3279,17 @@ class Fighter {
     const s = this.state;
     this.emit({ type: 'land', who: this.index, x: this.body.x, heavy: s === 'juggle' || s === 'ko' });
     if (s === 'jump') {
-      this.setState('land', { duration: TUNING.landingFrames }, 'land', { blend: 4, params: { duration: TUNING.landingFrames } });
+      const ld = Math.max(1, Math.round(TUNING.landingFrames / this.agility));
+      this.setState('land', { duration: ld }, 'land', { blend: 4, params: { duration: ld } });
     } else if (s === 'attack') {
       const m = this.move.def;
-      const lock = m.landRecovery || TUNING.airAttackLandingFrames;
+      const lock = Math.round((m.landRecovery || TUNING.airAttackLandingFrames) / this.agility);
       this.move = null;
       this.setState('land', { duration: lock, locked: true }, 'land', { blend: 5, params: { duration: lock } });
     } else if (s === 'juggle') {
       if (this.sd.knockdown) {
         this.body.vx *= 0.3;
-        this.setState('knockdown', { duration: TUNING.knockdownFrames }, 'knockdown', { blend: 6 });
+        this.setState('knockdown', { duration: Math.round(TUNING.knockdownFrames / this.agility) }, 'knockdown', { blend: 6 });
       } else {
         this.setState('land', { duration: 10, locked: true }, 'land', { blend: 9, params: { duration: 10 } });
       }
@@ -3123,7 +3305,7 @@ class Fighter {
   invulnerability() {
     if (this.state === 'knockdown' || this.state === 'getup' || this.state === 'intro' || this.state === 'victory') return 'all';
     if (this.state === 'ko' || this.state === 'thrown' || this.state === 'throwing') return 'all';
-    if (this.state === 'dashB' && this.stateFrame <= 5) return 'all';
+    if (this.state === 'dashB' && this.stateFrame <= Math.round(5 * this.agility)) return 'all'; // agile back dashes slip out longer
     if (this.state === 'attack' && this.move?.def.invuln) {
       const parts = new Set();
       for (const iv of this.move.def.invuln) {
@@ -3155,7 +3337,7 @@ class Fighter {
     this.move = null;
     this.hitstop = hitstop;
     this.body.vx = dir * m.push.block;
-    const dur = m.blockstun;
+    const dur = Math.max(2, Math.round(m.blockstun / this.agility)); // agile fighters recover from blocking sooner
     this.setState('blockstun', { duration: dur, low }, low ? 'blockLow' : 'blockHigh', { blend: 3, params: { duration: dur } });
     if (m.isSpecial || m.chip) this.health = Math.max(this.health - Math.round(m.damage * TUNING.chipDamage), 0);
   }
@@ -9579,6 +9761,7 @@ __define("src/ai/aiController.js", function (__exports, __require) {
 // anti-airs, whiff punishes and short cancel combos executed as input macros (incl. motions).
 const { Rng } = __require("src/core/rng.js");
 const { emptyRaw } = __require("src/input/inputBuffer.js");
+const { AI_CURVES } = __require("src/data/attributes.js");
 
 const AI_LEVELS = {
   easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22], tech: 0.1, throws: 0.08, signature: 0.12, super: 0.25 },
@@ -9614,7 +9797,8 @@ const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 class AIController {
   constructor(index, { level = 'normal', seed = 1234 } = {}) {
     this.index = index;
-    this.cfg = AI_LEVELS[level] || AI_LEVELS.normal;
+    this.base = AI_LEVELS[level] || AI_LEVELS.normal;
+    this.cfg = this.base;
     this.rng = new Rng(seed + index * 977);
     this.macro = [];
     this.step = 0;
@@ -9654,8 +9838,42 @@ class AIController {
     return r;
   }
 
+  /** Movement is planned in distance: a walk / run of n "average" ticks lasts fewer ticks for faster fighters. */
+  walk(n) { return Math.max(2, Math.round((n * 3.2) / (this.walkSpeed || 3.2))); }
+  run(n) { return Math.max(4, Math.round((n * 6.8) / (this.runSpeed || 6.8))); }
+
+  /** Applies the fighter's CHARACTER attributes on top of the difficulty level. */
+  personalize(def) {
+    const b = this.base, p = def.ai || {};
+    const at = (attr, key) => {
+      const [lo, hi] = AI_CURVES[attr][key];
+      const k = p[attr] ?? 0.5;
+      return lo + (hi - lo) * k;
+    };
+    const c01 = (v) => Math.max(0, Math.min(0.97, v));
+    const thinkK = at('aggression', 'think');
+    this.cfg = {
+      ...b,
+      reaction: Math.max(2, Math.round(b.reaction * at('reaction', 'reactionFrames'))),
+      block: c01(b.block * at('reaction', 'block')),
+      aggression: c01(b.aggression * at('aggression', 'aggression')),
+      think: [Math.max(1, Math.round(b.think[0] * thinkK)), Math.max(2, Math.round(b.think[1] * thinkK))],
+      combo: c01(b.combo * at('combo', 'combo')),
+      punish: c01(b.punish * at('combo', 'punish')),
+      antiAir: c01(b.antiAir * at('antiAir', 'antiAir')),
+      aaGuard: c01(at('antiAir', 'aaGuard')),
+      throws: c01(b.throws * at('cunning', 'throws')),
+      tech: c01(b.tech * at('cunning', 'tech')),
+      signature: c01(b.signature * at('cunning', 'signature')),
+    };
+    this.walkSpeed = def.stats.walkF;
+    this.runSpeed = def.stats.run;
+    this.personalized = def;
+  }
+
   input(match) {
     const me = match.fighters[this.index];
+    if (this.personalized !== me.def) this.personalize(me.def);
     const seen = this.perceive(match);
     if (match.phase === 'finish') return this.finishInput(match, me);
     if (match.phase !== 'fight') return emptyRaw();
@@ -9664,6 +9882,9 @@ class AIController {
       if (me.stateFrame === 2) this.techTry = this.rng.chance(this.cfg.tech);
       return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
     }
+    if (me.state === 'blockstun') this.lastBlockstun = match.frame;
+    const aa = this.antiAirWatch(match, me, seen);
+    if (aa) return aa;
     // Run the current macro.
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];
@@ -9685,6 +9906,41 @@ class AIController {
     if (this.step < this.macro.length) return this.input(match);
     if (this.hold && this.hold.n-- > 0) return this.toRaw(this.hold.d, null, me.facing);
     return emptyRaw();
+  }
+
+  /**
+   * Jump-ins: once per jump the CPU decides (ANTI-AIR attribute) whether it will meet the jumper
+   * with a well-timed uppercut, just block, or get caught napping. A planned anti-air reads the
+   * jump arc and fires when the jumper will be in reach as the uppercut becomes active.
+   */
+  antiAirWatch(match, me, seen) {
+    const op = match.fighters[1 - this.index];
+    const jumping = !op.body.onGround && (op.state === 'jump' || (op.state === 'attack' && op.move?.def.stance === 'air'));
+    // reading jumps is what this attribute measures: the plan is made as the opponent leaves the floor
+    if (!jumping) { if (op.body.onGround) { this.aaPlan = null; this.aaJump = null; } return null; }
+    if (op.state === 'jump') this.aaJumpStart = match.frame - op.stateFrame;
+    const jumpId = this.aaJumpStart;
+    if (this.aaJump !== jumpId) {
+      this.aaJump = jumpId;
+      const toward = Math.sign(op.body.vx) === Math.sign(me.body.x - op.body.x) || Math.abs(op.body.x - me.body.x) < 200;
+      if (!toward) { this.aaPlan = null; return null; }
+      const r = this.rng;
+      this.aaPlan = r.chance(this.cfg.antiAir) ? 'aa' : r.chance(this.cfg.aaGuard) ? 'block' : 'caught';
+      if (this.aaPlan === 'block') { this.macro = []; this.step = 0; this.hold = { d: 'b', n: 26 }; this.cooldown = 22; }
+      if (this.aaPlan === 'caught') { this.macro = []; this.step = 0; this.hold = { d: 'f', n: 14 }; this.cooldown = 14; }
+    }
+    if (this.aaPlan !== 'aa' || !me.actionable) return null;
+    const L = (me.def.moves.chp?.startup || 7) + 1;
+    const g = 0.88 * (op.body.gravityScale || 1);
+    const yp = op.body.y + op.body.vy * L - 0.5 * g * L * L;
+    const xp = op.body.x + op.body.vx * L;
+    if (Math.abs(xp - me.body.x) < 115 * me.props.posScale && yp < 175 && yp > 10) {
+      this.aaPlan = null;
+      this.queue([{ d: 'd', b: ['hp'], n: 2 }, { d: 'd', n: 2 }]);
+      return this.input(match);
+    }
+    // waiting for the window: guard (a planned anti-air never leaves the CPU wide open)
+    return this.toRaw('b', null, me.facing);
   }
 
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
@@ -9787,23 +10043,17 @@ class AIController {
         return;
       }
     }
-    // Anti-air.
-    if (op.airborne && op.state === 'jump' && dist < 230 && op.vy < 4) {
-      if (r.chance(cfg.antiAir)) {
-        this.queue(r.chance(0.5) ? [{ d: 'd', n: 3 }, ...press('hp', 'd')] : M.s2);
-        return;
-      }
-      this.hold = { d: 'b', n: 20 };
-      return;
-    }
     // Broken guard (Tao's flurry): punish the stagger.
     if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {
       this.queue(r.chance(0.5) ? press('hp') : M.s1);
       return;
     }
-    // Whiff punish.
-    if (op.phase === 'recovery' && dist < 230 && r.chance(cfg.punish)) {
-      this.queue(dist < 140 ? (r.chance(0.4) ? press('hp', 'd') : press('hp')) : M.s1);
+    // Whiff punish. Faster fighters (MOBILITY) dash in and punish from further away.
+    const reach = 120 + 70 * me.stats.dash / 9.76;
+    if (op.phase === 'recovery' && dist < reach + 110 && r.chance(cfg.punish)) {
+      if (dist < 140) this.queue(r.chance(0.4) ? press('hp', 'd') : press('hp'));
+      else if (dist < 230) this.queue(M.s1);
+      else this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }, { d: '', n: Math.max(2, Math.round(12 - me.stats.dash)) }, ...press('hp')]);
       return;
     }
     // Opponent knocked down: approach for pressure.
@@ -9817,19 +10067,27 @@ class AIController {
       return;
     }
     if (dist > 330) {
-      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: r.int(24, 36) }]); // dash into a run
+      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: this.run(r.int(24, 36)) }]); // dash into a run
       else if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
-      else if (r.chance(0.14)) this.queue([{ d: 'uf', n: 3 }]);
-      else this.hold = { d: 'f', n: r.int(10, 24) };
+      else this.hold = { d: 'f', n: this.walk(r.int(10, 24)) };
       return;
     }
     if (dist > 190) {
       const roll = r.next();
       if (roll < 0.22 * aggr + 0.1) this.queue(M.s1);
       else if (roll < 0.35) this.queue(press('hk'));
-      else if (roll < 0.45 && r.chance(aggr)) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]);
-      else if (roll < 0.75) this.hold = { d: 'f', n: r.int(6, 16) };
-      else this.hold = { d: 'b', n: r.int(6, 14) };
+      else if (roll < 0.62) {
+        // jump in only from where the arc actually reaches the opponent
+        if (dist < 228) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]);
+        else this.hold = { d: 'f', n: this.walk(r.int(6, 14)) };
+      } else if (roll < 0.75) this.hold = { d: 'f', n: this.walk(r.int(6, 16)) };
+      else this.hold = { d: 'b', n: this.walk(r.int(6, 14)) };
+      return;
+    }
+    // Just blocked a string up close: sometimes back-dash out (agile fighters slip out cleanly).
+    if (me.state !== 'blockstun' && this.lastBlockstun && match.frame - this.lastBlockstun < 10 && dist < 200 && r.chance(0.3)) {
+      this.lastBlockstun = 0;
+      this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]);
       return;
     }
     // Close range.
@@ -9841,7 +10099,9 @@ class AIController {
     else if (roll < 0.55) this.queue(press('lk'));
     else if (roll < 0.63) this.queue(press('hk', 'd'));
     else if (roll < 0.7) this.queue(M.s3);
-    else if (roll < 0.78) this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]); // back dash
+    else if (roll < 0.74) this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]); // back dash
+    else if (roll < 0.86 && dist > 130) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]); // jump in from close
+    else if (roll < 0.8) this.queue([{ d: 'u', n: 3 }, { d: '', n: 12 }, { d: '', b: ['hk'], n: 2 }]); // hop
     else this.hold = { d: r.chance(0.5) ? 'db' : 'b', n: r.int(8, 18) };
   }
 }
@@ -9976,21 +10236,13 @@ const { ROSTER, buildFighterDef } = __require("src/data/fighters.js");
 const { Keyboard } = __require("src/input/keyboard.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 const { FighterPreview } = __require("src/ui/preview.js");
+const { ATTRIBUTES, ATTRIBUTE_GROUPS, attributeRanges, attributeFill } = __require("src/data/attributes.js");
 
 const MODE_LABEL = { cpu: 'ARCADE · VS CPU', versus: 'VERSUS · 2 PLAYERS', training: 'TRAINING', watch: 'CPU VS CPU' };
 
-function stats(def) {
-  const m = def.moves;
-  const dmg = (m.lp.damage + m.hp.damage + m.lk.damage + m.hk.damage + m.s1.damage) / 5;
-  const reach = def.props.upperArm + def.props.foreArm + def.props.thigh + def.props.shin;
-  const n = (v, lo, hi) => Math.max(0.08, Math.min(1, (v - lo) / (hi - lo)));
-  return [
-    ['POWER', n(dmg, 52, 90)],
-    ['SPEED', n(def.stats.walkF + def.stats.dash * 0.2, 4.4, 6.0)],
-    ['REACH', n(reach, 190, 230)],
-    ['GRIT', n(def.stats.health, 860, 1220)],
-  ];
-}
+// Bars are scaled between the weakest and strongest value in the whole roster (see attributes.js).
+const DEFS = ROSTER.map((f) => buildFighterDef(f.id));
+const RANGES = attributeRanges(DEFS);
 
 class SelectScene {
   constructor(app, mode = 'cpu') {
@@ -10014,7 +10266,7 @@ class SelectScene {
     this.sides = [0, 1].map((s) => this.buildSide(s));
     const second = this.mode === 'versus' ? 'P2' : this.mode === 'watch' ? 'CPU 2' : this.mode === 'training' ? 'DUMMY' : 'CPU';
     this.secondLabel = second;
-    this.root = el('div', { class: 'select' }, [
+    this.root = el('div', { class: `select mode-${this.mode}` }, [
       el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
       el('div', { class: 'marquee' }, [el('div', { class: 'marquee-track' }, ['CHOOSE YOUR FIGHTER ✦ PIER 9 FIGHT NIGHT ✦ CHOOSE YOUR FIGHTER ✦ PIER 9 FIGHT NIGHT ✦ '.repeat(2)])]),
       el('div', { class: 'sel-mode' }, [MODE_LABEL[this.mode] || '']),
@@ -10161,11 +10413,19 @@ class SelectScene {
       side.root.querySelector('.blurb').textContent = f.blurb;
       const st = side.root.querySelector('.stats');
       st.innerHTML = '';
-      for (const [label, v] of stats(def)) {
-        st.appendChild(el('div', { class: 'stat' }, [
-          el('span', { class: 'stat-l' }, [label]),
-          el('span', { class: 'stat-bar' }, [el('i', { style: { width: `${Math.round(v * 100)}%` } })]),
-        ]));
+      // BODY always; CHARACTER (how the CPU plays this fighter) only when the CPU plays both sides
+      const groups = this.mode === 'watch' ? ATTRIBUTE_GROUPS : ATTRIBUTE_GROUPS.filter((g) => g.id === 'body');
+      for (const g of groups) {
+        if (groups.length > 1) st.appendChild(el('div', { class: 'stat-group' }, [g.label]));
+        for (const a of ATTRIBUTES.filter((x) => x.group === g.id)) {
+          const v = def.attrs[a.id];
+          const k = attributeFill(a, v, RANGES[a.id]);
+          st.appendChild(el('div', { class: 'stat', title: a.hint }, [
+            el('span', { class: 'stat-l' }, [a.label]),
+            el('span', { class: 'stat-bar' }, [el('i', { style: { width: `${Math.round(4 + k * 96)}%` } })]),
+            el('span', { class: 'stat-v' }, [a.fmt(v)]),
+          ]));
+        }
       }
       side.preview.setFighter(f.id);
     });

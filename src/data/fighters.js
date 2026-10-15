@@ -7,6 +7,7 @@ import { MOVES } from './moves.js';
 import { SIGNATURES } from './signatures.js';
 import { compileMove } from './compileMove.js';
 import { buildProportions } from '../anim/skeleton.js';
+import { ATTRIBUTES, ATTR_DEFAULTS, MOBILITY_RATIOS, AGILITY_EXP, rawAverageDamage, averageStartup, attrsFromProfile } from './attributes.js';
 
 export const ROSTER = [
   {
@@ -16,6 +17,8 @@ export const ROSTER = [
     blurb: 'Dock-yard brawler. Heavy hands, heavy grin, heavier follow-through.',
     body: { height: 1.02, bulk: 1.22, arms: 1.0, legs: 0.97, head: 1.05, torso: 1.02, shoulders: 1.2, armBulk: 1.15, waist: 1.05 },
     stats: { health: 1080, walkF: 3.0, walkB: 2.4, run: 6.4, dash: 9, jumpVY: 15.8, jumpVX: 3.8, mass: 1.15, stunMax: 680, pushW: 37 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.85, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.7, reaction: 0.4, aggression: 0.85, combo: 0.55, antiAir: 0.4, cunning: 0.0 },
     look: {
       skin: '#c88a5e', outline: '#1b1012', rim: '#ff4fd8',
       eyes: '#3fd29a', brows: 'thick', mouth: 'grin',
@@ -43,6 +46,8 @@ export const ROSTER = [
     blurb: 'A gentleman thief with goggles, a sharp tie and sharper teeth. Quick and slippery.',
     body: { height: 0.94, bulk: 0.88, arms: 1.05, legs: 1.04, head: 1.12, torso: 0.96, shoulders: 0.92 },
     stats: { health: 920, walkF: 3.6, walkB: 3.0, run: 7.4, dash: 10.5, jumpVY: 17, jumpVX: 4.4, mass: 0.88, stunMax: 560, pushW: 32 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.0, speed: 0.8, mobility: 0.9, health: 0.15, toughness: 0.2, reaction: 0.7, aggression: 0.35, combo: 0.45, antiAir: 0.55, cunning: 1.0 },
     look: {
       species: 'weasel',
       skin: '#8a5a36', fur2: '#d9b48a', outline: '#1a0f14', rim: '#ff3fd0',
@@ -72,6 +77,8 @@ export const ROSTER = [
     blurb: 'Tall, bald and always laughing. Long legs make his kicks reach across the street.',
     body: { height: 1.08, bulk: 0.96, arms: 1.06, legs: 1.1, head: 1.0, torso: 1.0, shoulders: 1.02 },
     stats: { health: 1000, walkF: 3.2, walkB: 2.6, run: 6.8, dash: 9.5, jumpVY: 16, jumpVX: 4, mass: 1.0, stunMax: 620, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.55, speed: 0.4, mobility: 0.5, health: 0.55, toughness: 0.5, reaction: 0.45, aggression: 0.5, combo: 0.7, antiAir: 0.9, cunning: 0.4 },
     look: {
       skin: '#a8714c', outline: '#1d1414', rim: '#ff52e0',
       eyes: '#2a1a12', brows: 'thick', mouth: 'grin', eyesClosed: true,
@@ -100,6 +107,8 @@ export const ROSTER = [
     blurb: 'Freckles, piercings and a jacket full of patches. Never stops coming forward.',
     body: { height: 0.98, bulk: 1.0, arms: 1.0, legs: 1.0, head: 1.08, torso: 0.98, shoulders: 1.04 },
     stats: { health: 960, walkF: 3.5, walkB: 2.8, run: 7.2, dash: 10.2, jumpVY: 16.4, jumpVX: 4.2, mass: 0.96, stunMax: 590, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.4, speed: 0.7, mobility: 0.75, health: 0.35, toughness: 0.3, reaction: 0.55, aggression: 0.95, combo: 0.6, antiAir: 0.2, cunning: 0.5 },
     look: {
       skin: '#e3a27e', outline: '#1d1216', rim: '#2ee6d6',
       eyes: '#b04fd6', brows: 'angry', mouth: 'teeth', freckles: true,
@@ -127,6 +136,8 @@ export const ROSTER = [
     blurb: 'Pompadour, gold earrings and a coat that costs more than your street. Punishes everything.',
     body: { height: 1.06, bulk: 0.94, arms: 1.08, legs: 1.04, head: 1.0, torso: 1.04, shoulders: 1.0 },
     stats: { health: 1020, walkF: 3.0, walkB: 2.6, run: 6.5, dash: 9.2, jumpVY: 15.6, jumpVX: 3.8, mass: 1.04, stunMax: 650, pushW: 34 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.6, speed: 0.5, mobility: 0.25, health: 0.6, toughness: 0.6, reaction: 0.95, aggression: 0.25, combo: 0.55, antiAir: 0.45, cunning: 0.65 },
     look: {
       skin: '#b98256', outline: '#1a1012', rim: '#ff47d6',
       eyes: '#b34be0', brows: 'angry', mouth: 'snarl',
@@ -154,6 +165,8 @@ export const ROSTER = [
     blurb: 'Street-punk kickboxer with a spiked pauldron and a bad attitude. Fastest legs in the district.',
     body: { height: 0.96, bulk: 0.84, arms: 0.98, legs: 1.08, head: 0.98, torso: 0.95, shoulders: 0.88, hips: 1.06, waist: 0.84 },
     stats: { health: 900, walkF: 3.7, walkB: 3.1, run: 7.6, dash: 11, jumpVY: 17.2, jumpVX: 4.5, mass: 0.85, stunMax: 560, pushW: 31 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.3, speed: 1.0, mobility: 1.0, health: 0.0, toughness: 0.0, reaction: 0.6, aggression: 1.0, combo: 0.8, antiAir: 0.0, cunning: 0.4 },
     look: {
       female: true,
       skin: '#7a4a32', outline: '#140d12', rim: '#ff3fd0',
@@ -184,6 +197,8 @@ export const ROSTER = [
     blurb: 'Runs the meanest kitchen on the docks. Slow, enormous, and every hit is a cleaver.',
     body: { height: 1.08, bulk: 1.36, arms: 1.02, legs: 0.94, head: 1.02, torso: 1.06, shoulders: 1.28, armBulk: 1.2, legBulk: 1.15, waist: 1.3, hands: 1.15 },
     stats: { health: 1200, walkF: 2.5, walkB: 2.0, run: 5.6, dash: 8, jumpVY: 14.6, jumpVX: 3.4, mass: 1.4, stunMax: 810, pushW: 42 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 1.0, speed: 0.0, mobility: 0.0, health: 1.0, toughness: 1.0, reaction: 0.0, aggression: 0.6, combo: 0.4, antiAir: 0.35, cunning: 0.7 },
     look: {
       skin: '#b07a52', outline: '#141012', rim: '#ff47d6',
       eyes: '#b04fd6', brows: 'thick', mouth: 'grin',
@@ -213,6 +228,8 @@ export const ROSTER = [
     blurb: 'A luchador-shaman in a golden jaguar mask. Patient, precise, and terrifyingly flexible.',
     body: { height: 1.0, bulk: 0.94, arms: 1.03, legs: 1.03, head: 1.0, torso: 1.0, shoulders: 1.0 },
     stats: { health: 980, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.95, stunMax: 610, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.55, speed: 0.6, mobility: 0.7, health: 0.45, toughness: 0.4, reaction: 0.55, aggression: 0.7, combo: 0.4, antiAir: 0.6, cunning: 0.45 },
     look: {
       skin: '#6a4430', outline: '#120c10', rim: '#ff3fd0',
       eyes: '#e6e23a', brows: 'none', mouth: 'none',
@@ -240,6 +257,8 @@ export const ROSTER = [
     blurb: 'Moody street kid with fire in his fists. Keeps it caged until the bar is full, then lets it burn.',
     body: { height: 1.0, bulk: 0.86, arms: 1.03, legs: 1.04, head: 1.05, torso: 0.98, shoulders: 0.94, waist: 0.9 },
     stats: { health: 930, walkF: 3.4, walkB: 2.8, run: 7.1, dash: 10.3, jumpVY: 16.6, jumpVX: 4.3, mass: 0.92, stunMax: 590, pushW: 32 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.7, speed: 0.65, mobility: 0.6, health: 0.2, toughness: 0.25, reaction: 0.4, aggression: 0.9, combo: 0.75, antiAir: 0.4, cunning: 0.25 },
     look: {
       skin: '#b97f58', outline: '#140c10', rim: '#ff8a2a',
       eyes: '#f2c230', brows: 'angry', mouth: 'flat', freckles: true, ears: 'pointed',
@@ -266,6 +285,8 @@ export const ROSTER = [
     blurb: 'Lost a bet, kept the bear suit. Shrugs off a punch mid-charge and mauls whoever threw it.',
     body: { height: 1.06, bulk: 1.18, arms: 1.02, legs: 0.98, head: 1.04, torso: 1.04, shoulders: 1.16, armBulk: 1.1, waist: 1.12, hands: 1.1 },
     stats: { health: 1000, walkF: 2.9, walkB: 2.4, run: 6.3, dash: 9, jumpVY: 15.6, jumpVX: 3.8, mass: 1.2, stunMax: 690, pushW: 38 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.8, speed: 0.2, mobility: 0.1, health: 0.9, toughness: 0.95, reaction: 0.3, aggression: 0.65, combo: 0.0, antiAir: 0.6, cunning: 0.6 },
     look: {
       skin: '#8a5a3c', outline: '#160e0c', rim: '#3fd2c2',
       eyes: '#4fb8a0', brows: 'thick', mouth: 'flat',
@@ -292,6 +313,8 @@ export const ROSTER = [
     blurb: 'Thirty years of dock fights and still standing. Once he hooks you in, you stay for the whole lesson.',
     body: { height: 1.0, bulk: 1.1, arms: 1.04, legs: 0.98, head: 1.06, torso: 1.02, shoulders: 1.12, armBulk: 1.08, waist: 1.04 },
     stats: { health: 1060, walkF: 3.0, walkB: 2.5, run: 6.5, dash: 9.4, jumpVY: 15.8, jumpVX: 3.9, mass: 1.08, stunMax: 650, pushW: 35 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.35, speed: 0.35, mobility: 0.3, health: 0.75, toughness: 0.75, reaction: 0.6, aggression: 0.0, combo: 0.45, antiAir: 1.0, cunning: 0.75 },
     look: {
       skin: '#a8684a', outline: '#160c0c', rim: '#ff4fd8',
       eyes: '#5aa8c8', brows: 'thick', mouth: 'flat', facepaint: '#c8308f',
@@ -319,6 +342,8 @@ export const ROSTER = [
     blurb: 'Shaved head, wrapped fists, zero small talk. Every punch he throws he has practised ten thousand times.',
     body: { height: 1.0, bulk: 1.0, arms: 1.03, legs: 1.0, head: 1.02, torso: 1.0, shoulders: 1.05 },
     stats: { health: 920, walkF: 3.4, walkB: 2.9, run: 7.0, dash: 10.4, jumpVY: 16.6, jumpVX: 4.3, mass: 0.97, stunMax: 600, pushW: 33 },
+    // attributes: 0..1 inside the calibrated roster ranges (src/data/attributes.js)
+    profile: { power: 0.4, speed: 0.75, mobility: 0.5, health: 0.25, toughness: 0.3, reaction: 1.0, aggression: 0.5, combo: 1.0, antiAir: 0.4, cunning: 0.4 },
     look: {
       skin: '#b0784e', outline: '#150d0e', rim: '#ff4fd8',
       eyes: '#e8c84a', brows: 'angry', mouth: 'flat',
@@ -353,11 +378,27 @@ const deepMerge = (base, over) => {
 export function buildFighterDef(id, overrides = {}) {
   const src = ROSTER.find((f) => f.id === id) || ROSTER[0];
   const def = deepMerge(src, overrides);
-  const moves = {};
+  // profile (0..1 inside the calibrated ranges) -> attribute values; explicit attrs override (experiments)
+  const attrs = { ...ATTR_DEFAULTS, ...(def.profile ? attrsFromProfile(def.profile) : {}), ...(def.attrs || {}) };
   const sig = SIGNATURES[def.id] || {};
+  const raw = {};
   for (const mid of new Set([...Object.keys(MOVES), ...Object.keys(sig)])) {
     const base = MOVES[mid] ? deepMerge(MOVES[mid], sig[mid] || {}) : sig[mid];
-    moves[mid] = compileMove(mid, deepMerge(base, def.moves?.[mid] || {}));
+    raw[mid] = deepMerge(base, def.moves?.[mid] || {});
   }
-  return { ...def, moves, props: buildProportions(def.body) };
+  // ATTACK SPEED: single-strike attacks are scaled so the normals average the target start-up
+  const k = attrs.speed / averageStartup(raw);
+  for (const m of Object.values(raw)) {
+    if (m && m.startup && !m.steps && !m.super && m.type !== 'throw') m.startup = Math.max(2, Math.round(m.startup * k));
+  }
+  const moves = {};
+  for (const mid in raw) moves[mid] = compileMove(mid, raw[mid]);
+  // POWER / HEALTH / TOUGHNESS / MOBILITY become the physical stats
+  const stats = { ...def.stats, health: attrs.health, stunMax: attrs.toughness, damage: attrs.power / rawAverageDamage(raw) };
+  for (const [key, r] of Object.entries(MOBILITY_RATIOS)) stats[key] = attrs.mobility * r;
+  stats.agility = Math.pow(attrs.mobility / ATTR_DEFAULTS.mobility, AGILITY_EXP);
+  // CHARACTER: 0..1 personality read by the AI controller
+  const ai = {};
+  for (const a of ATTRIBUTES) if (a.group === 'mind') ai[a.id] = attrs[a.id] / 100;
+  return { ...def, attrs, stats, ai, moves, props: buildProportions(def.body) };
 }

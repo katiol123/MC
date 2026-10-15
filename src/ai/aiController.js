@@ -3,6 +3,7 @@
 // anti-airs, whiff punishes and short cancel combos executed as input macros (incl. motions).
 import { Rng } from '../core/rng.js';
 import { emptyRaw } from '../input/inputBuffer.js';
+import { AI_CURVES } from '../data/attributes.js';
 
 export const AI_LEVELS = {
   easy: { reaction: 24, block: 0.25, antiAir: 0.15, aggression: 0.35, combo: 0.25, punish: 0.3, think: [10, 22], tech: 0.1, throws: 0.08, signature: 0.12, super: 0.25 },
@@ -38,7 +39,8 @@ const press = (b, d = '') => [{ d, b: [b], n: 2 }, { d, n: 1 }];
 export class AIController {
   constructor(index, { level = 'normal', seed = 1234 } = {}) {
     this.index = index;
-    this.cfg = AI_LEVELS[level] || AI_LEVELS.normal;
+    this.base = AI_LEVELS[level] || AI_LEVELS.normal;
+    this.cfg = this.base;
     this.rng = new Rng(seed + index * 977);
     this.macro = [];
     this.step = 0;
@@ -78,8 +80,42 @@ export class AIController {
     return r;
   }
 
+  /** Movement is planned in distance: a walk / run of n "average" ticks lasts fewer ticks for faster fighters. */
+  walk(n) { return Math.max(2, Math.round((n * 3.2) / (this.walkSpeed || 3.2))); }
+  run(n) { return Math.max(4, Math.round((n * 6.8) / (this.runSpeed || 6.8))); }
+
+  /** Applies the fighter's CHARACTER attributes on top of the difficulty level. */
+  personalize(def) {
+    const b = this.base, p = def.ai || {};
+    const at = (attr, key) => {
+      const [lo, hi] = AI_CURVES[attr][key];
+      const k = p[attr] ?? 0.5;
+      return lo + (hi - lo) * k;
+    };
+    const c01 = (v) => Math.max(0, Math.min(0.97, v));
+    const thinkK = at('aggression', 'think');
+    this.cfg = {
+      ...b,
+      reaction: Math.max(2, Math.round(b.reaction * at('reaction', 'reactionFrames'))),
+      block: c01(b.block * at('reaction', 'block')),
+      aggression: c01(b.aggression * at('aggression', 'aggression')),
+      think: [Math.max(1, Math.round(b.think[0] * thinkK)), Math.max(2, Math.round(b.think[1] * thinkK))],
+      combo: c01(b.combo * at('combo', 'combo')),
+      punish: c01(b.punish * at('combo', 'punish')),
+      antiAir: c01(b.antiAir * at('antiAir', 'antiAir')),
+      aaGuard: c01(at('antiAir', 'aaGuard')),
+      throws: c01(b.throws * at('cunning', 'throws')),
+      tech: c01(b.tech * at('cunning', 'tech')),
+      signature: c01(b.signature * at('cunning', 'signature')),
+    };
+    this.walkSpeed = def.stats.walkF;
+    this.runSpeed = def.stats.run;
+    this.personalized = def;
+  }
+
   input(match) {
     const me = match.fighters[this.index];
+    if (this.personalized !== me.def) this.personalize(me.def);
     const seen = this.perceive(match);
     if (match.phase === 'finish') return this.finishInput(match, me);
     if (match.phase !== 'fight') return emptyRaw();
@@ -88,6 +124,9 @@ export class AIController {
       if (me.stateFrame === 2) this.techTry = this.rng.chance(this.cfg.tech);
       return this.techTry && me.stateFrame >= 3 && me.stateFrame <= 6 ? { ...emptyRaw(), lp: true, lk: true } : emptyRaw();
     }
+    if (me.state === 'blockstun') this.lastBlockstun = match.frame;
+    const aa = this.antiAirWatch(match, me, seen);
+    if (aa) return aa;
     // Run the current macro.
     if (this.step < this.macro.length) {
       const s = this.macro[this.step];
@@ -109,6 +148,41 @@ export class AIController {
     if (this.step < this.macro.length) return this.input(match);
     if (this.hold && this.hold.n-- > 0) return this.toRaw(this.hold.d, null, me.facing);
     return emptyRaw();
+  }
+
+  /**
+   * Jump-ins: once per jump the CPU decides (ANTI-AIR attribute) whether it will meet the jumper
+   * with a well-timed uppercut, just block, or get caught napping. A planned anti-air reads the
+   * jump arc and fires when the jumper will be in reach as the uppercut becomes active.
+   */
+  antiAirWatch(match, me, seen) {
+    const op = match.fighters[1 - this.index];
+    const jumping = !op.body.onGround && (op.state === 'jump' || (op.state === 'attack' && op.move?.def.stance === 'air'));
+    // reading jumps is what this attribute measures: the plan is made as the opponent leaves the floor
+    if (!jumping) { if (op.body.onGround) { this.aaPlan = null; this.aaJump = null; } return null; }
+    if (op.state === 'jump') this.aaJumpStart = match.frame - op.stateFrame;
+    const jumpId = this.aaJumpStart;
+    if (this.aaJump !== jumpId) {
+      this.aaJump = jumpId;
+      const toward = Math.sign(op.body.vx) === Math.sign(me.body.x - op.body.x) || Math.abs(op.body.x - me.body.x) < 200;
+      if (!toward) { this.aaPlan = null; return null; }
+      const r = this.rng;
+      this.aaPlan = r.chance(this.cfg.antiAir) ? 'aa' : r.chance(this.cfg.aaGuard) ? 'block' : 'caught';
+      if (this.aaPlan === 'block') { this.macro = []; this.step = 0; this.hold = { d: 'b', n: 26 }; this.cooldown = 22; }
+      if (this.aaPlan === 'caught') { this.macro = []; this.step = 0; this.hold = { d: 'f', n: 14 }; this.cooldown = 14; }
+    }
+    if (this.aaPlan !== 'aa' || !me.actionable) return null;
+    const L = (me.def.moves.chp?.startup || 7) + 1;
+    const g = 0.88 * (op.body.gravityScale || 1);
+    const yp = op.body.y + op.body.vy * L - 0.5 * g * L * L;
+    const xp = op.body.x + op.body.vx * L;
+    if (Math.abs(xp - me.body.x) < 115 * me.props.posScale && yp < 175 && yp > 10) {
+      this.aaPlan = null;
+      this.queue([{ d: 'd', b: ['hp'], n: 2 }, { d: 'd', n: 2 }]);
+      return this.input(match);
+    }
+    // waiting for the window: guard (a planned anti-air never leaves the CPU wide open)
+    return this.toRaw('b', null, me.facing);
   }
 
   /** FINISH HIM: walk up to the dazed opponent and perform the fatality (or just wait it out). */
@@ -211,23 +285,17 @@ export class AIController {
         return;
       }
     }
-    // Anti-air.
-    if (op.airborne && op.state === 'jump' && dist < 230 && op.vy < 4) {
-      if (r.chance(cfg.antiAir)) {
-        this.queue(r.chance(0.5) ? [{ d: 'd', n: 3 }, ...press('hp', 'd')] : M.s2);
-        return;
-      }
-      this.hold = { d: 'b', n: 20 };
-      return;
-    }
     // Broken guard (Tao's flurry): punish the stagger.
     if (opF.state === 'stagger' && dist < 170 && r.chance(cfg.punish)) {
       this.queue(r.chance(0.5) ? press('hp') : M.s1);
       return;
     }
-    // Whiff punish.
-    if (op.phase === 'recovery' && dist < 230 && r.chance(cfg.punish)) {
-      this.queue(dist < 140 ? (r.chance(0.4) ? press('hp', 'd') : press('hp')) : M.s1);
+    // Whiff punish. Faster fighters (MOBILITY) dash in and punish from further away.
+    const reach = 120 + 70 * me.stats.dash / 9.76;
+    if (op.phase === 'recovery' && dist < reach + 110 && r.chance(cfg.punish)) {
+      if (dist < 140) this.queue(r.chance(0.4) ? press('hp', 'd') : press('hp'));
+      else if (dist < 230) this.queue(M.s1);
+      else this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }, { d: '', n: Math.max(2, Math.round(12 - me.stats.dash)) }, ...press('hp')]);
       return;
     }
     // Opponent knocked down: approach for pressure.
@@ -241,19 +309,27 @@ export class AIController {
       return;
     }
     if (dist > 330) {
-      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: r.int(24, 36) }]); // dash into a run
+      if (r.chance(0.4 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: this.run(r.int(24, 36)) }]); // dash into a run
       else if (r.chance(0.25 * aggr)) this.queue([{ d: 'f', n: 2 }, { d: '', n: 2 }, { d: 'f', n: 3 }]); // dash
-      else if (r.chance(0.14)) this.queue([{ d: 'uf', n: 3 }]);
-      else this.hold = { d: 'f', n: r.int(10, 24) };
+      else this.hold = { d: 'f', n: this.walk(r.int(10, 24)) };
       return;
     }
     if (dist > 190) {
       const roll = r.next();
       if (roll < 0.22 * aggr + 0.1) this.queue(M.s1);
       else if (roll < 0.35) this.queue(press('hk'));
-      else if (roll < 0.45 && r.chance(aggr)) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]);
-      else if (roll < 0.75) this.hold = { d: 'f', n: r.int(6, 16) };
-      else this.hold = { d: 'b', n: r.int(6, 14) };
+      else if (roll < 0.62) {
+        // jump in only from where the arc actually reaches the opponent
+        if (dist < 228) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]);
+        else this.hold = { d: 'f', n: this.walk(r.int(6, 14)) };
+      } else if (roll < 0.75) this.hold = { d: 'f', n: this.walk(r.int(6, 16)) };
+      else this.hold = { d: 'b', n: this.walk(r.int(6, 14)) };
+      return;
+    }
+    // Just blocked a string up close: sometimes back-dash out (agile fighters slip out cleanly).
+    if (me.state !== 'blockstun' && this.lastBlockstun && match.frame - this.lastBlockstun < 10 && dist < 200 && r.chance(0.3)) {
+      this.lastBlockstun = 0;
+      this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]);
       return;
     }
     // Close range.
@@ -265,7 +341,9 @@ export class AIController {
     else if (roll < 0.55) this.queue(press('lk'));
     else if (roll < 0.63) this.queue(press('hk', 'd'));
     else if (roll < 0.7) this.queue(M.s3);
-    else if (roll < 0.78) this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]); // back dash
+    else if (roll < 0.74) this.queue([{ d: 'b', n: 2 }, { d: '', n: 2 }, { d: 'b', n: 3 }]); // back dash
+    else if (roll < 0.86 && dist > 130) this.queue([{ d: 'uf', n: 3 }, { d: '', n: 14 }, { d: '', b: [r.chance(0.4) ? 'hp' : 'hk'], n: 2 }]); // jump in from close
+    else if (roll < 0.8) this.queue([{ d: 'u', n: 3 }, { d: '', n: 12 }, { d: '', b: ['hk'], n: 2 }]); // hop
     else this.hold = { d: r.chance(0.5) ? 'db' : 'b', n: r.int(8, 18) };
   }
 }

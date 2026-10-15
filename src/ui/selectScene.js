@@ -4,21 +4,13 @@ import { ROSTER, buildFighterDef } from '../data/fighters.js';
 import { Keyboard } from '../input/keyboard.js';
 import { el, clearUI } from './dom.js';
 import { FighterPreview } from './preview.js';
+import { ATTRIBUTES, ATTRIBUTE_GROUPS, attributeRanges, attributeFill } from '../data/attributes.js';
 
 const MODE_LABEL = { cpu: 'ARCADE · VS CPU', versus: 'VERSUS · 2 PLAYERS', training: 'TRAINING', watch: 'CPU VS CPU' };
 
-function stats(def) {
-  const m = def.moves;
-  const dmg = (m.lp.damage + m.hp.damage + m.lk.damage + m.hk.damage + m.s1.damage) / 5;
-  const reach = def.props.upperArm + def.props.foreArm + def.props.thigh + def.props.shin;
-  const n = (v, lo, hi) => Math.max(0.08, Math.min(1, (v - lo) / (hi - lo)));
-  return [
-    ['POWER', n(dmg, 52, 90)],
-    ['SPEED', n(def.stats.walkF + def.stats.dash * 0.2, 4.4, 6.0)],
-    ['REACH', n(reach, 190, 230)],
-    ['GRIT', n(def.stats.health, 860, 1220)],
-  ];
-}
+// Bars are scaled between the weakest and strongest value in the whole roster (see attributes.js).
+const DEFS = ROSTER.map((f) => buildFighterDef(f.id));
+const RANGES = attributeRanges(DEFS);
 
 export class SelectScene {
   constructor(app, mode = 'cpu') {
@@ -42,7 +34,7 @@ export class SelectScene {
     this.sides = [0, 1].map((s) => this.buildSide(s));
     const second = this.mode === 'versus' ? 'P2' : this.mode === 'watch' ? 'CPU 2' : this.mode === 'training' ? 'DUMMY' : 'CPU';
     this.secondLabel = second;
-    this.root = el('div', { class: 'select' }, [
+    this.root = el('div', { class: `select mode-${this.mode}` }, [
       el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
       el('div', { class: 'marquee' }, [el('div', { class: 'marquee-track' }, ['CHOOSE YOUR FIGHTER ✦ PIER 9 FIGHT NIGHT ✦ CHOOSE YOUR FIGHTER ✦ PIER 9 FIGHT NIGHT ✦ '.repeat(2)])]),
       el('div', { class: 'sel-mode' }, [MODE_LABEL[this.mode] || '']),
@@ -189,11 +181,19 @@ export class SelectScene {
       side.root.querySelector('.blurb').textContent = f.blurb;
       const st = side.root.querySelector('.stats');
       st.innerHTML = '';
-      for (const [label, v] of stats(def)) {
-        st.appendChild(el('div', { class: 'stat' }, [
-          el('span', { class: 'stat-l' }, [label]),
-          el('span', { class: 'stat-bar' }, [el('i', { style: { width: `${Math.round(v * 100)}%` } })]),
-        ]));
+      // BODY always; CHARACTER (how the CPU plays this fighter) only when the CPU plays both sides
+      const groups = this.mode === 'watch' ? ATTRIBUTE_GROUPS : ATTRIBUTE_GROUPS.filter((g) => g.id === 'body');
+      for (const g of groups) {
+        if (groups.length > 1) st.appendChild(el('div', { class: 'stat-group' }, [g.label]));
+        for (const a of ATTRIBUTES.filter((x) => x.group === g.id)) {
+          const v = def.attrs[a.id];
+          const k = attributeFill(a, v, RANGES[a.id]);
+          st.appendChild(el('div', { class: 'stat', title: a.hint }, [
+            el('span', { class: 'stat-l' }, [a.label]),
+            el('span', { class: 'stat-bar' }, [el('i', { style: { width: `${Math.round(4 + k * 96)}%` } })]),
+            el('span', { class: 'stat-v' }, [a.fmt(v)]),
+          ]));
+        }
       }
       side.preview.setFighter(f.id);
     });

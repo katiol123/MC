@@ -89,10 +89,20 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .p2 .pname::first-line { color: var(--p2); }
 .ptitle { margin-top: 6px; font: italic 800 14px "Segoe UI", sans-serif; color: var(--gold); letter-spacing: 1px; }
 .blurb { margin-top: 8px; font: 600 12px/1.35 "Segoe UI", sans-serif; color: #cdbfe0; }
-.stats { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
-.stat { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; }
+.stats { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.stat { display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: 1.5px; }
 .p2 .stat { flex-direction: row-reverse; }
-.stat-l { width: 58px; color: #bfb2d4; }
+.stat-l { width: 88px; color: #bfb2d4; white-space: nowrap; }
+.stat-v { width: 34px; color: #fff6c8; font-size: 10px; letter-spacing: 0; text-align: right; }
+.p2 .stat-v { text-align: left; }
+.stat-group { margin-top: 4px; font-size: 11px; letter-spacing: 3px; color: var(--gold); border-bottom: 1px solid rgba(255,210,63,.35); }
+.mode-watch .stat { font-size: 9.5px; }
+.mode-watch .stat-bar { height: 7px; }
+.mode-watch .stats { gap: 3px; margin-top: 6px; }
+.mode-watch .blurb { display: none; }
+.mode-watch .preview { width: 150px; height: 150px; }
+.mode-watch .p1 .preview { left: 420px; bottom: -40px; }
+.mode-watch .p2 .preview { right: 420px; bottom: -40px; }
 .stat-bar { flex: 1; height: 9px; background: rgba(255,255,255,.08); transform: skewX(-20deg); overflow: hidden; }
 .stat-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #ff7a3a); transition: width .35s cubic-bezier(.2,1.4,.4,1); }
 .p2 .stat-bar i { margin-left: auto; background: linear-gradient(270deg, var(--p2), #4a8aff); }

@@ -19,8 +19,9 @@ export class Match {
    */
   constructor(opts = {}) {
     this.opts = { roundsToWin: 2, roundTime: TUNING.roundTimeSeconds, training: false, ...opts };
-    const d1 = buildFighterDef(this.opts.p1 || 'brick');
-    const d2 = buildFighterDef(this.opts.p2 || 'jax');
+    // o1 / o2: optional definition overrides (attribute experiments, balancing tools)
+    const d1 = buildFighterDef(this.opts.p1 || 'brick', this.opts.o1);
+    const d2 = buildFighterDef(this.opts.p2 || 'jax', this.opts.o2);
     this.fighters = [
       new Fighter(d1, 0, STAGE_CENTER - START_GAP, 1),
       new Fighter(d2, 1, STAGE_CENTER + START_GAP, -1),
