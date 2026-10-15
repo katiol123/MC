@@ -2156,6 +2156,10 @@ export class FighterPainter {
         this.drawFeather(ctx, R, R * 1.9, this.mat(hat.color, 0).base, this.mat(hat.tip, 0).base);
         break;
       }
+      case 'earring':
+        if (!lk.earrings) { ok = false; break; }
+        this.drawEarring(ctx, R, 0, 0);
+        break;
       case 'headphones':
         if (!lk.headphones) { ok = false; break; }
         this.drawHeadphonesAt(ctx, { x: -2, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 });
@@ -2317,13 +2321,7 @@ export class FighterPainter {
     ctx.ellipse(-0.14 * R, -0.06 * R, 0.09 * R, 0.16 * R, 0.15, 0, Math.PI * 2);
     ctx.fillStyle = darken(this.skin.base, 0.25);
     ctx.fill();
-    if (lk.earrings) {
-      ctx.beginPath();
-      ctx.arc(-0.12 * R, lk.hoops ? -0.5 * R : -0.36 * R, lk.hoops ? 0.2 * R : 0.1 * R, 0, Math.PI * 2);
-      ctx.lineWidth = 2.2;
-      ctx.strokeStyle = this.mat(lk.earrings, t).base;
-      ctx.stroke();
-    }
+    if (lk.earrings) this.drawEarring(ctx, R, -0.12 * R, lk.hoops ? -0.5 * R : -0.36 * R);
   }
 
   drawBeard(ctx, R, beard) {
@@ -2846,6 +2844,16 @@ export class FighterPainter {
   }
 
   /** Feather headdress: a fan of feathers over the crown, a patterned headband and a gold disc. */
+  /** Earring (a hoop or a stud) hanging at (x, y) in head space. */
+  drawEarring(ctx, R, x, y) {
+    const lk = this.look;
+    ctx.beginPath();
+    ctx.arc(x, y, lk.hoops ? 0.2 * R : 0.1 * R, 0, Math.PI * 2);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = this.mat(lk.earrings, this.tint).base;
+    ctx.stroke();
+  }
+
   /** One headdress feather centred on the origin along +x. */
   drawFeather(ctx, R, L, quill, tip) {
     const outl = this.outline;

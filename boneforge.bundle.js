@@ -843,6 +843,8 @@ const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
+    // low-health look: her hoop earring gets knocked off
+    damaged: { look: { earrings: null }, props: [{ type: 'earring', from: 'head', vx: 2.5, vy: 9, spin: 0.5 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },
@@ -9301,6 +9303,10 @@ class FighterPainter {
         this.drawFeather(ctx, R, R * 1.9, this.mat(hat.color, 0).base, this.mat(hat.tip, 0).base);
         break;
       }
+      case 'earring':
+        if (!lk.earrings) { ok = false; break; }
+        this.drawEarring(ctx, R, 0, 0);
+        break;
       case 'headphones':
         if (!lk.headphones) { ok = false; break; }
         this.drawHeadphonesAt(ctx, { x: -2, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 });
@@ -9462,13 +9468,7 @@ class FighterPainter {
     ctx.ellipse(-0.14 * R, -0.06 * R, 0.09 * R, 0.16 * R, 0.15, 0, Math.PI * 2);
     ctx.fillStyle = darken(this.skin.base, 0.25);
     ctx.fill();
-    if (lk.earrings) {
-      ctx.beginPath();
-      ctx.arc(-0.12 * R, lk.hoops ? -0.5 * R : -0.36 * R, lk.hoops ? 0.2 * R : 0.1 * R, 0, Math.PI * 2);
-      ctx.lineWidth = 2.2;
-      ctx.strokeStyle = this.mat(lk.earrings, t).base;
-      ctx.stroke();
-    }
+    if (lk.earrings) this.drawEarring(ctx, R, -0.12 * R, lk.hoops ? -0.5 * R : -0.36 * R);
   }
 
   drawBeard(ctx, R, beard) {
@@ -9991,6 +9991,16 @@ class FighterPainter {
   }
 
   /** Feather headdress: a fan of feathers over the crown, a patterned headband and a gold disc. */
+  /** Earring (a hoop or a stud) hanging at (x, y) in head space. */
+  drawEarring(ctx, R, x, y) {
+    const lk = this.look;
+    ctx.beginPath();
+    ctx.arc(x, y, lk.hoops ? 0.2 * R : 0.1 * R, 0, Math.PI * 2);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = this.mat(lk.earrings, this.tint).base;
+    ctx.stroke();
+  }
+
   /** One headdress feather centred on the origin along +x. */
   drawFeather(ctx, R, L, quill, tip) {
     const outl = this.outline;
@@ -11169,7 +11179,7 @@ const DRAW = {
 const FLOAT = { feather: true, belt: true };
 
 /** Rest height of the centre of each item on the floor (big hats sit higher than a tooth). */
-const FLOOR = { tophat: 18, chefhat: 18, cap: 12, sombrero: 8, mask: 16, bearhood: 20, headphones: 10 };
+const FLOOR = { earring: 5, tophat: 18, chefhat: 18, cap: 12, sombrero: 8, mask: 16, bearhood: 20, headphones: 10 };
 
 /**
  * painter (optional): the owner's FighterPainter; when given, the item is drawn with the same code as
@@ -11711,9 +11721,12 @@ function drawHud(ctx, match, hud, portraits) {
     g.addColorStop(1, low ? '#c43a1a' : '#d98a14');
     ctx.fillStyle = g;
     ctx.fill();
+    // glossy highlight, clipped to the health fill so it never pokes past its slanted ends
+    ctx.save();
+    ctx.clip();
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    slanted(ctx, left ? x + barW - hw : x, top + 2, hw, 5, left ? 2 : -2);
-    ctx.fill();
+    ctx.fillRect(x, top + 2, barW, 5);
+    ctx.restore();
     // stun meter
     const sk = Math.min(1, f.stun / f.stats.stunMax);
     ctx.fillStyle = 'rgba(12,6,18,0.8)';

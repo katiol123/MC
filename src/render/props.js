@@ -173,7 +173,7 @@ const DRAW = {
 const FLOAT = { feather: true, belt: true };
 
 /** Rest height of the centre of each item on the floor (big hats sit higher than a tooth). */
-const FLOOR = { tophat: 18, chefhat: 18, cap: 12, sombrero: 8, mask: 16, bearhood: 20, headphones: 10 };
+const FLOOR = { earring: 5, tophat: 18, chefhat: 18, cap: 12, sombrero: 8, mask: 16, bearhood: 20, headphones: 10 };
 
 /**
  * painter (optional): the owner's FighterPainter; when given, the item is drawn with the same code as

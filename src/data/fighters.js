@@ -180,6 +180,8 @@ export const ROSTER = [
       shoes: { type: 'boots', color: '#1d1a20', sole: '#0c0a0d' },
       victory: 0,
     },
+    // low-health look: her hoop earring gets knocked off
+    damaged: { look: { earrings: null }, props: [{ type: 'earring', from: 'head', vx: 2.5, vy: 9, spin: 0.5 }] },
     moves: {
       lk: { damage: 46, startup: 5 },
       hk: { startup: 10, damage: 88 },

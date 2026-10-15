@@ -100,9 +100,12 @@ export function drawHud(ctx, match, hud, portraits) {
     g.addColorStop(1, low ? '#c43a1a' : '#d98a14');
     ctx.fillStyle = g;
     ctx.fill();
+    // glossy highlight, clipped to the health fill so it never pokes past its slanted ends
+    ctx.save();
+    ctx.clip();
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    slanted(ctx, left ? x + barW - hw : x, top + 2, hw, 5, left ? 2 : -2);
-    ctx.fill();
+    ctx.fillRect(x, top + 2, barW, 5);
+    ctx.restore();
     // stun meter
     const sk = Math.min(1, f.stun / f.stats.stunMax);
     ctx.fillStyle = 'rgba(12,6,18,0.8)';
