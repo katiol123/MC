@@ -7634,22 +7634,31 @@ class FightRenderer {
 
   /** Focus (Tao's super buff): a pulsing golden aura behind the fighter (screen space). */
   drawFocusAura(ctx, f, skel, now, z, s) {
-    const t = now / 1000, fade = Math.min(1, f.focus / 60);
-    const prev = ctx.globalCompositeOperation;
+    // a faint golden halo stretched along the body (head to feet), so it lies down with a lying fighter
+    const t = now / 1000, fade = Math.min(1, f.focus / 60), ps = f.props.posScale;
+    const J = skel.j;
+    const P = (x, y) => ({ x: s.x + x * z * f.facing, y: s.y - y * z });
+    const head = P(J.head.x, J.head.y), feet = P((J.ankleF.x + J.ankleB.x) / 2, (J.ankleF.y + J.ankleB.y) / 2);
+    const cx = (head.x + feet.x) / 2, cy = (head.y + feet.y) / 2;
+    const len = Math.hypot(head.x - feet.x, head.y - feet.y) / 2 + 30 * z * ps;
+    const wid = 44 * z * ps;
+    const pulse = Math.sin(t * 4);
     ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.atan2(head.y - feet.y, head.x - feet.x));
+    ctx.save();
+    ctx.scale(1, wid / len); // the round glow squashed into an ellipse around the body axis
     ctx.globalCompositeOperation = 'lighter';
-    const cy = s.y - 120 * z * f.props.posScale;
-    drawGlow(ctx, s.x, cy, (110 + 8 * Math.sin(t * 6)) * z, 0.32 * fade, '255,210,90');
-    ctx.globalCompositeOperation = prev;
-    ctx.strokeStyle = `rgba(255,214,90,${0.5 * fade})`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 2; i++) {
-      ctx.beginPath();
-      ctx.ellipse(s.x, cy, (70 + i * 14 + 6 * Math.sin(t * 5 + i)) * z, (130 + i * 10) * z, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    drawGlow(ctx, 0, 0, len * 1.2, (0.12 + 0.03 * pulse) * fade, '255,210,90');
+    ctx.restore();
+    ctx.strokeStyle = `rgba(255,214,90,${(0.16 + 0.05 * pulse) * fade})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, len + 3 * pulse * z, wid + 2 * pulse * z, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
+
 
   /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */
   drawTalon(ctx, f, skel, alpha) {
