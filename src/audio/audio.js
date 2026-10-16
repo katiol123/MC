@@ -14,6 +14,22 @@ const SAMPLES = {
   crowdLaugh: { src: 'crowd-laugh.mp3', gain: 0.95, gap: 1.0 },
   chomp: { src: 'chomp.mp3', gain: 0.9, gap: 0.25 },
   shing: { src: 'knife.mp3', gain: 0.9, gap: 0.3 },
+  // fatality scenes (the frying-pan clang and the heartbeat stay synthesised)
+  boom: { src: 'boom.mp3', gain: 0.85, gap: 0.3 },
+  whoosh: { src: 'whoosh.mp3', gain: 0.55, gap: 0.3 },
+  crash: { src: 'crash.mp3', gain: 0.85, gap: 0.3 },
+  boing: { src: 'boing.mp3', gain: 0.7, gap: 0.2 },
+  thud: { src: 'thud.mp3', gain: 0.85, gap: 0.15 },
+  pop: { src: 'pop.mp3', gain: 0.8, gap: 0.15 },
+  crumble: { src: 'crumble.mp3', gain: 0.75, gap: 0.5 },
+  ding: { src: 'ding.mp3', gain: 0.6, gap: 0.3 },
+  splash: { src: 'splash.mp3', gain: 0.8, gap: 0.4 },
+  cash: { src: 'cash.mp3', gain: 0.7, gap: 0.2 },
+  zap: { src: 'zap.mp3', gain: 0.55, gap: 0.15 },
+  twang: { src: 'twang.mp3', gain: 0.8, gap: 0.3 },
+  snore: { src: 'snore.mp3', gain: 0.7, gap: 0.5 },
+  kiss: { src: 'kiss.mp3', gain: 0.8, gap: 0.3 },
+  fire: { src: 'fire.mp3', gain: 0.6, gap: 0.8 },
 };
 
 export class AudioSystem {
