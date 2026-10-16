@@ -134,12 +134,12 @@ export const DIZZY = [
 export const VICTORY = [
   // 0: fist to the sky
   P(STANCE, { x: 0, y: 118, lean: -6, chest: -8, neck: -10, head: -18, fa: [176, 14, 0], ba: [22, 118, 10], ff: [26, 8, 0], bf: [-26, 8, 0] }),
-  // 1: arms crossed, calm
-  P(STANCE, { x: 0, y: 121, lean: -3, chest: -4, neck: 2, head: -6, fa: [66, 128, 0], ba: [72, 122, 0], ff: [20, 8, 0], bf: [-22, 8, 0] }),
-  // 2: martial bow (fist to palm)
-  P(STANCE, { x: 0, y: 118, lean: 22, chest: 6, neck: 10, head: 14, fa: [72, 112, 0], ba: [78, 108, 0], ff: [14, 8, 0], bf: [-14, 8, 0] }),
-  // 3: double flex
-  P(STANCE, { x: 0, y: 112, lean: -4, chest: -6, neck: -4, head: -10, fa: [112, 130, 0], ba: [104, 132, 0], ff: [30, 8, 0], bf: [-30, 8, 0] }),
+  // 1: arms folded across the chest, chin up (forearms level: reads as folded arms in profile)
+  P(STANCE, { x: -2, y: 121, lean: -6, chest: -10, neck: -4, head: -12, fa: [24, 76, 0], ba: [30, 70, 0], ff: [20, 8, 0], bf: [-22, 8, 0] }),
+  // 2: martial bow - fist pressed into the palm, held well out in front of the chest
+  P(STANCE, { x: 0, y: 118, lean: 24, chest: 8, neck: 12, head: 16, fa: [58, 44, 0], ba: [64, 40, 0], ff: [14, 8, 0], bf: [-14, 8, 0] }),
+  // 3: biceps flex - near arm out front with the fist up, far arm cocked higher behind it
+  P(STANCE, { x: 0, y: 114, lean: -6, chest: -12, neck: -6, head: -12, fa: [92, 80, 0], ba: [104, 90, 0], ff: [30, 8, 0], bf: [-30, 8, 0] }),
 ];
 
 export const DEFEAT_KNEEL = P(STANCE, {
