@@ -68,14 +68,15 @@ export const INJ = {
   spectacle: 15, // spectacle points for injuring the opponent
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
-  upgradeCost: 150, upgradeCostGrowth: 0.35, // 150, 203, 255, ... per level of that attribute
+  upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
 };
 
-export function upgradeCost(f, attr) {
-  const lvl = f.upLevels?.[attr] || 0;
-  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * lvl));
+export function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
+  // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
+  const bought = Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
+  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought));
 }
 
 /** Average permanent bar shift over the whole league (upgrades minus injury damage). */
@@ -141,7 +142,7 @@ export function addInjury(t, id, kind, drift = leagueDrift(t)) {
   }
   f.injuries = f.injuries.filter((i) => i.kind !== kind);
   f.injuries.push({ kind, games: inj.games });
-  f.injuryLog.push({ kind, perm });
+  f.injuryLog.push({ kind, perm, season: t.season || 1 });
   return { kind, games: inj.games, perm };
 }
 
@@ -154,7 +155,7 @@ export function tickInjuries(rec) {
 /** Purchase history (fighter card): what was bought, after which round, by whom. */
 export function logPurchase(t, id, item, cost, by) {
   const f = t.fighters[id];
-  (f.purchases ||= []).push({ after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
+  (f.purchases ||= []).push({ season: t.season || 1, after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
 }
 
 export function buyUpgrade(t, id, attr, by = 'you') {

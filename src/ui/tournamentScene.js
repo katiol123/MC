@@ -5,7 +5,7 @@ import { ROSTER } from '../data/fighters.js';
 import { el, clearUI } from './dom.js';
 import {
   createTournament, load, save, clearSaved, standings, awards, allMatches, nextMatch, isFinished,
-  currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME,
+  currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME, nextSeason,
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
 import { showFighterCard, fighterLink } from './fighterCard.js';
@@ -142,7 +142,7 @@ export class TournamentScene {
     this.root = el('div', { class: 'tour' }, [
       el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
       el('div', { class: 'tour-head' }, [
-        el('div', { class: 'tour-title' }, ['ROUND ROBIN']),
+        el('div', { class: 'tour-title' }, [`SEASON ${t.season || 1} · ROUND ROBIN`]),
         el('div', { class: 'tour-progress' }, [
           el('span', {}, [finished ? 'TOURNAMENT COMPLETE' : `ROUND ${cr + 1} / ${t.rounds.length}`]),
           el('div', { class: 'tbar' }, [el('div', { class: 'tbar-fill', style: { width: `${(played / total) * 100}%` } })]),
@@ -162,7 +162,7 @@ export class TournamentScene {
         el('div', { class: 'fixtures' }, fixtures),
         roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
         el('div', { class: 'tour-actions col' }, finished
-          ? [btn('CHAMPION', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          ? [btn(`▶ START SEASON ${(t.season || 1) + 1}`, () => this.startNextSeason(), 'big'), btn('CHAMPION', () => this.showFinal()), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
           : [
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
@@ -200,6 +200,32 @@ export class TournamentScene {
       ['Yes, start over', () => { this.modal = null; clearSaved(); this.t = null; this.showNew(); }],
       ['Cancel', () => { this.modal = null; }],
     ], { subtitle: 'The current table and all results will be lost.', onBack: () => { this.modal = null; } });
+  }
+
+  /** The league carries on: same fighters with their careers, a fresh schedule (tournament.js nextSeason). */
+  startNextSeason() {
+    if (!isFinished(this.t)) return;
+    this.t = nextSeason(this.t);
+    save(this.t);
+    this.viewRound = null;
+    this.app.audio.ui('slam');
+    this.render();
+    const s = this.t.season;
+    const wrap = el('div', { class: 'menu-overlay final' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, [`SEASON ${s - 1} IS IN THE BOOKS`]),
+        el('div', { class: 'awards-title' }, [`SEASON ${s}`]),
+        el('div', { class: 'season-note' }, [
+          'Fame, upgrades, injury damage and every fighter\'s history carry over. ',
+          'Upgrade prices are back to ★150, stamina is full, injuries healed over the break and morale has calmed down. New schedule.',
+        ]),
+        el('div', { class: 'tour-actions' }, [btn('LET\'S GO', () => close(), 'big')]),
+      ]),
+    ]);
+    const close = () => { wrap.remove(); this.modal = null; unsub(); };
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (['Escape', 'Enter', 'Space'].includes(code)) close(); });
+    document.getElementById('ui').appendChild(wrap);
   }
 
   // --- watching / replays -------------------------------------------------------------------------
@@ -244,7 +270,7 @@ export class TournamentScene {
     const ri = t.rounds.findIndex((r) => r.includes(m));
     const order = standings(t).map((r) => r.id);
     const place = (id) => `#${order.indexOf(id) + 1} IN TABLE`;
-    const sub = `${isReplay ? 'REPLAY · ' : ''}TOURNAMENT · ROUND ${ri + 1} OF ${t.rounds.length}`;
+    const sub = `${isReplay ? 'REPLAY · ' : ''}SEASON ${t.season || 1} · ROUND ${ri + 1} OF ${t.rounds.length}`;
     this.app.setScene(new VersusScene(this.app, m.a, m.b, 'watch', { sub, tags: isReplay || ri === 0 ? null : [place(m.a), place(m.b)], start }));
   }
 
@@ -418,7 +444,7 @@ export class TournamentScene {
     const base = BASE_PROFILE[id];
     const row = (a) => {
       const b = base[a] ?? 0.5, perm = f.perm[a] || 0;
-      const up = (f.upLevels[a] || 0) * INJ.upgradeStep, hurt = perm - up;
+      const up = ((f.upLevels[a] || 0) + (f.careerUp?.[a] || 0)) * INJ.upgradeStep, hurt = perm - up;
       const cost = upgradeCost(f, a);
       const pct = (v) => `${Math.max(0, Math.min(140, v * 100)) / 1.4}%`;
       return el('div', { class: `up-row ${ATTRIBUTES.find((x) => x.id === a).group}` }, [
@@ -440,7 +466,7 @@ export class TournamentScene {
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
           el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
-        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
+        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · every upgrade raises the next price (resets each season)']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
         el('div', { class: 'up-inj' }, f.injuryLog.length
           ? f.injuryLog.map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${ATTR_LABEL[a].toLowerCase()} ${v.toFixed(2)}`).join(', ')}`]))
@@ -546,14 +572,14 @@ export class TournamentScene {
     const close = () => { wrap.remove(); this.modal = null; unsub(); };
     const wrap = el('div', { class: 'menu-overlay final' }, [
       el('div', { class: 'final-panel' }, [
-        el('div', { class: 'final-kicker' }, ['TOURNAMENT CHAMPION']),
+        el('div', { class: 'final-kicker' }, [`SEASON ${t.season || 1} CHAMPION`]),
         el('div', { class: 'final-champ' }, [
           el('div', { class: 'final-portrait', style: { backgroundImage: `url(${this.app.portraitURL(champ.id)})` } }),
           el('div', { class: 'final-name' }, [this.link(champ.id, NAME[champ.id]), el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. `, this.link(r.id), ` · ${r.pts} pts`]))),
-        el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
+        el('div', { class: 'tour-actions' }, [btn(`▶ SEASON ${(t.season || 1) + 1}`, () => { close(); this.startNextSeason(); }, 'big'), btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
       ]),
     ]);
     this.modal = true;

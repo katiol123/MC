@@ -55,7 +55,7 @@ export function showFighterCard(app, t, id, opts = {}) {
   const cond = { body: conditionShift(f.stamina, 'stamina'), mind: conditionShift(f.morale, 'morale') };
   const attrRow = (a) => {
     const base = src.profile?.[a.id] ?? 0.5;
-    const up = (f.upLevels?.[a.id] || 0) * INJ.upgradeStep;
+    const up = ((f.upLevels?.[a.id] || 0) + (f.careerUp?.[a.id] || 0)) * INJ.upgradeStep;
     const perm = f.perm?.[a.id] || 0, hurt = perm - up, tmp = temp[a.id] || 0, c = cond[a.group];
     const now = base + shift[a.id] + c;
     const pct = (v) => `${Math.max(0, Math.min(1.4, v)) / 1.4 * 100}%`;
@@ -102,7 +102,8 @@ export function showFighterCard(app, t, id, opts = {}) {
   const injuries = f.injuries.length
     ? f.injuries.map((i) => el('div', { class: 'fc-inj' }, [`${INJURIES[i.kind].icon} ${INJURIES[i.kind].label}`, el('small', {}, [` — ${INJURIES[i.kind].desc} · ${i.games} more match${i.games > 1 ? 'es' : ''}`])]))
     : [el('div', { class: 'fc-none' }, ['No active injuries.'])];
-  const scars = (f.injuryLog || []).map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${LABEL[a].toLowerCase()} ${signed(pts(v))}`).join(', ')}`]));
+  const multi = (t.season || 1) > 1;
+  const scars = (f.injuryLog || []).map((l) => el('span', {}, [`${multi ? `S${l.season || 1} ` : ''}${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${LABEL[a].toLowerCase()} ${signed(pts(v))}`).join(', ')}`]));
 
   // --- matches
   const matches = [];
@@ -133,14 +134,29 @@ export function showFighterCard(app, t, id, opts = {}) {
   });
   const won = (t.roundAwards || []).flatMap((list, ri) => (list || []).filter((a) => a.id === id).map((a) => el('span', { class: 'fc-award' }, [`🏅 R${ri + 1} ${a.title}`])));
 
+  // --- career: past seasons (places, titles), career fame
+  const c = f.career, past = (t.seasons || []).map((s) => {
+    const i = s.table.findIndex((r) => r.id === id), r = s.table[i];
+    return r ? el('span', { class: `fc-season ${i === 0 ? 'champ' : ''}` }, [`S${s.season}: ${i === 0 ? '🏆 ' : ''}#${i + 1} · ${r.pts} pts · ${r.won}W ${r.lost}L`]) : null;
+  });
+  const career = c ? el('div', { class: 'fc-career' }, [
+    el('div', { class: 'fc-sec' }, ['CAREER']),
+    el('div', { class: 'fc-cstats' }, [
+      el('span', {}, [`${c.seasons} past season${c.seasons > 1 ? 's' : ''}`]),
+      el('span', { class: 'gold' }, [`${c.titles} title${c.titles === 1 ? '' : 's'}`]),
+      el('span', {}, [`fame earned ${c.fameEarned + (f.fameEarned || 0)} · spent ${c.spentFame + (f.spentFame || 0)}`]),
+    ]),
+    el('div', { class: 'fc-seasons' }, past),
+  ]) : null;
+
   // --- purchases, grouped by the camp they were made in
   const byCamp = {};
-  for (const p of f.purchases || []) (byCamp[p.after] ||= []).push(p);
+  for (const p of f.purchases || []) (byCamp[`${p.season || 1}|${p.after}`] ||= []).push(p);
   const purchases = Object.keys(byCamp).length
-    ? Object.entries(byCamp).map(([after, list]) => el('div', { class: 'fc-camp' }, [
-      el('span', { class: 'fc-rd' }, [Number(after) ? `after R${after}` : 'before R1']),
+    ? Object.entries(byCamp).reverse().map(([key, list]) => { const [s, after] = key.split('|').map(Number); return el('div', { class: 'fc-camp' }, [
+      el('span', { class: 'fc-rd' }, [`${multi ? `S${s} ` : ''}${after ? `after R${after}` : 'before R1'}`]),
       el('span', { class: 'fc-items' }, list.map((p) => el('em', { class: p.by === 'auto' ? 'auto' : 'you' }, [`${itemLabel(p.item)} ★${p.cost}`, el('small', {}, [p.by === 'auto' ? ' manager' : ' you'])]))),
-    ]))
+    ]); })
     : [el('div', { class: 'fc-none' }, ['Nothing bought yet.'])];
 
   const wrap = el('div', { class: 'menu-overlay fcard-overlay', onclick: (e) => { if (e.target === wrap) close(); } }, [
@@ -157,7 +173,7 @@ export function showFighterCard(app, t, id, opts = {}) {
             el('span', {}, [`${row.won}W ${row.lost}L${row.drawn ? ` ${row.drawn}D` : ''}`]),
             el('span', {}, [`rounds ${row.rf}:${row.ra}`]),
             el('span', { class: 'gold' }, [`★${f.fame} fame`]),
-            el('span', { class: 'dim' }, [`earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
+            el('span', { class: 'dim' }, [`this season: earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
           ]),
         ]),
       ]),
@@ -175,7 +191,8 @@ export function showFighterCard(app, t, id, opts = {}) {
           el('div', { class: 'fc-move su' }, [el('div', { class: 'fc-mname' }, [def.moves.su?.name || '—', el('small', {}, [` SUPER · ${SUPER_INPUT}`])]), el('p', {}, [info.super || ''])]),
         ]),
         el('div', { class: 'fc-col' }, [
-          el('div', { class: 'fc-sec' }, ['TOURNAMENT', opts.onReplay ? el('small', {}, [' · click a result to replay']) : null]),
+          career,
+          el('div', { class: 'fc-sec' }, [`SEASON ${t.season || 1}`, opts.onReplay ? el('small', {}, [' · click a result to replay']) : null]),
           el('div', { class: 'fc-matches' }, matches),
           won.length ? el('div', { class: 'fc-awards' }, won) : null,
           el('div', { class: 'fc-sec' }, ['PURCHASES']),

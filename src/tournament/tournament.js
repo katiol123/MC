@@ -76,6 +76,52 @@ export function createTournament(opts) {
   return t;
 }
 
+/** Off-season: morale settles this share of the way back to the start value. */
+const OFFSEASON_MORALE = 0.5;
+
+/**
+ * Next season: a fresh round robin with a new schedule, but the fighters keep their careers -
+ * fame, upgrades and permanent injury damage, purchase / injury history, manager mode - and the
+ * finished season is filed in t.seasons. Upgrade prices start again from the base price, stamina
+ * is fully restored, active injuries heal over the break and morale calms down halfway.
+ */
+export function nextSeason(t) {
+  const table = standings(t);
+  const season = t.season || 1;
+  const n = createTournamentRaw({ ids: t.ids, level: t.level, seed: (Math.imul(t.seed || 1, 1103515245) + 12345 + season) >>> 2 });
+  n.season = season + 1;
+  n.seasons = [...(t.seasons || []), {
+    season,
+    champion: table[0]?.id,
+    table: table.map((r) => ({ id: r.id, pts: r.pts, won: r.won, lost: r.lost, drawn: r.drawn, rf: r.rf, ra: r.ra })),
+  }];
+  for (const id of t.ids) {
+    const o = t.fighters[id], f = n.fighters[id];
+    const careerUp = { ...(o.careerUp || {}) };
+    for (const [a, lv] of Object.entries(o.upLevels || {})) careerUp[a] = (careerUp[a] || 0) + lv;
+    const c = o.career || {};
+    Object.assign(f, {
+      overrides: o.overrides || {},
+      fame: o.fame,
+      auto: o.auto,
+      perm: { ...(o.perm || {}) },
+      upLevels: {}, // prices reset to the base price
+      careerUp, // upgrades bought in past seasons (fighter card / upgrade shop breakdown)
+      injuryLog: (o.injuryLog || []).map((l) => ({ season, ...l })),
+      purchases: (o.purchases || []).map((p) => ({ season, ...p })),
+      morale: COND.start.morale + (o.morale - COND.start.morale) * (1 - OFFSEASON_MORALE),
+      career: {
+        seasons: (c.seasons || 0) + 1,
+        titles: (c.titles || 0) + (table[0]?.id === id ? 1 : 0),
+        fameEarned: (c.fameEarned || 0) + (o.fameEarned || 0),
+        spentFame: (c.spentFame || 0) + (o.spentFame || 0),
+      },
+    });
+  }
+  n.history[0] = snapshot(n);
+  return n;
+}
+
 export function allMatches(t) {
   return t.rounds.flatMap((r, ri) => r.map((m, mi) => ({ m, ri, mi })));
 }

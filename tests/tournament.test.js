@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTournament, allMatches, roundRobin, MatchRunner, standings, snapshotOverrides, awards, roundComplete, setupMatch, AWARD_FAME } from '../src/tournament/tournament.js';
+import { createTournament, allMatches, roundRobin, MatchRunner, standings, snapshotOverrides, awards, roundComplete, setupMatch, AWARD_FAME, nextSeason, isFinished } from '../src/tournament/tournament.js';
 
 test('round robin: every pair meets exactly once, everyone plays once per round', () => {
   const ids = Array.from({ length: 16 }, (_, i) => `f${i}`);
@@ -136,6 +136,7 @@ test('upgrades: any attribute, rising price, raise the bars the fighter fights w
   const c1 = I.upgradeCost(f, 'power');
   assert.ok(I.buyUpgrade(t, 'brick', 'power'));
   assert.ok(I.upgradeCost(f, 'power') > c1);
+  assert.equal(I.upgradeCost(f, 'speed'), I.upgradeCost(f, 'power'), 'any upgrade raises the price of every attribute');
   for (const a of I.ATTR_IDS) assert.ok(I.buyUpgrade(t, 'brick', a), a);
   const after = buildFighterDef('brick', snapshotOverrides(t, allMatches(t)[0].m)[allMatches(t)[0].m.a === 'brick' ? 0 : 1]).attrs.power;
   assert.ok(after > before);
@@ -166,4 +167,33 @@ test('underdog fame bonus: none in rounds 1-2, from round 3 the bottom 4 of the 
     }
   }
   assert.ok(t.history.length === t.rounds.length + 1 && t.history.every(Boolean), 'a chart snapshot per round');
+});
+
+test('next season: careers carry over (fame, upgrades, history), prices and condition reset, new schedule', async () => {
+  const I = await import('../src/tournament/injuries.js');
+  const ids = ['brick', 'jax', 'roxy', 'tao'];
+  const t = createTournament({ seed: 9, ids });
+  for (const { m } of allMatches(t)) { const r = new MatchRunner(t, m); r.finish(); r.record(); }
+  assert.ok(isFinished(t));
+  const f = t.fighters.brick;
+  f.fame += 1000;
+  I.buyUpgrade(t, 'brick', 'power'); I.buyUpgrade(t, 'brick', 'speed');
+  f.injuries = [{ kind: 'ankle', games: 2 }];
+  f.stamina = 30;
+  const champ = standings(t)[0].id;
+  const n = nextSeason(t);
+  const g = n.fighters.brick;
+  assert.equal(n.season, 2);
+  assert.equal(n.seasons.length, 1);
+  assert.equal(n.seasons[0].champion, champ);
+  assert.equal(g.fame, f.fame);
+  assert.deepEqual(g.perm, f.perm);
+  assert.equal(g.careerUp.power, 1);
+  assert.equal(I.upgradeCost(g, 'power'), 150, 'prices start again from the base price');
+  assert.equal(g.injuries.length, 0);
+  assert.equal(g.stamina, 100);
+  assert.equal(g.purchases.length, f.purchases.length);
+  assert.equal(n.fighters[champ].career.titles, 1);
+  assert.ok(allMatches(n).every(({ m }) => !m.result));
+  assert.notDeepEqual(n.rounds.map((r) => r.map((m) => m.seed)), t.rounds.map((r) => r.map((m) => m.seed)));
 });

@@ -576,3 +576,8 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .fc-items em { font-style: normal; }
 .fc-items em small { color: rgba(255,255,255,.45); }
 .fc-items em.you small { color: var(--p2); }
+.fc-cstats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; font-weight: 700; }
+.fc-cstats .gold { color: var(--gold); }
+.fc-seasons { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: rgba(255,255,255,.75); }
+.fc-season.champ { color: var(--gold); font-weight: 800; }
+.season-note { max-width: 640px; text-align: center; font: 600 14px/1.5 "Segoe UI", sans-serif; color: rgba(255,255,255,.85); }

@@ -13236,6 +13236,7 @@ __define("src/tournament/tournament.js", function (__exports, __require) {
   Object.defineProperty(__exports, "POINTS", { enumerable: true, get: () => POINTS });
   Object.defineProperty(__exports, "roundRobin", { enumerable: true, get: () => roundRobin });
   Object.defineProperty(__exports, "createTournament", { enumerable: true, get: () => createTournament });
+  Object.defineProperty(__exports, "nextSeason", { enumerable: true, get: () => nextSeason });
   Object.defineProperty(__exports, "allMatches", { enumerable: true, get: () => allMatches });
   Object.defineProperty(__exports, "nextMatch", { enumerable: true, get: () => nextMatch });
   Object.defineProperty(__exports, "isFinished", { enumerable: true, get: () => isFinished });
@@ -13327,6 +13328,52 @@ function createTournament(opts) {
   const t = createTournamentRaw(opts);
   t.history[0] = snapshot(t);
   return t;
+}
+
+/** Off-season: morale settles this share of the way back to the start value. */
+const OFFSEASON_MORALE = 0.5;
+
+/**
+ * Next season: a fresh round robin with a new schedule, but the fighters keep their careers -
+ * fame, upgrades and permanent injury damage, purchase / injury history, manager mode - and the
+ * finished season is filed in t.seasons. Upgrade prices start again from the base price, stamina
+ * is fully restored, active injuries heal over the break and morale calms down halfway.
+ */
+function nextSeason(t) {
+  const table = standings(t);
+  const season = t.season || 1;
+  const n = createTournamentRaw({ ids: t.ids, level: t.level, seed: (Math.imul(t.seed || 1, 1103515245) + 12345 + season) >>> 2 });
+  n.season = season + 1;
+  n.seasons = [...(t.seasons || []), {
+    season,
+    champion: table[0]?.id,
+    table: table.map((r) => ({ id: r.id, pts: r.pts, won: r.won, lost: r.lost, drawn: r.drawn, rf: r.rf, ra: r.ra })),
+  }];
+  for (const id of t.ids) {
+    const o = t.fighters[id], f = n.fighters[id];
+    const careerUp = { ...(o.careerUp || {}) };
+    for (const [a, lv] of Object.entries(o.upLevels || {})) careerUp[a] = (careerUp[a] || 0) + lv;
+    const c = o.career || {};
+    Object.assign(f, {
+      overrides: o.overrides || {},
+      fame: o.fame,
+      auto: o.auto,
+      perm: { ...(o.perm || {}) },
+      upLevels: {}, // prices reset to the base price
+      careerUp, // upgrades bought in past seasons (fighter card / upgrade shop breakdown)
+      injuryLog: (o.injuryLog || []).map((l) => ({ season, ...l })),
+      purchases: (o.purchases || []).map((p) => ({ season, ...p })),
+      morale: COND.start.morale + (o.morale - COND.start.morale) * (1 - OFFSEASON_MORALE),
+      career: {
+        seasons: (c.seasons || 0) + 1,
+        titles: (c.titles || 0) + (table[0]?.id === id ? 1 : 0),
+        fameEarned: (c.fameEarned || 0) + (o.fameEarned || 0),
+        spentFame: (c.spentFame || 0) + (o.spentFame || 0),
+      },
+    });
+  }
+  n.history[0] = snapshot(n);
+  return n;
 }
 
 function allMatches(t) {
@@ -14028,14 +14075,15 @@ const INJ = {
   spectacle: 15, // spectacle points for injuring the opponent
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
-  upgradeCost: 150, upgradeCostGrowth: 0.35, // 150, 203, 255, ... per level of that attribute
+  upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
 };
 
-function upgradeCost(f, attr) {
-  const lvl = f.upLevels?.[attr] || 0;
-  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * lvl));
+function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
+  // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
+  const bought = Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
+  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought));
 }
 
 /** Average permanent bar shift over the whole league (upgrades minus injury damage). */
@@ -14101,7 +14149,7 @@ function addInjury(t, id, kind, drift = leagueDrift(t)) {
   }
   f.injuries = f.injuries.filter((i) => i.kind !== kind);
   f.injuries.push({ kind, games: inj.games });
-  f.injuryLog.push({ kind, perm });
+  f.injuryLog.push({ kind, perm, season: t.season || 1 });
   return { kind, games: inj.games, perm };
 }
 
@@ -14114,7 +14162,7 @@ function tickInjuries(rec) {
 /** Purchase history (fighter card): what was bought, after which round, by whom. */
 function logPurchase(t, id, item, cost, by) {
   const f = t.fighters[id];
-  (f.purchases ||= []).push({ after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
+  (f.purchases ||= []).push({ season: t.season || 1, after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
 }
 
 function buyUpgrade(t, id, attr, by = 'you') {
@@ -14653,7 +14701,7 @@ __define("src/ui/tournamentScene.js", function (__exports, __require) {
 // spectacle report after each match, and the final awards screen.
 const { ROSTER } = __require("src/data/fighters.js");
 const { el, clearUI } = __require("src/ui/dom.js");
-const { createTournament, load, save, clearSaved, standings, awards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
+const { createTournament, load, save, clearSaved, standings, awards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME, nextSeason } = __require("src/tournament/tournament.js");
 const { showSpectacle } = __require("src/ui/spectacle.js");
 const { showFighterCard, fighterLink } = __require("src/ui/fighterCard.js");
 const { faceStyle } = __require("src/ui/faces.js");
@@ -14789,7 +14837,7 @@ class TournamentScene {
     this.root = el('div', { class: 'tour' }, [
       el('div', { class: 'sel-bg' }, [el('div', { class: 'sel-stripes left' }), el('div', { class: 'sel-stripes right' }), el('div', { class: 'sel-halftone' })]),
       el('div', { class: 'tour-head' }, [
-        el('div', { class: 'tour-title' }, ['ROUND ROBIN']),
+        el('div', { class: 'tour-title' }, [`SEASON ${t.season || 1} · ROUND ROBIN`]),
         el('div', { class: 'tour-progress' }, [
           el('span', {}, [finished ? 'TOURNAMENT COMPLETE' : `ROUND ${cr + 1} / ${t.rounds.length}`]),
           el('div', { class: 'tbar' }, [el('div', { class: 'tbar-fill', style: { width: `${(played / total) * 100}%` } })]),
@@ -14809,7 +14857,7 @@ class TournamentScene {
         el('div', { class: 'fixtures' }, fixtures),
         roundComplete(t, vr) ? btn(`🏅 ROUND ${vr + 1} AWARDS`, () => this.showRoundAwards(vr), 'mini wide') : null,
         el('div', { class: 'tour-actions col' }, finished
-          ? [btn('CHAMPION', () => this.showFinal(), 'big'), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
+          ? [btn(`▶ START SEASON ${(t.season || 1) + 1}`, () => this.startNextSeason(), 'big'), btn('CHAMPION', () => this.showFinal()), btn('RESULTS GRID', () => this.showGrid()), btn('📈 CHARTS', () => this.openCharts()), btn('NEW TOURNAMENT', () => this.confirmNew()), btn('MAIN MENU', () => this.app.goTitle())]
           : [
             btn('▶ WATCH NEXT MATCH', () => this.watchNext(), 'big'),
             el('div', { class: 'tour-actions' }, [btn('SIMULATE MATCH', () => this.simulate('one')), btn('SIMULATE ROUND', () => this.simulate('round'))]),
@@ -14847,6 +14895,32 @@ class TournamentScene {
       ['Yes, start over', () => { this.modal = null; clearSaved(); this.t = null; this.showNew(); }],
       ['Cancel', () => { this.modal = null; }],
     ], { subtitle: 'The current table and all results will be lost.', onBack: () => { this.modal = null; } });
+  }
+
+  /** The league carries on: same fighters with their careers, a fresh schedule (tournament.js nextSeason). */
+  startNextSeason() {
+    if (!isFinished(this.t)) return;
+    this.t = nextSeason(this.t);
+    save(this.t);
+    this.viewRound = null;
+    this.app.audio.ui('slam');
+    this.render();
+    const s = this.t.season;
+    const wrap = el('div', { class: 'menu-overlay final' }, [
+      el('div', { class: 'final-panel' }, [
+        el('div', { class: 'final-kicker' }, [`SEASON ${s - 1} IS IN THE BOOKS`]),
+        el('div', { class: 'awards-title' }, [`SEASON ${s}`]),
+        el('div', { class: 'season-note' }, [
+          'Fame, upgrades, injury damage and every fighter\'s history carry over. ',
+          'Upgrade prices are back to ★150, stamina is full, injuries healed over the break and morale has calmed down. New schedule.',
+        ]),
+        el('div', { class: 'tour-actions' }, [btn('LET\'S GO', () => close(), 'big')]),
+      ]),
+    ]);
+    const close = () => { wrap.remove(); this.modal = null; unsub(); };
+    this.modal = true;
+    const unsub = this.app.keyboard.onPress((code) => { if (['Escape', 'Enter', 'Space'].includes(code)) close(); });
+    document.getElementById('ui').appendChild(wrap);
   }
 
   // --- watching / replays -------------------------------------------------------------------------
@@ -14891,7 +14965,7 @@ class TournamentScene {
     const ri = t.rounds.findIndex((r) => r.includes(m));
     const order = standings(t).map((r) => r.id);
     const place = (id) => `#${order.indexOf(id) + 1} IN TABLE`;
-    const sub = `${isReplay ? 'REPLAY · ' : ''}TOURNAMENT · ROUND ${ri + 1} OF ${t.rounds.length}`;
+    const sub = `${isReplay ? 'REPLAY · ' : ''}SEASON ${t.season || 1} · ROUND ${ri + 1} OF ${t.rounds.length}`;
     this.app.setScene(new VersusScene(this.app, m.a, m.b, 'watch', { sub, tags: isReplay || ri === 0 ? null : [place(m.a), place(m.b)], start }));
   }
 
@@ -15065,7 +15139,7 @@ class TournamentScene {
     const base = BASE_PROFILE[id];
     const row = (a) => {
       const b = base[a] ?? 0.5, perm = f.perm[a] || 0;
-      const up = (f.upLevels[a] || 0) * INJ.upgradeStep, hurt = perm - up;
+      const up = ((f.upLevels[a] || 0) + (f.careerUp?.[a] || 0)) * INJ.upgradeStep, hurt = perm - up;
       const cost = upgradeCost(f, a);
       const pct = (v) => `${Math.max(0, Math.min(140, v * 100)) / 1.4}%`;
       return el('div', { class: `up-row ${ATTRIBUTES.find((x) => x.id === a).group}` }, [
@@ -15087,7 +15161,7 @@ class TournamentScene {
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
           el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
-        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
+        el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · every upgrade raises the next price (resets each season)']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
         el('div', { class: 'up-inj' }, f.injuryLog.length
           ? f.injuryLog.map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${ATTR_LABEL[a].toLowerCase()} ${v.toFixed(2)}`).join(', ')}`]))
@@ -15193,14 +15267,14 @@ class TournamentScene {
     const close = () => { wrap.remove(); this.modal = null; unsub(); };
     const wrap = el('div', { class: 'menu-overlay final' }, [
       el('div', { class: 'final-panel' }, [
-        el('div', { class: 'final-kicker' }, ['TOURNAMENT CHAMPION']),
+        el('div', { class: 'final-kicker' }, [`SEASON ${t.season || 1} CHAMPION`]),
         el('div', { class: 'final-champ' }, [
           el('div', { class: 'final-portrait', style: { backgroundImage: `url(${this.app.portraitURL(champ.id)})` } }),
           el('div', { class: 'final-name' }, [this.link(champ.id, NAME[champ.id]), el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. `, this.link(r.id), ` · ${r.pts} pts`]))),
-        el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
+        el('div', { class: 'tour-actions' }, [btn(`▶ SEASON ${(t.season || 1) + 1}`, () => { close(); this.startNextSeason(); }, 'big'), btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
       ]),
     ]);
     this.modal = true;
@@ -15520,7 +15594,7 @@ function showFighterCard(app, t, id, opts = {}) {
   const cond = { body: conditionShift(f.stamina, 'stamina'), mind: conditionShift(f.morale, 'morale') };
   const attrRow = (a) => {
     const base = src.profile?.[a.id] ?? 0.5;
-    const up = (f.upLevels?.[a.id] || 0) * INJ.upgradeStep;
+    const up = ((f.upLevels?.[a.id] || 0) + (f.careerUp?.[a.id] || 0)) * INJ.upgradeStep;
     const perm = f.perm?.[a.id] || 0, hurt = perm - up, tmp = temp[a.id] || 0, c = cond[a.group];
     const now = base + shift[a.id] + c;
     const pct = (v) => `${Math.max(0, Math.min(1.4, v)) / 1.4 * 100}%`;
@@ -15567,7 +15641,8 @@ function showFighterCard(app, t, id, opts = {}) {
   const injuries = f.injuries.length
     ? f.injuries.map((i) => el('div', { class: 'fc-inj' }, [`${INJURIES[i.kind].icon} ${INJURIES[i.kind].label}`, el('small', {}, [` — ${INJURIES[i.kind].desc} · ${i.games} more match${i.games > 1 ? 'es' : ''}`])]))
     : [el('div', { class: 'fc-none' }, ['No active injuries.'])];
-  const scars = (f.injuryLog || []).map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${LABEL[a].toLowerCase()} ${signed(pts(v))}`).join(', ')}`]));
+  const multi = (t.season || 1) > 1;
+  const scars = (f.injuryLog || []).map((l) => el('span', {}, [`${multi ? `S${l.season || 1} ` : ''}${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${LABEL[a].toLowerCase()} ${signed(pts(v))}`).join(', ')}`]));
 
   // --- matches
   const matches = [];
@@ -15598,14 +15673,29 @@ function showFighterCard(app, t, id, opts = {}) {
   });
   const won = (t.roundAwards || []).flatMap((list, ri) => (list || []).filter((a) => a.id === id).map((a) => el('span', { class: 'fc-award' }, [`🏅 R${ri + 1} ${a.title}`])));
 
+  // --- career: past seasons (places, titles), career fame
+  const c = f.career, past = (t.seasons || []).map((s) => {
+    const i = s.table.findIndex((r) => r.id === id), r = s.table[i];
+    return r ? el('span', { class: `fc-season ${i === 0 ? 'champ' : ''}` }, [`S${s.season}: ${i === 0 ? '🏆 ' : ''}#${i + 1} · ${r.pts} pts · ${r.won}W ${r.lost}L`]) : null;
+  });
+  const career = c ? el('div', { class: 'fc-career' }, [
+    el('div', { class: 'fc-sec' }, ['CAREER']),
+    el('div', { class: 'fc-cstats' }, [
+      el('span', {}, [`${c.seasons} past season${c.seasons > 1 ? 's' : ''}`]),
+      el('span', { class: 'gold' }, [`${c.titles} title${c.titles === 1 ? '' : 's'}`]),
+      el('span', {}, [`fame earned ${c.fameEarned + (f.fameEarned || 0)} · spent ${c.spentFame + (f.spentFame || 0)}`]),
+    ]),
+    el('div', { class: 'fc-seasons' }, past),
+  ]) : null;
+
   // --- purchases, grouped by the camp they were made in
   const byCamp = {};
-  for (const p of f.purchases || []) (byCamp[p.after] ||= []).push(p);
+  for (const p of f.purchases || []) (byCamp[`${p.season || 1}|${p.after}`] ||= []).push(p);
   const purchases = Object.keys(byCamp).length
-    ? Object.entries(byCamp).map(([after, list]) => el('div', { class: 'fc-camp' }, [
-      el('span', { class: 'fc-rd' }, [Number(after) ? `after R${after}` : 'before R1']),
+    ? Object.entries(byCamp).reverse().map(([key, list]) => { const [s, after] = key.split('|').map(Number); return el('div', { class: 'fc-camp' }, [
+      el('span', { class: 'fc-rd' }, [`${multi ? `S${s} ` : ''}${after ? `after R${after}` : 'before R1'}`]),
       el('span', { class: 'fc-items' }, list.map((p) => el('em', { class: p.by === 'auto' ? 'auto' : 'you' }, [`${itemLabel(p.item)} ★${p.cost}`, el('small', {}, [p.by === 'auto' ? ' manager' : ' you'])]))),
-    ]))
+    ]); })
     : [el('div', { class: 'fc-none' }, ['Nothing bought yet.'])];
 
   const wrap = el('div', { class: 'menu-overlay fcard-overlay', onclick: (e) => { if (e.target === wrap) close(); } }, [
@@ -15622,7 +15712,7 @@ function showFighterCard(app, t, id, opts = {}) {
             el('span', {}, [`${row.won}W ${row.lost}L${row.drawn ? ` ${row.drawn}D` : ''}`]),
             el('span', {}, [`rounds ${row.rf}:${row.ra}`]),
             el('span', { class: 'gold' }, [`★${f.fame} fame`]),
-            el('span', { class: 'dim' }, [`earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
+            el('span', { class: 'dim' }, [`this season: earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
           ]),
         ]),
       ]),
@@ -15640,7 +15730,8 @@ function showFighterCard(app, t, id, opts = {}) {
           el('div', { class: 'fc-move su' }, [el('div', { class: 'fc-mname' }, [def.moves.su?.name || '—', el('small', {}, [` SUPER · ${SUPER_INPUT}`])]), el('p', {}, [info.super || ''])]),
         ]),
         el('div', { class: 'fc-col' }, [
-          el('div', { class: 'fc-sec' }, ['TOURNAMENT', opts.onReplay ? el('small', {}, [' · click a result to replay']) : null]),
+          career,
+          el('div', { class: 'fc-sec' }, [`SEASON ${t.season || 1}`, opts.onReplay ? el('small', {}, [' · click a result to replay']) : null]),
           el('div', { class: 'fc-matches' }, matches),
           won.length ? el('div', { class: 'fc-awards' }, won) : null,
           el('div', { class: 'fc-sec' }, ['PURCHASES']),
