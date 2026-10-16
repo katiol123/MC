@@ -7445,6 +7445,9 @@ function blinkAt(t, seed) {
   return Math.min(1, 1.6 * (1 - Math.abs(dt - 0.08) / 0.08));
 }
 
+/** Where Focus qi rises from (skeleton joints). */
+const FOCUS_JOINTS = ['head', 'shoulderF', 'shoulderB', 'elbowF', 'elbowB', 'handF', 'handB', 'waist', 'hipF', 'kneeF', 'kneeB', 'ankleF', 'ankleB'];
+
 class FightRenderer {
   constructor(match, { arena = 'dusk', portraits = {}, hud = true } = {}) {
     this.match = match;
@@ -7581,7 +7584,7 @@ class FightRenderer {
     const sq = sec.squash;
     const fx = f.fx || {};
     if (fx.hidden) return;
-    if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s);
+    if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s, 'back');
     ctx.save();
     if (fx.alpha !== undefined) ctx.globalAlpha = Math.max(0, Math.min(1, fx.alpha));
     if (fx.clipFloor) {
@@ -7629,36 +7632,66 @@ class FightRenderer {
     if (f.burn > 0) this.drawBurning(ctx, f, skel, now);
     if (mv?.def.pull && f.state === 'attack') this.drawTalon(ctx, f, skel, alpha);
     ctx.restore();
+    if (f.focus > 0) this.drawFocusAura(ctx, f, skel, now, z, s, 'front');
     if (f.state === 'dizzy' || f.state === 'dazed' || fx.stars) this.drawDizzyStars(ctx, f, skel, x, y, now);
   }
 
   /** Focus (Tao's super buff): a pulsing golden aura behind the fighter (screen space). */
-  drawFocusAura(ctx, f, skel, now, z, s) {
-    // a faint golden halo stretched along the body (head to feet), so it lies down with a lying fighter
+  drawFocusAura(ctx, f, skel, now, z, s, layer) {
+    // Focus = qi: a faint golden warmth along the body, small flame-like tongues licking up from the
+    // joints and sparks of qi drifting off every limb. All anchored to the skeleton, so it stands,
+    // bends and lies down with the fighter; the qi itself always rises (like heat).
     const t = now / 1000, fade = Math.min(1, f.focus / 60), ps = f.props.posScale;
     const J = skel.j;
-    const P = (x, y) => ({ x: s.x + x * z * f.facing, y: s.y - y * z });
-    const head = P(J.head.x, J.head.y), feet = P((J.ankleF.x + J.ankleB.x) / 2, (J.ankleF.y + J.ankleB.y) / 2);
-    const cx = (head.x + feet.x) / 2, cy = (head.y + feet.y) / 2;
-    const len = Math.hypot(head.x - feet.x, head.y - feet.y) / 2 + 30 * z * ps;
-    const wid = 44 * z * ps;
-    const pulse = Math.sin(t * 4);
+    const P = (j) => ({ x: s.x + j.x * z * f.facing, y: s.y - j.y * z });
+    const pts = FOCUS_JOINTS.map((n) => P(J[n]));
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(Math.atan2(head.y - feet.y, head.x - feet.x));
-    ctx.save();
-    ctx.scale(1, wid / len); // the round glow squashed into an ellipse around the body axis
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, 0, 0, len * 1.2, (0.12 + 0.03 * pulse) * fade, '255,210,90');
-    ctx.restore();
-    ctx.strokeStyle = `rgba(255,214,90,${(0.16 + 0.05 * pulse) * fade})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, len + 3 * pulse * z, wid + 2 * pulse * z, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    if (layer === 'front') return this.drawFocusSparks(ctx, pts, t, fade, z, ps), ctx.restore();
+    // warmth: soft glows on the trunk and head
+    for (const [n, r] of [['waist', 62], ['neck', 54], ['head', 40]]) drawGlow(ctx, P(J[n]).x, P(J[n]).y, r * z * ps, 0.07 * fade, '255,200,90');
+    // tongues of qi: a slim teardrop per joint, flickering and leaning with a slow sway
+    pts.forEach((p, k) => {
+      const ph = t * 7 + k * 1.9;
+      const h = (26 + 12 * Math.sin(ph) + 7 * Math.sin(ph * 2.3)) * z * ps, w = 7 * z * ps;
+      const lean = Math.sin(t * 2 + k) * 0.25;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(lean);
+      const g = ctx.createLinearGradient(0, 0, 0, -h);
+      g.addColorStop(0, `rgba(255,214,110,${0.3 * fade})`);
+      g.addColorStop(1, 'rgba(255,240,180,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(-w, 0);
+      ctx.quadraticCurveTo(-w * 0.8, -h * 0.55, 0, -h);
+      ctx.quadraticCurveTo(w * 0.8, -h * 0.55, w, 0);
+      ctx.quadraticCurveTo(0, w * 0.9, -w, 0);
+      ctx.fill();
+      ctx.restore();
+    });
     ctx.restore();
   }
 
+  /** Focus sparks in front of the body: each is born on a joint, drifts up and sideways, swells and fades. */
+  drawFocusSparks(ctx, pts, t, fade, z, ps) {
+    for (let i = 0; i < 22; i++) {
+      const life = (t * (0.55 + (i % 5) * 0.08) + i * 0.137) % 1;
+      const p = pts[(i * 7) % pts.length];
+      const x = p.x + Math.sin(i * 12.9 + life * 5) * 10 * z + (i % 2 ? 1 : -1) * life * 8 * z;
+      const y = p.y - life * 46 * z * ps;
+      const a = Math.sin(life * Math.PI) * 0.75 * fade;
+      const r = (1.2 + 1.6 * Math.sin(life * Math.PI)) * z;
+      ctx.fillStyle = `rgba(255,226,140,${a})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,210,90,${a * 0.25})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   /** Old Hawk's thrown talon: a hook on a line shooting out of his lead hand during the strike. */
   drawTalon(ctx, f, skel, alpha) {
