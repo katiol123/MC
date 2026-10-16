@@ -178,11 +178,14 @@ class Keyboard {
     this.down = new Set();
     this.pressedQueue = [];
     this.listeners = [];
+    this.captures = [];
     target.addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F1', 'F2', 'F3', 'F4', 'Tab'].includes(e.code)) e.preventDefault();
       if (!e.repeat) {
         this.down.add(e.code);
-        for (const l of this.listeners) l(e.code, e);
+        // a modal on top (fighter card) can capture the keyboard: only it hears key presses then
+        const top = this.captures[this.captures.length - 1];
+        for (const l of top ? [top] : this.listeners) l(e.code, e);
       }
     });
     target.addEventListener('keyup', (e) => this.down.delete(e.code));
@@ -191,6 +194,11 @@ class Keyboard {
   onPress(fn) {
     this.listeners.push(fn);
     return () => (this.listeners = this.listeners.filter((l) => l !== fn));
+  }
+  /** Exclusive listener (stacked): while set, the regular listeners hear nothing. */
+  capture(fn) {
+    this.captures.push(fn);
+    return () => (this.captures = this.captures.filter((l) => l !== fn));
   }
   raw(player) {
     const b = BINDINGS[player];
@@ -13769,6 +13777,7 @@ __define("src/tournament/condition.js", function (__exports, __require) {
 // back toward calm. Fame buys recovery: every fighter has a manager (automatic by default) that
 // decides what to buy; the player can take over and buy by hand.
 const { ROSTER } = __require("src/data/fighters.js");
+const { logPurchase } = __require("src/tournament/injuries.js");
 
 const BODY = ['power', 'speed', 'mobility', 'health', 'toughness'];
 const MIND = ['reaction', 'aggression', 'combo', 'antiAir', 'cunning'];
@@ -13896,13 +13905,14 @@ function canBuy(t, id, itemId) {
   return !!it && f.fame >= it.cost;
 }
 
-function buy(t, id, itemId) {
+function buy(t, id, itemId, by = 'you') {
   const it = SHOP.find((x) => x.id === itemId), f = t.fighters[id];
   if (!it || f.fame < it.cost) return false;
   f.fame -= it.cost;
   f.spentFame += it.cost;
   if (it.stamina) f.stamina = clamp(f.stamina + it.stamina, 0, 100);
   if (it.morale) f.morale = clamp(f.morale + it.morale, 0, 100);
+  logPurchase(t, id, it.id, it.cost, by);
   return true;
 }
 
@@ -13924,7 +13934,7 @@ function autoManage(t, id) {
     else if (f.stamina < 65 && spare >= cost('rest')) pick = 'rest';
     else if (f.morale < 40 && f.stamina >= 60 && spare >= cost('party') && (p.aggression ?? 0.5) > 0.5) pick = 'party';
     else if (f.morale < 55 && spare >= cost('pep')) pick = 'pep';
-    if (!pick || !buy(t, id, pick)) break;
+    if (!pick || !buy(t, id, pick, 'auto')) break;
     bought.push(pick);
   }
   return bought;
@@ -13944,6 +13954,7 @@ __define("src/tournament/injuries.js", function (__exports, __require) {
   Object.defineProperty(__exports, "injuryRoller", { enumerable: true, get: () => injuryRoller });
   Object.defineProperty(__exports, "addInjury", { enumerable: true, get: () => addInjury });
   Object.defineProperty(__exports, "tickInjuries", { enumerable: true, get: () => tickInjuries });
+  Object.defineProperty(__exports, "logPurchase", { enumerable: true, get: () => logPurchase });
   Object.defineProperty(__exports, "buyUpgrade", { enumerable: true, get: () => buyUpgrade });
   Object.defineProperty(__exports, "treatInjury", { enumerable: true, get: () => treatInjury });
   Object.defineProperty(__exports, "autoInvest", { enumerable: true, get: () => autoInvest });
@@ -14100,7 +14111,13 @@ function tickInjuries(rec) {
   rec.injuries = rec.injuries.filter((i) => i.games > 0);
 }
 
-function buyUpgrade(t, id, attr) {
+/** Purchase history (fighter card): what was bought, after which round, by whom. */
+function logPurchase(t, id, item, cost, by) {
+  const f = t.fighters[id];
+  (f.purchases ||= []).push({ after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
+}
+
+function buyUpgrade(t, id, attr, by = 'you') {
   const f = t.fighters[id], cost = upgradeCost(f, attr);
   if (!ATTR_IDS.includes(attr) || f.fame < cost) return false;
   f.fame -= cost;
@@ -14108,16 +14125,18 @@ function buyUpgrade(t, id, attr) {
   f.spentUpgrades = (f.spentUpgrades || 0) + cost;
   f.upLevels[attr] = (f.upLevels[attr] || 0) + 1;
   f.perm[attr] = (f.perm[attr] || 0) + INJ.upgradeStep;
+  logPurchase(t, id, `up:${attr}`, cost, by);
   return true;
 }
 
-function treatInjury(t, id, kind) {
+function treatInjury(t, id, kind, by = 'you') {
   const f = t.fighters[id], inj = f.injuries.find((i) => i.kind === kind);
   if (!inj || f.fame < INJ.treatCost) return false;
   f.fame -= INJ.treatCost;
   f.spentFame += INJ.treatCost;
   inj.games--;
   f.injuries = f.injuries.filter((i) => i.games > 0);
+  logPurchase(t, id, `treat:${kind}`, INJ.treatCost, by);
   return true;
 }
 
@@ -14131,13 +14150,13 @@ function autoInvest(t, id, baseProfile) {
   const reserve = 30 + 40 * (baseProfile.cunning ?? 0.5);
   const out = [];
   const long = f.injuries.filter((i) => i.games >= 2).sort((a, b) => b.games - a.games)[0];
-  if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind)) out.push('treat');
+  if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind, 'auto')) out.push('treat');
   const specialist = (baseProfile.cunning ?? 0.5) >= 0.6;
   for (let n = 0; n < 2; n++) {
     const cur = (a) => (baseProfile[a] ?? 0.5) + (f.perm[a] || 0);
     const cand = ATTR_IDS.slice().sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)) || upgradeCost(f, a) - upgradeCost(f, b));
     const pick = cand.find((a) => cur(a) < 1.3);
-    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick)) break;
+    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick, 'auto')) break;
     out.push(`up:${pick}`);
   }
   return out;
@@ -14636,6 +14655,7 @@ const { ROSTER } = __require("src/data/fighters.js");
 const { el, clearUI } = __require("src/ui/dom.js");
 const { createTournament, load, save, clearSaved, standings, awards, allMatches, nextMatch, isFinished, currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME } = __require("src/tournament/tournament.js");
 const { showSpectacle } = __require("src/ui/spectacle.js");
+const { showFighterCard, fighterLink } = __require("src/ui/fighterCard.js");
 const { faceStyle } = __require("src/ui/faces.js");
 const { showCharts } = __require("src/ui/charts.js");
 const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
@@ -14740,7 +14760,7 @@ class TournamentScene {
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
       el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
-      el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
+      el('span', { class: 'tname' }, [this.link(r.id, NAME[r.id]), ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
       el('span', { class: 'tnum' }, [String(r.lost)]),
@@ -14756,7 +14776,7 @@ class TournamentScene {
       const r = m.result, isNext = nx && nx.m === m;
       const side = (id, i) => el('div', { class: `fx-side ${r && r.winner === i ? 'won' : ''} ${r && r.winner !== i && r.winner !== 'draw' ? 'lost' : ''}` }, [
         el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
-        el('span', { class: 'fx-name' }, [short(id)]),
+        el('span', { class: 'fx-name' }, [this.link(id)]),
         el('span', { class: 'fx-place', title: 'current place in the table' }, [`(${placeOf[id]})`]),
       ]);
       return el('div', { class: `fx ${isNext ? 'next' : ''} ${r ? 'done' : ''}`, onclick: r ? () => this.replay(m) : null, title: r ? 'Click to replay' : '' }, [
@@ -14801,6 +14821,19 @@ class TournamentScene {
       ]),
     ]);
     ui.appendChild(this.root);
+  }
+
+  /** Fighter card (click on any name). Replays are offered only from the hub itself. */
+  card(id) {
+    const fromHub = !this.modal;
+    this.modal = true;
+    showFighterCard(this.app, this.t, id, {
+      onReplay: fromHub ? (m) => { this.modal = null; this.replay(m); } : null,
+      onClose: () => { if (fromHub) this.modal = null; },
+    });
+  }
+  link(id, text = short(id)) {
+    return fighterLink(text, () => this.card(id));
   }
 
   browse(d) {
@@ -14927,7 +14960,7 @@ class TournamentScene {
   // --- spectacle report ---------------------------------------------------------------------------
   spectacle(m, before) {
     this.modal = true;
-    showSpectacle(this.app, m, before, () => {
+    showSpectacle(this.app, m, before, (id) => this.card(id), () => {
       this.modal = null;
       this.render();
       this.afterResults();
@@ -14944,9 +14977,9 @@ class TournamentScene {
       res[`${m.a}|${m.b}`] = { m, i: 0 };
       res[`${m.b}|${m.a}`] = { m, i: 1 };
     }
-    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: NAME[id] }))];
+    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: `${NAME[id]} — click for the fighter card`, onclick: () => this.card(id) }))];
     const body = order.flatMap((rid) => [
-      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: NAME[rid] }),
+      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: `${NAME[rid]} — click for the fighter card`, onclick: () => this.card(rid) }),
       ...order.map((cid) => {
         if (rid === cid) return el('div', { class: 'gcell self' });
         const x = res[`${rid}|${cid}`];
@@ -14984,7 +15017,7 @@ class TournamentScene {
       return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''}` }, [
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
-          el('span', { class: 'camp-name' }, [short(id)]),
+          el('span', { class: 'camp-name' }, [this.link(id)]),
           el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
             el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
           el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
@@ -15052,7 +15085,7 @@ class TournamentScene {
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
-          el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
@@ -15100,7 +15133,7 @@ class TournamentScene {
       for (const b of c.items) counts[b] = (counts[b] || 0) + 1;
       return el('div', { class: `cr-row ${c.spent ? '' : 'saved'}`, style: { '--i': i } }, [
         el('span', { class: 'fx-face', style: faceStyle(this.app, id) }),
-        el('span', { class: 'cr-name' }, [short(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
+        el('span', { class: 'cr-name' }, [this.link(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
         el('span', { class: 'cr-items' }, c.items.length
           ? Object.entries(counts).map(([b, n]) => el('em', {}, [`${label(b)}${n > 1 ? ` ×${n}` : ''}`]))
           : [el('em', { class: 'none' }, ['spent nothing'])]),
@@ -15129,7 +15162,7 @@ class TournamentScene {
     return el('div', { class: 'awards' }, list.map((a, i) => el('div', { class: 'award', style: { '--d': `${delay + i * 0.3}s` } }, [
       el('div', { class: 'award-title' }, [a.title]),
       a.id ? el('div', { class: 'award-face', style: { ...faceStyle(this.app, a.id) } }) : el('div', { class: 'award-face none' }),
-      el('div', { class: 'award-name' }, [a.id ? short(a.id) : 'nobody']),
+      el('div', { class: 'award-name' }, [a.id ? this.link(a.id) : 'nobody']),
       el('div', { class: 'award-value' }, [a.value]),
       a.note ? el('div', { class: 'award-note' }, [a.note.replace(/vs (\w+)/, (_, id) => `vs ${short(id)}`)]) : null,
       a.fame ? el('div', { class: 'award-fame' }, [`+${a.fame} FAME`]) : null,
@@ -15163,10 +15196,10 @@ class TournamentScene {
         el('div', { class: 'final-kicker' }, ['TOURNAMENT CHAMPION']),
         el('div', { class: 'final-champ' }, [
           el('div', { class: 'final-portrait', style: { backgroundImage: `url(${this.app.portraitURL(champ.id)})` } }),
-          el('div', { class: 'final-name' }, [NAME[champ.id], el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
+          el('div', { class: 'final-name' }, [this.link(champ.id, NAME[champ.id]), el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
-          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. `, this.link(r.id), ` · ${r.pts} pts`]))),
         el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
       ]),
     ]);
@@ -15251,7 +15284,7 @@ function injBlock(inj) {
   ]);
 }
 
-function showSpectacle(app, m, before, onClose) {
+function showSpectacle(app, m, before, onName, onClose) {
   const r = m.result;
   const ids = [m.a, m.b];
   const timers = [];
@@ -15299,7 +15332,7 @@ function showSpectacle(app, m, before, onClose) {
     const col = el('div', { class: `sp-col ${i ? 'right' : 'left'} ${won ? 'won' : ''}` }, [
       el('div', { class: 'sp-head' }, [
         el('div', { class: 'sp-portrait', style: faceStyle(app, id) }),
-        el('div', { class: 'sp-name' }, [NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
+        el('div', { class: 'sp-name' }, [onName ? el('button', { class: 'fname-link', onclick: (e) => { e.stopPropagation(); onName(id); } }, [NAME[id]]) : NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
       ]),
       el('div', { class: 'sp-list' }, rows.length ? rows.map((x) => x.row) : [el('div', { class: 'sp-row empty' }, ['no highlights this time'])]),
       el('div', { class: 'sp-total' }, [el('span', {}, ['SPECTACLE']), total]),
@@ -15425,6 +15458,300 @@ function faceStyle(app, id, fill = 0.9) {
     backgroundRepeat: 'no-repeat',
   };
 }
+
+});
+__define("src/ui/fighterCard.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "showFighterCard", { enumerable: true, get: () => showFighterCard });
+  Object.defineProperty(__exports, "fighterLink", { enumerable: true, get: () => fighterLink });
+// Tournament fighter card: opened by clicking any fighter's name in the tournament screens.
+// Attributes (click one for a full explanation and the breakdown of its current value), signature
+// special and super, condition, injuries, fame, the tournament so far match by match, awards and
+// every purchase made with fame.
+const { ROSTER, buildFighterDef } = __require("src/data/fighters.js");
+const { ATTRIBUTES, ATTRIBUTE_GROUPS } = __require("src/data/attributes.js");
+const { MOVE_INFO, ATTRIBUTE_INFO, SIGNATURE_INPUT, SUPER_INPUT } = __require("src/data/moveInfo.js");
+const { standings } = __require("src/tournament/tournament.js");
+const { SHOP, COND, conditionShift } = __require("src/tournament/condition.js");
+const { INJURIES, INJ, profileShift } = __require("src/tournament/injuries.js");
+const { el } = __require("src/ui/dom.js");
+const { faceStyle } = __require("src/ui/faces.js");
+
+const FIGHTER = Object.fromEntries(ROSTER.map((f) => [f.id, f]));
+const LABEL = Object.fromEntries(ATTRIBUTES.map((a) => [a.id, a.label]));
+const short = (id) => {
+  const n = FIGHTER[id]?.name || id;
+  const m = n.match(/"([^"]+)"/);
+  return m ? m[1] : n.split(' ').slice(-1)[0];
+};
+const pts = (v) => Math.round(v * 100);
+const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
+
+/** Text of a purchase record. */
+function itemLabel(item) {
+  if (item.startsWith('up:')) return `⬆ ${LABEL[item.slice(3)]} +${pts(INJ.upgradeStep)}`;
+  if (item.startsWith('treat')) {
+    const k = INJURIES[item.split(':')[1]];
+    return `🩺 Treatment${k ? `: ${k.label}` : ''}`;
+  }
+  const it = SHOP.find((x) => x.id === item);
+  return it ? `${it.icon} ${it.label} (${it.desc})` : item;
+}
+
+/**
+ * Opens the card of fighter `id`. opts.onReplay(m) replays a match; opts.onClose runs after closing.
+ * Clicking an opponent's name inside the card opens that fighter's card instead.
+ */
+function showFighterCard(app, t, id, opts = {}) {
+  const f = t.fighters[id], src = FIGHTER[id];
+  const def = buildFighterDef(id);
+  const table = standings(t);
+  const place = table.findIndex((r) => r.id === id) + 1;
+  const row = table[place - 1];
+  const info = MOVE_INFO[id] || {};
+
+  const close = () => { wrap.remove(); release(); opts.onClose?.(); };
+  const open = (other) => { wrap.remove(); release(); showFighterCard(app, t, other, opts); };
+  const link = (other) => el('button', { class: 'fc-link', onclick: (e) => { e.stopPropagation(); app.audio.ui('move'); open(other); } }, [short(other)]);
+
+  // --- attributes: base, upgrades / injury damage, active injuries, condition -> now
+  const shift = profileShift(f); // perm (upgrades − injury damage) + active injury debuffs
+  const temp = {};
+  for (const inj of f.injuries) for (const [a, v] of Object.entries(INJURIES[inj.kind].temp)) temp[a] = (temp[a] || 0) + v;
+  const cond = { body: conditionShift(f.stamina, 'stamina'), mind: conditionShift(f.morale, 'morale') };
+  const attrRow = (a) => {
+    const base = src.profile?.[a.id] ?? 0.5;
+    const up = (f.upLevels?.[a.id] || 0) * INJ.upgradeStep;
+    const perm = f.perm?.[a.id] || 0, hurt = perm - up, tmp = temp[a.id] || 0, c = cond[a.group];
+    const now = base + shift[a.id] + c;
+    const pct = (v) => `${Math.max(0, Math.min(1.4, v)) / 1.4 * 100}%`;
+    const parts = [
+      ['Base', pts(base)],
+      up ? ['Upgrades', signed(pts(up))] : null,
+      hurt < -0.004 ? ['Injury damage (permanent)', signed(pts(hurt))] : null,
+      tmp ? ['Active injuries', signed(pts(tmp))] : null,
+      Math.abs(c) >= 0.005 ? [a.group === 'body' ? `Stamina ${Math.round(f.stamina)}` : `Morale ${Math.round(f.morale)}`, signed(pts(c))] : null,
+    ].filter(Boolean);
+    const detail = el('div', { class: 'fc-detail' }, [
+      el('p', {}, [ATTRIBUTE_INFO[a.id] || a.hint]),
+      el('div', { class: 'fc-break' }, [
+        ...parts.map(([k, v]) => el('span', {}, [`${k} `, el('b', {}, [String(v)])])),
+        el('span', { class: 'now' }, ['Now ', el('b', {}, [String(pts(now))])]),
+        el('span', { class: 'val' }, [`${a.hint}: `, el('b', {}, [a.fmt(def.attrs[a.id])]), ' (base)']),
+      ]),
+    ]);
+    const rowEl = el('div', { class: `fc-attr ${a.group}` }, [
+      el('button', { class: 'fc-attr-label', onclick: () => { rowEl.classList.toggle('open'); app.audio.ui('move'); } }, [a.label, el('i', {}, ['▾'])]),
+      el('span', { class: 'fc-bar' }, [
+        el('b', { class: 'base', style: { width: pct(base) } }),
+        el('b', { class: `now ${now >= base ? 'up' : 'down'}`, style: { width: pct(now) } }),
+        el('i', { style: { left: pct(1) } }),
+      ]),
+      el('span', { class: 'fc-num' }, [String(pts(now)), now !== base ? el('small', {}, [` ${signed(pts(now - base))}`]) : null]),
+      detail,
+    ]);
+    return rowEl;
+  };
+  const attrs = ATTRIBUTE_GROUPS.map((g) => el('div', { class: 'fc-group' }, [
+    el('div', { class: 'fc-sub' }, [g.label, el('small', {}, [g.id === 'body' ? ' · shifted by stamina' : ' · CPU behaviour, shifted by morale'])]),
+    ...ATTRIBUTES.filter((a) => a.group === g.id).map(attrRow),
+  ]));
+
+  // --- condition and injuries
+  const meter = (label, v, cls, note) => el('div', { class: `fc-meter ${cls}` }, [
+    el('span', {}, [label]),
+    el('span', { class: 'fc-mbar' }, [el('b', { style: { width: `${v}%` } }), el('i', { style: { left: `${COND.fit}%` } })]),
+    el('b', {}, [String(Math.round(v))]),
+    el('small', {}, [note]),
+  ]);
+  const shiftNote = (v, what) => `${what} ${signed(pts(v))}`;
+  const injuries = f.injuries.length
+    ? f.injuries.map((i) => el('div', { class: 'fc-inj' }, [`${INJURIES[i.kind].icon} ${INJURIES[i.kind].label}`, el('small', {}, [` — ${INJURIES[i.kind].desc} · ${i.games} more match${i.games > 1 ? 'es' : ''}`])]))
+    : [el('div', { class: 'fc-none' }, ['No active injuries.'])];
+  const scars = (f.injuryLog || []).map((l) => el('span', {}, [`${INJURIES[l.kind].icon} ${INJURIES[l.kind].label}: ${Object.entries(l.perm).map(([a, v]) => `${LABEL[a].toLowerCase()} ${signed(pts(v))}`).join(', ')}`]));
+
+  // --- matches
+  const matches = [];
+  t.rounds.forEach((round, ri) => {
+    const m = round.find((x) => x.a === id || x.b === id);
+    if (!m) return;
+    const i = m.a === id ? 0 : 1, opp = i ? m.a : m.b, r = m.result;
+    if (!r) {
+      matches.push(el('div', { class: 'fc-match todo' }, [el('span', { class: 'fc-rd' }, [`R${ri + 1}`]), el('span', {}, ['vs ', link(opp)]), el('span', { class: 'fc-res' }, ['—'])]));
+      return;
+    }
+    const won = r.winner === i, draw = r.winner === 'draw';
+    const notes = [];
+    if (r.sides[i].fatality) notes.push('☠ fatality');
+    if (r.sides[1 - i].fatality) notes.push('☠ suffered a fatality');
+    if (r.injuries?.[i]) notes.push(`${INJURIES[r.injuries[i].kind].icon} injured`);
+    if (r.sides[i].hype) notes.push(`hype +${Math.round(r.sides[i].hype * 100)}%`);
+    if (r.sides[i].underdog) notes.push('underdog +20%');
+    const sb = r.sides[i].spectacle.items.find((x) => x.key === 'showboat');
+    if (sb) notes.push(`🎭 showboat ×${sb.count}`);
+    matches.push(el('div', { class: `fc-match ${won ? 'w' : draw ? 'd' : 'l'}`, title: opts.onReplay ? 'click to replay' : '', onclick: opts.onReplay ? () => { close(); opts.onReplay(m); } : null }, [
+      el('span', { class: 'fc-rd' }, [`R${ri + 1}`]),
+      el('span', {}, ['vs ', link(opp)]),
+      el('span', { class: 'fc-res' }, [`${won ? 'W' : draw ? 'D' : 'L'} ${r.wins[i]}:${r.wins[1 - i]}`]),
+      el('span', { class: 'fc-fame' }, [`★${r.sides[i].fame ?? r.sides[i].spectacle.total}`]),
+      el('span', { class: 'fc-notes' }, [notes.join(' · ')]),
+    ]));
+  });
+  const won = (t.roundAwards || []).flatMap((list, ri) => (list || []).filter((a) => a.id === id).map((a) => el('span', { class: 'fc-award' }, [`🏅 R${ri + 1} ${a.title}`])));
+
+  // --- purchases, grouped by the camp they were made in
+  const byCamp = {};
+  for (const p of f.purchases || []) (byCamp[p.after] ||= []).push(p);
+  const purchases = Object.keys(byCamp).length
+    ? Object.entries(byCamp).map(([after, list]) => el('div', { class: 'fc-camp' }, [
+      el('span', { class: 'fc-rd' }, [Number(after) ? `after R${after}` : 'before R1']),
+      el('span', { class: 'fc-items' }, list.map((p) => el('em', { class: p.by === 'auto' ? 'auto' : 'you' }, [`${itemLabel(p.item)} ★${p.cost}`, el('small', {}, [p.by === 'auto' ? ' manager' : ' you'])]))),
+    ]))
+    : [el('div', { class: 'fc-none' }, ['Nothing bought yet.'])];
+
+  const wrap = el('div', { class: 'menu-overlay fcard-overlay', onclick: (e) => { if (e.target === wrap) close(); } }, [
+    el('div', { class: 'fcard' }, [
+      el('button', { class: 'fc-close', onclick: close, title: 'close (Esc)' }, ['✕']),
+      el('div', { class: 'fc-head' }, [
+        el('div', { class: 'fc-portrait', style: faceStyle(app, id, 0.95) }),
+        el('div', { class: 'fc-id' }, [
+          el('div', { class: 'fc-name' }, [src.name]),
+          el('div', { class: 'fc-title' }, [src.title]),
+          el('div', { class: 'fc-stats' }, [
+            el('span', { class: 'big' }, [`#${place}`]),
+            el('span', {}, [`${row.pts} pts`]),
+            el('span', {}, [`${row.won}W ${row.lost}L${row.drawn ? ` ${row.drawn}D` : ''}`]),
+            el('span', {}, [`rounds ${row.rf}:${row.ra}`]),
+            el('span', { class: 'gold' }, [`★${f.fame} fame`]),
+            el('span', { class: 'dim' }, [`earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
+          ]),
+        ]),
+      ]),
+      el('div', { class: 'fc-body' }, [
+        el('div', { class: 'fc-col' }, [
+          el('div', { class: 'fc-sec' }, ['CONDITION']),
+          meter('STAMINA', f.stamina, 'sta', shiftNote(cond.body, 'body bars')),
+          meter('MORALE', f.morale, 'mor', shiftNote(cond.mind, 'character bars')),
+          ...injuries,
+          scars.length ? el('div', { class: 'fc-scars' }, [el('small', {}, ['Permanent damage: ']), ...scars]) : null,
+          el('div', { class: 'fc-sec' }, ['ATTRIBUTES', el('small', {}, [' · click a name for details'])]),
+          ...attrs,
+          el('div', { class: 'fc-sec' }, ['MOVES']),
+          el('div', { class: 'fc-move' }, [el('div', { class: 'fc-mname' }, [def.moves.s4?.name || '—', el('small', {}, [` SIGNATURE · ${SIGNATURE_INPUT}`])]), el('p', {}, [info.special || ''])]),
+          el('div', { class: 'fc-move su' }, [el('div', { class: 'fc-mname' }, [def.moves.su?.name || '—', el('small', {}, [` SUPER · ${SUPER_INPUT}`])]), el('p', {}, [info.super || ''])]),
+        ]),
+        el('div', { class: 'fc-col' }, [
+          el('div', { class: 'fc-sec' }, ['TOURNAMENT', opts.onReplay ? el('small', {}, [' · click a result to replay']) : null]),
+          el('div', { class: 'fc-matches' }, matches),
+          won.length ? el('div', { class: 'fc-awards' }, won) : null,
+          el('div', { class: 'fc-sec' }, ['PURCHASES']),
+          el('div', { class: 'fc-purchases' }, purchases),
+        ]),
+      ]),
+    ]),
+  ]);
+  const release = app.keyboard.capture((code) => { if (code === 'Escape' || code === 'Backspace') close(); });
+  document.getElementById('ui').appendChild(wrap);
+  app.audio.ui('confirm');
+  return { close };
+}
+
+/** A clickable fighter name for the tournament screens. */
+function fighterLink(text, onOpen) {
+  return el('button', { class: 'fname-link', onclick: (e) => { e.stopPropagation(); onOpen(); } }, [text]);
+}
+
+
+});
+__define("src/data/moveInfo.js", function (__exports, __require) {
+  Object.defineProperty(__exports, "SIGNATURE_INPUT", { enumerable: true, get: () => SIGNATURE_INPUT });
+  Object.defineProperty(__exports, "SUPER_INPUT", { enumerable: true, get: () => SUPER_INPUT });
+  Object.defineProperty(__exports, "MOVE_INFO", { enumerable: true, get: () => MOVE_INFO });
+  Object.defineProperty(__exports, "ATTRIBUTE_INFO", { enumerable: true, get: () => ATTRIBUTE_INFO });
+// Player-facing descriptions of every fighter's signature special and super (fighter card).
+// Move names come from the move data itself (signatures.js); this file only explains them.
+const SIGNATURE_INPUT = '↓ ↙ ← + PUNCH';
+const SUPER_INPUT = '↓ ↘ → ↓ ↘ → + PUNCH (full meter)';
+
+const MOVE_INFO = {
+  brick: {
+    special: 'Leaps up and hammers down with both fists. An overhead: it cannot be blocked crouching, and it knocks down.',
+    super: 'A relentless dockside beating: a long chain of heavy punches.',
+  },
+  rattigan: {
+    special: 'Flicks a coin across the screen: a fast projectile that keeps rivals honest at range.',
+    super: 'Teleports behind the rival and picks them clean with a flurry of blows.',
+  },
+  smiles: {
+    special: 'A long sliding kick along the floor. Hits low and knocks down - block it crouching.',
+    super: 'A storm of kicks delivered with a grin that never leaves his face.',
+  },
+  jax: {
+    special: 'A sonic wave from the amp: a projectile that hits twice.',
+    super: 'A mosh-pit barrage of punches finished with a kick.',
+  },
+  vellaro: {
+    special: 'Counter stance: catches high and mid strikes and answers with a counter-attack. Lows go straight through it.',
+    super: 'A tailored execution: quick jabs and crosses, finished with a lunge that sends the rival flying.',
+  },
+  roxy: {
+    special: 'Three advancing kicks that push the rival into the corner.',
+    super: 'A riot of strikes that ends in a spinning kick.',
+  },
+  bruno: {
+    special: 'A command grab: Bruno drags the rival into his pot. It cannot be teched.',
+    super: 'Serves the rival a beating with a cast-iron frying pan.',
+  },
+  jaguar: {
+    special: 'A diving pounce from the air. An overhead: it cannot be blocked crouching.',
+    super: 'Blots out the sun: a rush of jabs and crosses finished by a driving lunge.',
+  },
+  cinder: {
+    special: 'A burst of fire from the palms at close range that hits twice.',
+    super: 'A rush of flaming fists. Every hit sets the rival on fire for 10 s (5 damage every 0.5 s, up to 100) - the burn never finishes anyone, it leaves 1 HP.',
+  },
+  grizz: {
+    special: 'A shoulder charge with armor: shrugs off one hit (half damage, no flinch) and keeps going. Supers and throws break the armor.',
+    super: 'A frenzy of clawed swipes ending with a two-paw smash from above. Leaves claw marks.',
+  },
+  hawk: {
+    special: 'Casts a hook on a fishing line from long range and reels the rival in, leaving them open for a follow-up.',
+    super: 'A chain of strikes; every hit that lands heals him for half of the damage dealt.',
+  },
+  tao: {
+    special: 'Six lightning punches with ghost fists. The final palm breaks the guard: a blocking rival staggers.',
+    super: 'A very long barrage that grants FOCUS: a golden aura and +30 % damage for 8 seconds.',
+  },
+  goro: {
+    special: 'A sumo stomp that sends a shock wave along the boards. Hits low (block crouching or jump it) and has one hit of armor.',
+    super: 'Open-palm slaps finished by a full-body sumo charge.',
+  },
+  sobby: {
+    special: 'A cream pie in the face: a long stun, and while the cream is on (4 s) the rival moves 15 % slower and winds up attacks about 20 % longer.',
+    super: 'Slaps and kicks through the tears, finished by a boxing glove on a spring.',
+  },
+  snapper: {
+    special: 'A spinning death roll: a full-body rush with the tail that knocks down.',
+    super: 'Four snapping bites and a spinning tail strike.',
+  },
+  chuy: {
+    special: 'A strummed chord: three notes float across the screen, three hits.',
+    super: 'The guitar comes off his back and he plays it on the rival - it ends in splinters.',
+  },
+};
+
+/** What each attribute does, in detail (fighter card, click an attribute). */
+const ATTRIBUTE_INFO = {
+  power: 'Damage of every attack: normals, specials, throws and the super are all scaled by it. The strongest fighter in the roster hits about 5 % harder than the weakest. Stamina affects it (BODY bar).',
+  speed: 'How fast attacks come out. It scales the start-up frames of the single-hit attacks (lower is faster): faster pokes win exchanges, punish more mistakes and are harder to react to. Multi-hit sequences and the super keep their timing.',
+  mobility: 'Walking speed, and with it running, dashing and jump distance. It also sets agility: how quickly the fighter lands, wakes up after a knockdown and recovers. Mobile fighters control space and escape corners.',
+  health: 'Hit points per round. More health means more hits needed to finish the round.',
+  toughness: 'Size of the stun (dizzy) meter. Every hit fills it; when it is full the fighter is DIZZY and wide open (and the rival may showboat). Tough fighters can take long combos without getting dizzy.',
+  reaction: 'CPU only. How many frames the CPU needs to see an attack coming, and how often it blocks it. Low reaction gets hit by things it should have blocked. Morale affects all CHARACTER bars.',
+  aggression: 'CPU only. How much the CPU presses forward, attacks and how short its pauses between decisions are. Aggressive fighters also showboat more often and their managers like throwing parties.',
+  combo: 'CPU only. Chance to continue a landed hit into a combo and to punish a rival who whiffed or showboats.',
+  antiAir: 'CPU only. How reliably the CPU meets a jump-in with an uppercut, or at least blocks it.',
+  cunning: 'CPU only. Throws, throw escapes (teching) and well-timed signature specials. Cunning fighters rarely showboat, and their managers keep a bigger fame reserve and invest in their strengths.',
+};
 
 });
 __define("src/ui/charts.js", function (__exports, __require) {

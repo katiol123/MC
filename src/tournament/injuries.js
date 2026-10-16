@@ -151,7 +151,13 @@ export function tickInjuries(rec) {
   rec.injuries = rec.injuries.filter((i) => i.games > 0);
 }
 
-export function buyUpgrade(t, id, attr) {
+/** Purchase history (fighter card): what was bought, after which round, by whom. */
+export function logPurchase(t, id, item, cost, by) {
+  const f = t.fighters[id];
+  (f.purchases ||= []).push({ after: (t.roundAwards || []).filter(Boolean).length, item, cost, by });
+}
+
+export function buyUpgrade(t, id, attr, by = 'you') {
   const f = t.fighters[id], cost = upgradeCost(f, attr);
   if (!ATTR_IDS.includes(attr) || f.fame < cost) return false;
   f.fame -= cost;
@@ -159,16 +165,18 @@ export function buyUpgrade(t, id, attr) {
   f.spentUpgrades = (f.spentUpgrades || 0) + cost;
   f.upLevels[attr] = (f.upLevels[attr] || 0) + 1;
   f.perm[attr] = (f.perm[attr] || 0) + INJ.upgradeStep;
+  logPurchase(t, id, `up:${attr}`, cost, by);
   return true;
 }
 
-export function treatInjury(t, id, kind) {
+export function treatInjury(t, id, kind, by = 'you') {
   const f = t.fighters[id], inj = f.injuries.find((i) => i.kind === kind);
   if (!inj || f.fame < INJ.treatCost) return false;
   f.fame -= INJ.treatCost;
   f.spentFame += INJ.treatCost;
   inj.games--;
   f.injuries = f.injuries.filter((i) => i.games > 0);
+  logPurchase(t, id, `treat:${kind}`, INJ.treatCost, by);
   return true;
 }
 
@@ -182,13 +190,13 @@ export function autoInvest(t, id, baseProfile) {
   const reserve = 30 + 40 * (baseProfile.cunning ?? 0.5);
   const out = [];
   const long = f.injuries.filter((i) => i.games >= 2).sort((a, b) => b.games - a.games)[0];
-  if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind)) out.push('treat');
+  if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind, 'auto')) out.push('treat');
   const specialist = (baseProfile.cunning ?? 0.5) >= 0.6;
   for (let n = 0; n < 2; n++) {
     const cur = (a) => (baseProfile[a] ?? 0.5) + (f.perm[a] || 0);
     const cand = ATTR_IDS.slice().sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)) || upgradeCost(f, a) - upgradeCost(f, b));
     const pick = cand.find((a) => cur(a) < 1.3);
-    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick)) break;
+    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick, 'auto')) break;
     out.push(`up:${pick}`);
   }
   return out;

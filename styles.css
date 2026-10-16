@@ -497,3 +497,82 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .ch-chip.on { color: #fff; border-color: var(--c); background: rgba(255,255,255,.08); }
 .ch-chip.on .fx-face, .ch-chip.on i { opacity: 1; }
 .ch-chip.all { justify-content: center; color: var(--p2); }
+
+/* ---------- fighter card (tournament: click any name) ---------- */
+.fname-link { all: unset; cursor: pointer; color: inherit; font: inherit; border-bottom: 1px dotted rgba(255,255,255,.35); transition: color .12s, border-color .12s; }
+.fname-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+.gcell.ghead { cursor: pointer; }
+#ui > .menu-overlay.fcard-overlay { z-index: 80; }
+.fcard { position: relative; width: 1180px; max-height: 680px; display: flex; flex-direction: column; gap: 10px; padding: 16px 22px; box-sizing: border-box; background: linear-gradient(135deg, rgba(30,10,40,.98), rgba(10,4,16,.98)); border: 2px solid var(--gold); box-shadow: 0 0 0 4px var(--ink), 10px 10px 0 var(--p1); font-family: "Segoe UI", sans-serif; animation: slamIn .3s cubic-bezier(.2,1.5,.4,1); }
+.fc-close { all: unset; cursor: pointer; position: absolute; top: 8px; right: 12px; font-size: 20px; color: rgba(255,255,255,.6); }
+.fc-close:hover { color: var(--gold); }
+.fc-head { display: flex; gap: 16px; align-items: center; }
+.fc-portrait { width: 92px; height: 92px; border-radius: 50%; background-size: 240%; background-position: 50% 13%; background-repeat: no-repeat; background-color: #2a1238; border: 3px solid var(--gold); flex: none; }
+.fc-name { font: 900 26px "Arial Black", Impact, sans-serif; letter-spacing: 1px; }
+.fc-title { font: italic 700 14px "Segoe UI", sans-serif; color: var(--gold); margin-bottom: 6px; }
+.fc-stats { display: flex; gap: 14px; align-items: baseline; font-size: 14px; font-weight: 700; flex-wrap: wrap; }
+.fc-stats .big { font: 900 24px "Arial Black", sans-serif; color: var(--gold); }
+.fc-stats .gold { color: var(--gold); }
+.fc-stats .dim { color: rgba(255,255,255,.5); font-weight: 400; }
+.fc-body { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; overflow-y: auto; padding-right: 6px; min-height: 0; }
+.fc-col { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fc-sec { font: 900 13px "Arial Black", sans-serif; letter-spacing: 2px; color: var(--p2); margin-top: 8px; border-bottom: 1px solid rgba(63,230,208,.3); padding-bottom: 3px; }
+.fc-sec small, .fc-sub small { font: 400 11px "Segoe UI", sans-serif; letter-spacing: 0; color: rgba(255,255,255,.5); }
+.fc-sub { font: 800 11px "Segoe UI", sans-serif; letter-spacing: 1.5px; color: rgba(255,255,255,.7); margin-top: 4px; }
+.fc-meter { display: grid; grid-template-columns: 70px 1fr 34px 150px; gap: 8px; align-items: center; font-size: 12px; font-weight: 800; }
+.fc-meter small { font-weight: 400; color: rgba(255,255,255,.55); }
+.fc-mbar { position: relative; height: 9px; background: rgba(255,255,255,.1); border-radius: 5px; overflow: hidden; }
+.fc-mbar b { position: absolute; inset: 0 auto 0 0; border-radius: 5px; }
+.fc-meter.sta .fc-mbar b { background: linear-gradient(90deg, #3fe6a0, #9bf06b); }
+.fc-meter.mor .fc-mbar b { background: linear-gradient(90deg, #ff6fd8, #ffd23f); }
+.fc-mbar i { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.6); }
+.fc-inj { font-size: 13px; font-weight: 700; color: #ff8a8a; }
+.fc-inj small, .fc-scars span { font-weight: 400; color: rgba(255,255,255,.65); }
+.fc-scars { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; }
+.fc-none { font-size: 12px; color: rgba(255,255,255,.45); }
+.fc-attr { display: grid; grid-template-columns: 130px 1fr 66px; gap: 8px; align-items: center; }
+.fc-attr-label { all: unset; cursor: pointer; font: 800 12px "Segoe UI", sans-serif; letter-spacing: 1px; display: flex; justify-content: space-between; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,.04); }
+.fc-attr-label:hover { background: rgba(255,210,63,.15); color: var(--gold); }
+.fc-attr-label i { font-style: normal; transition: transform .2s; opacity: .6; }
+.fc-attr.open .fc-attr-label { color: var(--gold); background: rgba(255,210,63,.12); }
+.fc-attr.open .fc-attr-label i { transform: rotate(180deg); }
+.fc-bar { position: relative; height: 10px; background: rgba(255,255,255,.08); border-radius: 5px; overflow: hidden; }
+.fc-bar b { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 5px; }
+.fc-bar b.base { background: rgba(255,255,255,.22); }
+.fc-attr.body .fc-bar b.now { background: linear-gradient(90deg, var(--p2), #9bf0e4); }
+.fc-attr.mind .fc-bar b.now { background: linear-gradient(90deg, var(--p1), #ffa8ec); }
+.fc-bar b.now.down { opacity: .85; }
+.fc-bar i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.45); }
+.fc-num { font: 900 14px "Arial Black", sans-serif; text-align: right; }
+.fc-num small { font: 700 11px "Segoe UI", sans-serif; color: rgba(255,255,255,.55); }
+.fc-detail { grid-column: 1 / -1; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s ease, opacity .25s ease, margin .3s ease; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.85); background: rgba(255,255,255,.04); border-left: 3px solid var(--gold); padding: 0 10px; }
+.fc-attr.open .fc-detail { max-height: 220px; opacity: 1; margin: 2px 0 6px; padding: 6px 10px; }
+.fc-detail p { margin: 0 0 6px; }
+.fc-break { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: rgba(255,255,255,.65); }
+.fc-break b { color: #fff; }
+.fc-break .now b { color: var(--gold); }
+.fc-break .val { flex-basis: 100%; }
+.fc-move { padding: 6px 10px; background: rgba(63,230,208,.07); border-left: 3px solid var(--p2); }
+.fc-move.su { background: rgba(255,63,208,.08); border-left-color: var(--p1); }
+.fc-mname { font: 900 15px "Arial Black", sans-serif; }
+.fc-mname small { font: 700 10.5px "Segoe UI", sans-serif; letter-spacing: 1px; color: rgba(255,255,255,.55); }
+.fc-move p { margin: 3px 0 0; font-size: 12.5px; color: rgba(255,255,255,.85); line-height: 1.4; }
+.fc-matches, .fc-purchases { display: flex; flex-direction: column; gap: 2px; }
+.fc-match { display: grid; grid-template-columns: 34px 110px 60px 52px 1fr; gap: 6px; align-items: center; font-size: 12.5px; padding: 3px 6px; border-radius: 3px; background: rgba(255,255,255,.03); }
+.fc-match[title="click to replay"] { cursor: pointer; }
+.fc-match[title="click to replay"]:hover { background: rgba(255,210,63,.12); }
+.fc-match.w .fc-res { color: #7dff9a; font-weight: 900; }
+.fc-match.l .fc-res { color: #ff7a8a; font-weight: 900; }
+.fc-match.d .fc-res { color: #ffd23f; font-weight: 900; }
+.fc-match.todo { opacity: .45; }
+.fc-rd { font-weight: 800; color: rgba(255,255,255,.5); font-size: 11px; }
+.fc-fame { color: var(--gold); font-weight: 700; }
+.fc-notes { font-size: 11px; color: rgba(255,255,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-link { all: unset; cursor: pointer; font-weight: 800; border-bottom: 1px dotted rgba(255,255,255,.35); }
+.fc-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+.fc-awards { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--gold); margin-top: 4px; }
+.fc-camp { display: grid; grid-template-columns: 70px 1fr; gap: 6px; font-size: 12px; align-items: baseline; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.fc-items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.fc-items em { font-style: normal; }
+.fc-items em small { color: rgba(255,255,255,.45); }
+.fc-items em.you small { color: var(--p2); }

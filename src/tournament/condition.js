@@ -10,6 +10,7 @@
 // back toward calm. Fame buys recovery: every fighter has a manager (automatic by default) that
 // decides what to buy; the player can take over and buy by hand.
 import { ROSTER } from '../data/fighters.js';
+import { logPurchase } from './injuries.js';
 
 export const BODY = ['power', 'speed', 'mobility', 'health', 'toughness'];
 export const MIND = ['reaction', 'aggression', 'combo', 'antiAir', 'cunning'];
@@ -137,13 +138,14 @@ export function canBuy(t, id, itemId) {
   return !!it && f.fame >= it.cost;
 }
 
-export function buy(t, id, itemId) {
+export function buy(t, id, itemId, by = 'you') {
   const it = SHOP.find((x) => x.id === itemId), f = t.fighters[id];
   if (!it || f.fame < it.cost) return false;
   f.fame -= it.cost;
   f.spentFame += it.cost;
   if (it.stamina) f.stamina = clamp(f.stamina + it.stamina, 0, 100);
   if (it.morale) f.morale = clamp(f.morale + it.morale, 0, 100);
+  logPurchase(t, id, it.id, it.cost, by);
   return true;
 }
 
@@ -165,7 +167,7 @@ export function autoManage(t, id) {
     else if (f.stamina < 65 && spare >= cost('rest')) pick = 'rest';
     else if (f.morale < 40 && f.stamina >= 60 && spare >= cost('party') && (p.aggression ?? 0.5) > 0.5) pick = 'party';
     else if (f.morale < 55 && spare >= cost('pep')) pick = 'pep';
-    if (!pick || !buy(t, id, pick)) break;
+    if (!pick || !buy(t, id, pick, 'auto')) break;
     bought.push(pick);
   }
   return bought;

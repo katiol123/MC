@@ -45,7 +45,7 @@ function injBlock(inj) {
   ]);
 }
 
-export function showSpectacle(app, m, before, onClose) {
+export function showSpectacle(app, m, before, onName, onClose) {
   const r = m.result;
   const ids = [m.a, m.b];
   const timers = [];
@@ -93,7 +93,7 @@ export function showSpectacle(app, m, before, onClose) {
     const col = el('div', { class: `sp-col ${i ? 'right' : 'left'} ${won ? 'won' : ''}` }, [
       el('div', { class: 'sp-head' }, [
         el('div', { class: 'sp-portrait', style: faceStyle(app, id) }),
-        el('div', { class: 'sp-name' }, [NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
+        el('div', { class: 'sp-name' }, [onName ? el('button', { class: 'fname-link', onclick: (e) => { e.stopPropagation(); onName(id); } }, [NAME[id]]) : NAME[id], won ? el('span', { class: 'sp-stamp' }, ['WINNER']) : null]),
       ]),
       el('div', { class: 'sp-list' }, rows.length ? rows.map((x) => x.row) : [el('div', { class: 'sp-row empty' }, ['no highlights this time'])]),
       el('div', { class: 'sp-total' }, [el('span', {}, ['SPECTACLE']), total]),

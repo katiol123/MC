@@ -8,6 +8,7 @@ import {
   currentRound, roundComplete, MatchRunner, recordResult, POINTS, FAME_PER_SP, AWARD_FAME,
 } from '../tournament/tournament.js';
 import { showSpectacle } from './spectacle.js';
+import { showFighterCard, fighterLink } from './fighterCard.js';
 import { faceStyle } from './faces.js';
 import { showCharts } from './charts.js';
 import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
@@ -112,7 +113,7 @@ export class TournamentScene {
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
       el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
-      el('span', { class: 'tname' }, [NAME[r.id], ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
+      el('span', { class: 'tname' }, [this.link(r.id, NAME[r.id]), ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
       el('span', { class: 'tnum' }, [String(r.lost)]),
@@ -128,7 +129,7 @@ export class TournamentScene {
       const r = m.result, isNext = nx && nx.m === m;
       const side = (id, i) => el('div', { class: `fx-side ${r && r.winner === i ? 'won' : ''} ${r && r.winner !== i && r.winner !== 'draw' ? 'lost' : ''}` }, [
         el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
-        el('span', { class: 'fx-name' }, [short(id)]),
+        el('span', { class: 'fx-name' }, [this.link(id)]),
         el('span', { class: 'fx-place', title: 'current place in the table' }, [`(${placeOf[id]})`]),
       ]);
       return el('div', { class: `fx ${isNext ? 'next' : ''} ${r ? 'done' : ''}`, onclick: r ? () => this.replay(m) : null, title: r ? 'Click to replay' : '' }, [
@@ -173,6 +174,19 @@ export class TournamentScene {
       ]),
     ]);
     ui.appendChild(this.root);
+  }
+
+  /** Fighter card (click on any name). Replays are offered only from the hub itself. */
+  card(id) {
+    const fromHub = !this.modal;
+    this.modal = true;
+    showFighterCard(this.app, this.t, id, {
+      onReplay: fromHub ? (m) => { this.modal = null; this.replay(m); } : null,
+      onClose: () => { if (fromHub) this.modal = null; },
+    });
+  }
+  link(id, text = short(id)) {
+    return fighterLink(text, () => this.card(id));
   }
 
   browse(d) {
@@ -299,7 +313,7 @@ export class TournamentScene {
   // --- spectacle report ---------------------------------------------------------------------------
   spectacle(m, before) {
     this.modal = true;
-    showSpectacle(this.app, m, before, () => {
+    showSpectacle(this.app, m, before, (id) => this.card(id), () => {
       this.modal = null;
       this.render();
       this.afterResults();
@@ -316,9 +330,9 @@ export class TournamentScene {
       res[`${m.a}|${m.b}`] = { m, i: 0 };
       res[`${m.b}|${m.a}`] = { m, i: 1 };
     }
-    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: NAME[id] }))];
+    const head = [el('div', { class: 'gcell corner' }), ...order.map((id) => el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, id) }, title: `${NAME[id]} — click for the fighter card`, onclick: () => this.card(id) }))];
     const body = order.flatMap((rid) => [
-      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: NAME[rid] }),
+      el('div', { class: 'gcell ghead', style: { ...faceStyle(this.app, rid) }, title: `${NAME[rid]} — click for the fighter card`, onclick: () => this.card(rid) }),
       ...order.map((cid) => {
         if (rid === cid) return el('div', { class: 'gcell self' });
         const x = res[`${rid}|${cid}`];
@@ -356,7 +370,7 @@ export class TournamentScene {
       return el('div', { class: `camp-card ${f.stamina < COND.exhausted ? 'exhausted' : ''}` }, [
         el('div', { class: 'camp-top' }, [
           el('span', { class: 'fx-face', style: { ...faceStyle(this.app, id) } }),
-          el('span', { class: 'camp-name' }, [short(id)]),
+          el('span', { class: 'camp-name' }, [this.link(id)]),
           el('label', { class: 'camp-auto', title: 'automatic manager: buys recovery, treatment and upgrades after every round' }, [
             el('input', { type: 'checkbox', ...(f.auto ? { checked: '' } : {}), onchange: (e) => { f.auto = e.target.checked; save(t); } }), 'AUTO']),
           el('span', { class: 'camp-fame' }, [`★${f.fame}`]),
@@ -424,7 +438,7 @@ export class TournamentScene {
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
-          el('div', {}, [el('div', { class: 'awards-title small' }, [short(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · each level costs more']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
@@ -472,7 +486,7 @@ export class TournamentScene {
       for (const b of c.items) counts[b] = (counts[b] || 0) + 1;
       return el('div', { class: `cr-row ${c.spent ? '' : 'saved'}`, style: { '--i': i } }, [
         el('span', { class: 'fx-face', style: faceStyle(this.app, id) }),
-        el('span', { class: 'cr-name' }, [short(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
+        el('span', { class: 'cr-name' }, [this.link(id), t.fighters[id].auto ? null : el('small', {}, [' manual'])]),
         el('span', { class: 'cr-items' }, c.items.length
           ? Object.entries(counts).map(([b, n]) => el('em', {}, [`${label(b)}${n > 1 ? ` ×${n}` : ''}`]))
           : [el('em', { class: 'none' }, ['spent nothing'])]),
@@ -501,7 +515,7 @@ export class TournamentScene {
     return el('div', { class: 'awards' }, list.map((a, i) => el('div', { class: 'award', style: { '--d': `${delay + i * 0.3}s` } }, [
       el('div', { class: 'award-title' }, [a.title]),
       a.id ? el('div', { class: 'award-face', style: { ...faceStyle(this.app, a.id) } }) : el('div', { class: 'award-face none' }),
-      el('div', { class: 'award-name' }, [a.id ? short(a.id) : 'nobody']),
+      el('div', { class: 'award-name' }, [a.id ? this.link(a.id) : 'nobody']),
       el('div', { class: 'award-value' }, [a.value]),
       a.note ? el('div', { class: 'award-note' }, [a.note.replace(/vs (\w+)/, (_, id) => `vs ${short(id)}`)]) : null,
       a.fame ? el('div', { class: 'award-fame' }, [`+${a.fame} FAME`]) : null,
@@ -535,10 +549,10 @@ export class TournamentScene {
         el('div', { class: 'final-kicker' }, ['TOURNAMENT CHAMPION']),
         el('div', { class: 'final-champ' }, [
           el('div', { class: 'final-portrait', style: { backgroundImage: `url(${this.app.portraitURL(champ.id)})` } }),
-          el('div', { class: 'final-name' }, [NAME[champ.id], el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
+          el('div', { class: 'final-name' }, [this.link(champ.id, NAME[champ.id]), el('small', {}, [`${champ.pts} pts · ${champ.won}-${champ.lost} · ★${champ.fame} fame`])]),
         ]),
         el('div', { class: 'podium' }, table.slice(1, 3).map((r, i) => el('div', { class: 'pod' }, [
-          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. ${short(r.id)} · ${r.pts} pts`]))),
+          el('span', { class: 'fx-face', style: { ...faceStyle(this.app, r.id) } }), `${i + 2}. `, this.link(r.id), ` · ${r.pts} pts`]))),
         el('div', { class: 'tour-actions' }, [btn('VIEW TABLE', close), btn('NEW TOURNAMENT', () => { close(); this.confirmNew(); })]),
       ]),
     ]);

@@ -17,11 +17,14 @@ export class Keyboard {
     this.down = new Set();
     this.pressedQueue = [];
     this.listeners = [];
+    this.captures = [];
     target.addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'F1', 'F2', 'F3', 'F4', 'Tab'].includes(e.code)) e.preventDefault();
       if (!e.repeat) {
         this.down.add(e.code);
-        for (const l of this.listeners) l(e.code, e);
+        // a modal on top (fighter card) can capture the keyboard: only it hears key presses then
+        const top = this.captures[this.captures.length - 1];
+        for (const l of top ? [top] : this.listeners) l(e.code, e);
       }
     });
     target.addEventListener('keyup', (e) => this.down.delete(e.code));
@@ -30,6 +33,11 @@ export class Keyboard {
   onPress(fn) {
     this.listeners.push(fn);
     return () => (this.listeners = this.listeners.filter((l) => l !== fn));
+  }
+  /** Exclusive listener (stacked): while set, the regular listeners hear nothing. */
+  capture(fn) {
+    this.captures.push(fn);
+    return () => (this.captures = this.captures.filter((l) => l !== fn));
   }
   raw(player) {
     const b = BINDINGS[player];
