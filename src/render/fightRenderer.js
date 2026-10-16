@@ -109,7 +109,7 @@ export class FightRenderer {
   render(ctx, alpha, { debug = null, now = 0 } = {}) {
     const fs = this.match.fighters;
     const fat = this.match.fatality;
-    this.cam.update(fs, alpha, this.effects.shake, fat ? { x: fat.camX ?? (fat.ax + fat.vx) / 2, y: fat.camY || 0, zoom: fat.camZoom || 1.34 } : null);
+    this.cam.update(fs, alpha, this.effects.shake, fat ? { x: fat.camX ?? (fat.ax + fat.vx) / 2, y: fat.camY || 0, zoom: fat.camZoom || 1.34, kick: fat.cine.punch } : null);
     ctx.save();
     this.arena.drawBack(ctx, this.cam);
     if (fat) {
@@ -136,9 +136,23 @@ export class FightRenderer {
       ctx.fillStyle = rgba('#ffffff', this.effects.flash);
       ctx.fillRect(0, 0, VIEW.width, VIEW.height);
     }
+    if (fat) {
+      // cinematic direction: grade, spotlight, rays, speed lines, impact frames (fatality/cinema.js)
+      fat.cine.drawScene(ctx, fat, this.cam, VIEW.width, VIEW.height, (color) => {
+        for (const i of fat.order) {
+          const f = fs[i], fx = f.fx || (f.fx = {});
+          const keep = [fx.tint, fx.tintColor];
+          fx.tint = 1; fx.tintColor = color;
+          this.drawFighter(ctx, f, i, alpha, now);
+          [fx.tint, fx.tintColor] = keep;
+        }
+      });
+    }
     ctx.restore();
-    if (this.showHud) drawHud(ctx, this.match, this.hud, this.portraits);
+    // the HUD steps aside while a fatality plays (letterboxed); it returns for the FATALITY title
+    if (this.showHud && this.match.phase !== 'fatality') drawHud(ctx, this.match, this.hud, this.portraits);
     if (this.match.freeze) this.drawSuperCutIn(ctx, this.match.freeze);
+    if (fat) fat.cine.drawFrame(ctx, fat, VIEW.width, VIEW.height, Math.min(1, fat.t / 18), this.match.phase === 'fatality');
     if (debug?.enabled) drawDebug(ctx, this.match, this.cam, debug);
   }
 

@@ -13,6 +13,7 @@ export class Camera {
   }
   update(fighters, alpha, shake = 0, focus = null) {
     this.t++;
+    this.kick = focus?.kick || 0; // momentary zoom punch (fatality impacts)
     const xs = fighters.map((f) => lerp(f.prev.x, f.body.x, alpha));
     const ys = focus ? [0, 0] : fighters.map((f) => lerp(f.prev.y, f.body.y, alpha));
     // a fixed framing (fatality scenes) instead of following the fighters
@@ -35,8 +36,8 @@ export class Camera {
   }
   toScreen(x, y) {
     return {
-      x: (x - this.x) * this.zoom + VIEW.width / 2 + this.sx,
-      y: VIEW.groundY - (y - this.y) * this.zoom + this.sy,
+      x: (x - this.x) * this.zoom * (1 + (this.kick || 0)) + VIEW.width / 2 + this.sx,
+      y: VIEW.groundY - (y - this.y) * this.zoom * (1 + (this.kick || 0)) + this.sy,
     };
   }
 }

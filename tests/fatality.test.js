@@ -1,6 +1,7 @@
 // FINISH HIM / FATALITY: the deciding blow leaves the loser dazed; the winner's fatality plays on
 // every opponent and ends the match. Written once per fighter, it must work on every body type.
 import { test } from 'node:test';
+import { extraFrames } from '../src/fatality/cinema.js';
 import assert from 'node:assert/strict';
 import { fightingMatch, run, raw, place } from './helpers.js';
 import { ROSTER } from '../src/data/fighters.js';
@@ -50,7 +51,7 @@ test('every fatality plays on every opponent and ends the match (nothing breaks)
       assert.equal(m.phase, 'finish', `${a.id}->${v.id} finish`);
       let ev = run(m, 20, seq(SU_K));
       assert.ok(ev.some((e) => e.type === 'fatalityStart'), `${a.id}->${v.id} fatality started`);
-      const dur = FATALITIES[a.id].duration;
+      const dur = FATALITIES[a.id].duration + extraFrames(a.id);
       ev = run(m, dur + 5);
       const end = ev.find((e) => e.type === 'matchEnd');
       assert.ok(end && end.fatality && end.winner === 0, `${a.id}->${v.id} match ended by fatality`);

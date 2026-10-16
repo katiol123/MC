@@ -10,6 +10,7 @@
 import { resolvePose, blendPoses, emptyPose } from '../anim/skeleton.js';
 import { clamp, ease } from '../core/math.js';
 import { FATALITIES } from './fatalities.js';
+import { Cinema } from './cinema.js';
 
 export class FatalityDirector {
   constructor(match, who) {
@@ -28,6 +29,7 @@ export class FatalityDirector {
     this.gap = this.A.body.pushW + this.V.body.pushW + 46;
     this.events = [];
     this.s = {}; // per-scene scratch state
+    this.cine = new Cinema(this.A.def.id); // slow motion, freezes, letterbox... (cinema.js)
     this.order = [1 - who, who]; // draw order (victim behind by default)
     for (const f of [this.A, this.V]) {
       f.setState('scripted', {});
@@ -45,12 +47,20 @@ export class FatalityDirector {
 
   /** Advances one tick; returns true when the scene is over. */
   tick() {
-    this.t++;
     this.events = [];
+    this.cine.frameTick();
     for (const f of [this.A, this.V]) f.snapshot();
+    if (this.cine.hold > 0) {
+      // slow motion / hit-stop: the picture holds, the script waits
+      this.cine.hold--;
+      return false;
+    }
+    if (this.t >= this.duration) return true;
+    this.t++;
     this.script.run(this, this.t);
+    this.cine.scriptTick(this.t);
     for (const f of [this.A, this.V]) f.updatePose(false);
-    return this.t >= this.duration;
+    return this.t >= this.duration && this.cine.hold === 0;
   }
 
   // --- helpers for scripts ---------------------------------------------------------------------
