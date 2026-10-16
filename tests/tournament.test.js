@@ -189,7 +189,10 @@ test('next season: careers carry over (fame, upgrades, history), prices and cond
   assert.equal(g.fame, f.fame);
   assert.deepEqual(g.perm, f.perm);
   assert.equal(g.careerUp.power, 1);
-  assert.equal(I.upgradeCost(g, 'power'), 150, 'prices start again from the base price');
+  assert.equal(I.upgradeCost(g, 'power'), Math.round(150 * I.careerPriceFactor(g)), 'the per-season part starts again from the base price');
+  assert.ok(I.upgradeCost({ perm: { power: 0.3, speed: 0.3 }, upLevels: {} }, 'power') > 150, 'a built-up fighter pays a career premium');
+  const beaten = { perm: { power: -0.3, health: -0.3 }, upLevels: {} };
+  assert.ok(I.upgradeCost(beaten, 'power') < 150, 'a battered fighter gets a discount');
   assert.equal(g.injuries.length, 0);
   assert.equal(g.stamina, 100);
   assert.equal(g.purchases.length, f.purchases.length);

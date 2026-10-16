@@ -7,7 +7,7 @@ import { ATTRIBUTES, ATTRIBUTE_GROUPS } from '../data/attributes.js';
 import { MOVE_INFO, ATTRIBUTE_INFO, SIGNATURE_INPUT, SUPER_INPUT } from '../data/moveInfo.js';
 import { standings } from '../tournament/tournament.js';
 import { SHOP, COND, conditionShift } from '../tournament/condition.js';
-import { INJURIES, INJ, profileShift, fighterLevel } from '../tournament/injuries.js';
+import { INJURIES, INJ, profileShift, fighterLevel, careerPriceFactor, upgradeCost } from '../tournament/injuries.js';
 import { el } from './dom.js';
 import { faceStyle } from './faces.js';
 
@@ -174,6 +174,7 @@ export function showFighterCard(app, t, id, opts = {}) {
             el('span', {}, [`rounds ${row.rf}:${row.ra}`]),
             el('span', { class: 'gold' }, [`★${f.fame} fame`]),
             el('span', { class: 'dim' }, [`this season: earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
+            el('span', { class: 'dim', title: 'upgrade prices scale with how far the fighter has come from his own starting bars; never resets' }, [`next upgrade ★${upgradeCost(f)} (career ×${careerPriceFactor(f).toFixed(2)})`]),
           ]),
         ]),
       ]),

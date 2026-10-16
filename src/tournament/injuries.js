@@ -69,6 +69,7 @@ export const INJ = {
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
   upgradeBias: 2.5, // auto manager: the most preferred bar is 2.5× as likely as the least preferred one
+  careerPriceK: 3, careerPriceMin: 0.5, careerPriceMax: 2.5, // price × (1 + K × average bar shift from the fighter's own base)
   upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
@@ -79,10 +80,21 @@ export function fighterLevel(f) {
   return 1 + Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
 }
 
+/**
+ * Career price factor: how far the fighter has moved from his OWN starting profile (upgrades minus
+ * permanent injury damage, averaged over the bars). Built-up fighters pay more, battered ones less:
+ * a brake on leaders running away and a hand up for the beaten. Not reset between seasons.
+ */
+export function careerPriceFactor(f) {
+  const shift = ATTR_IDS.reduce((a, k) => a + (f.perm?.[k] || 0), 0) / ATTR_IDS.length;
+  return Math.max(INJ.careerPriceMin, Math.min(INJ.careerPriceMax, 1 + INJ.careerPriceK * shift));
+}
+
 export function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
-  // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
+  // the price does not depend on which bar: every upgrade bought this season makes the next one
+  // dearer, and the career factor scales it by how far the fighter has already come
   const bought = Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
-  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought));
+  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought) * careerPriceFactor(f));
 }
 
 /** Average permanent bar shift over the whole league (upgrades minus injury damage). */

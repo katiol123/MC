@@ -14043,6 +14043,7 @@ __define("src/tournament/injuries.js", function (__exports, __require) {
   Object.defineProperty(__exports, "INJURY_KINDS", { enumerable: true, get: () => INJURY_KINDS });
   Object.defineProperty(__exports, "INJ", { enumerable: true, get: () => INJ });
   Object.defineProperty(__exports, "fighterLevel", { enumerable: true, get: () => fighterLevel });
+  Object.defineProperty(__exports, "careerPriceFactor", { enumerable: true, get: () => careerPriceFactor });
   Object.defineProperty(__exports, "upgradeCost", { enumerable: true, get: () => upgradeCost });
   Object.defineProperty(__exports, "leagueDrift", { enumerable: true, get: () => leagueDrift });
   Object.defineProperty(__exports, "initInjuries", { enumerable: true, get: () => initInjuries });
@@ -14126,6 +14127,7 @@ const INJ = {
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
   upgradeBias: 2.5, // auto manager: the most preferred bar is 2.5× as likely as the least preferred one
+  careerPriceK: 3, careerPriceMin: 0.5, careerPriceMax: 2.5, // price × (1 + K × average bar shift from the fighter's own base)
   upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
@@ -14136,10 +14138,21 @@ function fighterLevel(f) {
   return 1 + Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
 }
 
+/**
+ * Career price factor: how far the fighter has moved from his OWN starting profile (upgrades minus
+ * permanent injury damage, averaged over the bars). Built-up fighters pay more, battered ones less:
+ * a brake on leaders running away and a hand up for the beaten. Not reset between seasons.
+ */
+function careerPriceFactor(f) {
+  const shift = ATTR_IDS.reduce((a, k) => a + (f.perm?.[k] || 0), 0) / ATTR_IDS.length;
+  return Math.max(INJ.careerPriceMin, Math.min(INJ.careerPriceMax, 1 + INJ.careerPriceK * shift));
+}
+
 function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
-  // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
+  // the price does not depend on which bar: every upgrade bought this season makes the next one
+  // dearer, and the career factor scales it by how far the fighter has already come
   const bought = Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
-  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought));
+  return Math.round(INJ.upgradeCost * (1 + INJ.upgradeCostGrowth * bought) * careerPriceFactor(f));
 }
 
 /** Average permanent bar shift over the whole league (upgrades minus injury damage). */
@@ -14776,7 +14789,7 @@ const { showFighterCard, fighterLink } = __require("src/ui/fighterCard.js");
 const { faceStyle } = __require("src/ui/faces.js");
 const { showCharts } = __require("src/ui/charts.js");
 const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
-const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel } = __require("src/tournament/injuries.js");
+const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel, careerPriceFactor } = __require("src/tournament/injuries.js");
 const { ATTRIBUTES } = __require("src/data/attributes.js");
 
 const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -15228,7 +15241,7 @@ class TournamentScene {
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
-          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`]), el('div', { class: 'up-career', title: 'prices scale with how far the fighter has come from his own starting bars (upgrades minus injury damage); never resets' }, [`career price ×${careerPriceFactor(f).toFixed(2)}`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · every upgrade raises the next price (resets each season)']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
@@ -15615,7 +15628,7 @@ const { ATTRIBUTES, ATTRIBUTE_GROUPS } = __require("src/data/attributes.js");
 const { MOVE_INFO, ATTRIBUTE_INFO, SIGNATURE_INPUT, SUPER_INPUT } = __require("src/data/moveInfo.js");
 const { standings } = __require("src/tournament/tournament.js");
 const { SHOP, COND, conditionShift } = __require("src/tournament/condition.js");
-const { INJURIES, INJ, profileShift, fighterLevel } = __require("src/tournament/injuries.js");
+const { INJURIES, INJ, profileShift, fighterLevel, careerPriceFactor, upgradeCost } = __require("src/tournament/injuries.js");
 const { el } = __require("src/ui/dom.js");
 const { faceStyle } = __require("src/ui/faces.js");
 
@@ -15782,6 +15795,7 @@ function showFighterCard(app, t, id, opts = {}) {
             el('span', {}, [`rounds ${row.rf}:${row.ra}`]),
             el('span', { class: 'gold' }, [`★${f.fame} fame`]),
             el('span', { class: 'dim' }, [`this season: earned ${f.fameEarned} · spent ${f.spentFame || 0}`]),
+            el('span', { class: 'dim', title: 'upgrade prices scale with how far the fighter has come from his own starting bars; never resets' }, [`next upgrade ★${upgradeCost(f)} (career ×${careerPriceFactor(f).toFixed(2)})`]),
           ]),
         ]),
       ]),

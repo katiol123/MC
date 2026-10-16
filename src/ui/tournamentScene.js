@@ -12,7 +12,7 @@ import { showFighterCard, fighterLink } from './fighterCard.js';
 import { faceStyle } from './faces.js';
 import { showCharts } from './charts.js';
 import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
-import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel } from '../tournament/injuries.js';
+import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel, careerPriceFactor } from '../tournament/injuries.js';
 import { ATTRIBUTES } from '../data/attributes.js';
 
 const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -464,7 +464,7 @@ export class TournamentScene {
       el('div', { class: 'up-panel' }, [
         el('div', { class: 'up-head' }, [
           el('span', { class: 'sp-portrait', style: { ...faceStyle(this.app, id) } }),
-          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`])]),
+          el('div', {}, [el('div', { class: 'awards-title small' }, [this.link(id)]), el('div', { class: 'camp-fame big' }, [`★${f.fame} fame`]), el('div', { class: 'up-career', title: 'prices scale with how far the fighter has come from his own starting bars (upgrades minus injury damage); never resets' }, [`career price ×${careerPriceFactor(f).toFixed(2)}`])]),
         ]),
         el('div', { class: 'up-legend' }, [el('i', { class: 'base' }), 'base', el('i', { class: 'gain' }), 'upgrades', el('i', { class: 'loss' }), 'injury damage (permanent)', ' · every upgrade raises the next price (resets each season)']),
         el('div', { class: 'up-list' }, ATTR_IDS.map(row)),
