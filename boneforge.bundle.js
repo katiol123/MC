@@ -9814,7 +9814,7 @@ class FighterPainter {
     return { shout: 0.5, attack: 0.32, hurt: 0.3, ko: 0.55, dizzy: 0.22, happy: 0.12, strain: 0.06 }[xp] ?? 0.04;
   }
 
-  /** Lower jaw (with its teeth) hinged under the skull, and the dark mouth between the jaws. */
+  /** Lower jaw (with its teeth) hinged under the skull; the mouth between the jaws is see-through. */
   drawCrocJaw(ctx, pass, R, opts) {
     const lk = this.look, t = this.tint;
     const th = -this.jawOpen(opts);
@@ -9827,13 +9827,7 @@ class FighterPainter {
     ctx.beginPath();
     smoothClosed(ctx, jaw, 0.4);
     if (pass === 'outline') return this.outlineFill(ctx);
-    // mouth inside (only shows when the jaw drops)
-    ctx.save();
-    ctx.beginPath();
-    smoothClosed(ctx, [{ x: -0.2 * R, y: -0.2 * R }, { x: 2.2 * R, y: -0.2 * R }, rot(2.15, -0.3), rot(-0.2, -0.3)], 0.2);
-    ctx.fillStyle = '#5a1020';
-    ctx.fill();
-    ctx.restore();
+    // the gap between the jaws stays open: whatever is behind the head shows through it
     ctx.beginPath();
     smoothClosed(ctx, jaw, 0.4);
     ctx.fillStyle = this.skin.base;
@@ -13993,6 +13987,7 @@ __define("src/tournament/injuries.js", function (__exports, __require) {
   Object.defineProperty(__exports, "INJURIES", { enumerable: true, get: () => INJURIES });
   Object.defineProperty(__exports, "INJURY_KINDS", { enumerable: true, get: () => INJURY_KINDS });
   Object.defineProperty(__exports, "INJ", { enumerable: true, get: () => INJ });
+  Object.defineProperty(__exports, "fighterLevel", { enumerable: true, get: () => fighterLevel });
   Object.defineProperty(__exports, "upgradeCost", { enumerable: true, get: () => upgradeCost });
   Object.defineProperty(__exports, "leagueDrift", { enumerable: true, get: () => leagueDrift });
   Object.defineProperty(__exports, "initInjuries", { enumerable: true, get: () => initInjuries });
@@ -14079,6 +14074,11 @@ const INJ = {
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
 };
+
+/** Fighter level this season: 1 + upgrades bought in the shop (resets with every new tournament). */
+function fighterLevel(f) {
+  return 1 + Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
+}
 
 function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
   // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
@@ -14707,7 +14707,7 @@ const { showFighterCard, fighterLink } = __require("src/ui/fighterCard.js");
 const { faceStyle } = __require("src/ui/faces.js");
 const { showCharts } = __require("src/ui/charts.js");
 const { SHOP, buy, conditionShift, COND } = __require("src/tournament/condition.js");
-const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } = __require("src/tournament/injuries.js");
+const { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel } = __require("src/tournament/injuries.js");
 const { ATTRIBUTES } = __require("src/data/attributes.js");
 
 const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -14807,7 +14807,7 @@ class TournamentScene {
 
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
-      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
+      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }, [el('b', { class: 'tlvl', title: `level ${fighterLevel(t.fighters[r.id])} (1 + upgrades bought this season)` }, [String(fighterLevel(t.fighters[r.id]))])]),
       el('span', { class: 'tname' }, [this.link(r.id, NAME[r.id]), ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),
@@ -15546,7 +15546,7 @@ const { ATTRIBUTES, ATTRIBUTE_GROUPS } = __require("src/data/attributes.js");
 const { MOVE_INFO, ATTRIBUTE_INFO, SIGNATURE_INPUT, SUPER_INPUT } = __require("src/data/moveInfo.js");
 const { standings } = __require("src/tournament/tournament.js");
 const { SHOP, COND, conditionShift } = __require("src/tournament/condition.js");
-const { INJURIES, INJ, profileShift } = __require("src/tournament/injuries.js");
+const { INJURIES, INJ, profileShift, fighterLevel } = __require("src/tournament/injuries.js");
 const { el } = __require("src/ui/dom.js");
 const { faceStyle } = __require("src/ui/faces.js");
 
@@ -15702,7 +15702,7 @@ function showFighterCard(app, t, id, opts = {}) {
     el('div', { class: 'fcard' }, [
       el('button', { class: 'fc-close', onclick: close, title: 'close (Esc)' }, ['✕']),
       el('div', { class: 'fc-head' }, [
-        el('div', { class: 'fc-portrait', style: faceStyle(app, id, 0.95) }),
+        el('div', { class: 'fc-portrait', style: faceStyle(app, id, 0.95) }, [el('b', { class: 'fc-lvl', title: 'level: 1 + upgrades bought this season (back to 1 every new tournament)' }, [`LV ${fighterLevel(f)}`])]),
         el('div', { class: 'fc-id' }, [
           el('div', { class: 'fc-name' }, [src.name]),
           el('div', { class: 'fc-title' }, [src.title]),

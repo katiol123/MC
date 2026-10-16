@@ -7,7 +7,7 @@ import { ATTRIBUTES, ATTRIBUTE_GROUPS } from '../data/attributes.js';
 import { MOVE_INFO, ATTRIBUTE_INFO, SIGNATURE_INPUT, SUPER_INPUT } from '../data/moveInfo.js';
 import { standings } from '../tournament/tournament.js';
 import { SHOP, COND, conditionShift } from '../tournament/condition.js';
-import { INJURIES, INJ, profileShift } from '../tournament/injuries.js';
+import { INJURIES, INJ, profileShift, fighterLevel } from '../tournament/injuries.js';
 import { el } from './dom.js';
 import { faceStyle } from './faces.js';
 
@@ -163,7 +163,7 @@ export function showFighterCard(app, t, id, opts = {}) {
     el('div', { class: 'fcard' }, [
       el('button', { class: 'fc-close', onclick: close, title: 'close (Esc)' }, ['✕']),
       el('div', { class: 'fc-head' }, [
-        el('div', { class: 'fc-portrait', style: faceStyle(app, id, 0.95) }),
+        el('div', { class: 'fc-portrait', style: faceStyle(app, id, 0.95) }, [el('b', { class: 'fc-lvl', title: 'level: 1 + upgrades bought this season (back to 1 every new tournament)' }, [`LV ${fighterLevel(f)}`])]),
         el('div', { class: 'fc-id' }, [
           el('div', { class: 'fc-name' }, [src.name]),
           el('div', { class: 'fc-title' }, [src.title]),

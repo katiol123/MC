@@ -1917,7 +1917,7 @@ export class FighterPainter {
     return { shout: 0.5, attack: 0.32, hurt: 0.3, ko: 0.55, dizzy: 0.22, happy: 0.12, strain: 0.06 }[xp] ?? 0.04;
   }
 
-  /** Lower jaw (with its teeth) hinged under the skull, and the dark mouth between the jaws. */
+  /** Lower jaw (with its teeth) hinged under the skull; the mouth between the jaws is see-through. */
   drawCrocJaw(ctx, pass, R, opts) {
     const lk = this.look, t = this.tint;
     const th = -this.jawOpen(opts);
@@ -1930,13 +1930,7 @@ export class FighterPainter {
     ctx.beginPath();
     smoothClosed(ctx, jaw, 0.4);
     if (pass === 'outline') return this.outlineFill(ctx);
-    // mouth inside (only shows when the jaw drops)
-    ctx.save();
-    ctx.beginPath();
-    smoothClosed(ctx, [{ x: -0.2 * R, y: -0.2 * R }, { x: 2.2 * R, y: -0.2 * R }, rot(2.15, -0.3), rot(-0.2, -0.3)], 0.2);
-    ctx.fillStyle = '#5a1020';
-    ctx.fill();
-    ctx.restore();
+    // the gap between the jaws stays open: whatever is behind the head shows through it
     ctx.beginPath();
     smoothClosed(ctx, jaw, 0.4);
     ctx.fillStyle = this.skin.base;

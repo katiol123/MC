@@ -12,7 +12,7 @@ import { showFighterCard, fighterLink } from './fighterCard.js';
 import { faceStyle } from './faces.js';
 import { showCharts } from './charts.js';
 import { SHOP, buy, conditionShift, COND } from '../tournament/condition.js';
-import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury } from '../tournament/injuries.js';
+import { INJURIES, INJ, ATTR_IDS, upgradeCost, buyUpgrade, treatInjury, fighterLevel } from '../tournament/injuries.js';
 import { ATTRIBUTES } from '../data/attributes.js';
 
 const BASE_PROFILE = Object.fromEntries(ROSTER.map((f) => [f.id, f.profile || {}]));
@@ -112,7 +112,7 @@ export class TournamentScene {
 
     const rows = table.map((r, i) => el('div', { class: `trow ${i < 4 ? 'top' : ''}`, style: { '--i': i } }, [
       el('span', { class: 'tpos' }, [String(i + 1)]),
-      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }),
+      el('span', { class: 'tface', style: { ...faceStyle(this.app, r.id) } }, [el('b', { class: 'tlvl', title: `level ${fighterLevel(t.fighters[r.id])} (1 + upgrades bought this season)` }, [String(fighterLevel(t.fighters[r.id]))])]),
       el('span', { class: 'tname' }, [this.link(r.id, NAME[r.id]), ...r.injuries.map((i) => el('em', { class: 'tinj', title: `${INJURIES[i.kind].label}: ${INJURIES[i.kind].desc} (${i.games} more)` }, [INJURIES[i.kind].icon]))]),
       el('span', { class: 'tnum' }, [String(r.played)]),
       el('span', { class: 'tnum' }, [String(r.won)]),

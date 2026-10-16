@@ -73,6 +73,11 @@ export const INJ = {
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
 };
 
+/** Fighter level this season: 1 + upgrades bought in the shop (resets with every new tournament). */
+export function fighterLevel(f) {
+  return 1 + Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);
+}
+
 export function upgradeCost(f, attr) { // eslint-disable-line no-unused-vars
   // the price does not depend on which bar: every upgrade bought so far makes the next one dearer
   const bought = Object.values(f.upLevels || {}).reduce((a, n) => a + n, 0);

@@ -581,3 +581,8 @@ html, body { margin: 0; height: 100%; background: #07030b; overflow: hidden; fon
 .fc-seasons { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: rgba(255,255,255,.75); }
 .fc-season.champ { color: var(--gold); font-weight: 800; }
 .season-note { max-width: 640px; text-align: center; font: 600 14px/1.5 "Segoe UI", sans-serif; color: rgba(255,255,255,.85); }
+/* fighter level: a small badge half over the avatar's bottom-right edge */
+.tface { position: relative; overflow: visible; }
+.tlvl { position: absolute; right: -8px; bottom: -6px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 900 9px/1 "Arial Black", sans-serif; color: var(--ink); background: var(--gold); border: 1.5px solid var(--ink); box-shadow: 0 0 0 1px rgba(255,210,63,.5); pointer-events: none; }
+.fc-portrait { position: relative; }
+.fc-lvl { position: absolute; right: -14px; bottom: -4px; padding: 3px 7px; border-radius: 12px; font: 900 12px/1 "Arial Black", sans-serif; color: var(--ink); background: var(--gold); border: 2px solid var(--ink); white-space: nowrap; }
