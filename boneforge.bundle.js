@@ -5836,20 +5836,26 @@ const FATALITIES = {
     run(d, t) {
       const { A, V, s } = d;
       const open = P(STAND, { y: 116, lean: -4, fa: [110, 10, 0], ba: [104, 14, 0] });
-      const hug = P(STAND, { y: 112, lean: 8, chest: 6, fa: [84, 110, 0], ba: [80, 116, 0], ff: [30, 8, 0], bf: [-32, 8, 0] });
+      // the embrace (profile): both arms reach round the victim at chest height, hands behind their back;
+      // Grizz leans back to lift them off the floor, cheek on their shoulder
+      const hug = P(STAND, { y: 114, lean: -10, chest: -6, neck: 14, head: 16, fa: [70, 22, -10], ba: [78, 16, -10], ff: [30, 8, 0], bf: [-34, 8, 0] });
+      const hug2 = P(hug, { lean: -16, chest: -10, y: 112, fa: [66, 30, -14], ba: [74, 24, -14] }); // squeeze
       const shh = P(STAND, { y: 116, lean: 6, neck: 6, head: 6, fa: [120, 160, 0], ff: [18, 8, 0], bf: [-20, 8, 0] });
-      d.keys(A, t, [[0, STAND], [20, open], [40, open], [52, hug], [110, hug], [126, P(STAND, { y: 80, lean: 40, fa: [60, 20, 0], ba: [56, 24, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
+      d.keys(A, t, [[0, STAND], [20, open], [40, open], [52, hug], [60, hug2], [66, hug], [72, hug2], [78, hug], [84, hug2], [90, hug], [96, hug2], [102, hug], [108, hug2], [114, hug], [126, P(STAND, { y: 80, lean: 40, fa: [60, 20, 0], ba: [56, 24, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
         [150, STAND], [170, shh], [230, shh], [250, P(STAND, { fa: [100, 140, 0] })], [280, FLEX]]);
       // victim is hugged (lifted, squeezed), goes limp, laid down and tucked in
-      if (t < 52) { d.at(V, d.vx + (d.fx(d.gap - 18) - d.vx) * d.span(t, 30, 52)); daze(d, V, t); }
+      const hugX = d.fx(d.gap - 44); // chest to chest, inside the bear's arms
+      if (t < 52) { d.at(V, d.vx + (hugX - d.vx) * d.span(t, 30, 52)); daze(d, V, t); }
       else if (t < 112) {
-        d.at(V, d.fx(d.gap - 18), 14 + 4 * Math.sin(t * 0.4));
-        d.pose(V, P(K.HIT_HIGH, { fa: [150, 60, 0], ba: [160, 40, 0] }), P(K.DIZZY[0], { neck: -30, head: -30, fa: [10, 10, 0], ba: [6, 10, 0] }), d.span(t, 60, 104));
+        // lifted off the floor and rocked side to side with every squeeze
+        d.at(V, hugX + d.dir * 3 * Math.sin(t * 0.52), 22 + 6 * Math.abs(Math.sin(t * 0.26)));
+        // pressed upright against the bear: arms flail over its shoulders, then go limp, head lolling
+        d.pose(V, P(STAND, { y: 116, lean: 8, chest: 4, neck: -12, head: -16, fa: [158, 50, 0], ba: [168, 34, 0], ff: [8, 8, 0], bf: [-10, 8, 0] }), P(STAND, { y: 116, lean: 12, chest: 6, neck: 22, head: 20, fa: [14, 12, 0], ba: [8, 12, 0], ff: [6, 8, 0], bf: [-8, 8, 0] }), d.span(t, 64, 104));
         V.fx.sx = 1 - 0.1 * Math.abs(Math.sin(t * 0.25));
         if (t % 16 === 0) d.sfx('squeeze');
       } else if (t < 140) {
         const k = d.span(t, 112, 140);
-        d.at(V, d.fx(d.gap - 10), 14 * (1 - k));
+        d.at(V, hugX + (d.fx(d.gap - 10) - hugX) * k, 22 * (1 - k));
         V.fx.sx = 1;
         d.pose(V, P(K.DIZZY[0], { neck: -30, head: -30 }), K.LYING, k);
       } else { d.at(V, d.fx(d.gap - 10)); d.pose(V, P(K.LYING, { neck: -6, head: -4, fa: [30, 40, 0], ba: [40, 40, 0] })); }
@@ -13456,7 +13462,13 @@ function recordResult(t, m, match, stats, overrides) {
   m.result.injuries = ids.map((id, i) => {
     tickInjuries(t.fighters[id]);
     const kind = rep.sides[i].injuredWith;
-    return kind ? addInjury(t, id, kind, drift) : null;
+    if (!kind) return null;
+    // the injury also drains stamina: rest it off or pay for treatment - not both on a budget
+    const f = t.fighters[id], c = m.result.condition[i];
+    f.stamina = Math.max(0, f.stamina - COND.injuryStamina);
+    c.stamina[1] = f.stamina;
+    c.notes.push({ label: 'Injured', stamina: -COND.injuryStamina });
+    return addInjury(t, id, kind, drift);
   });
   rep.sides.forEach((s, i) => {
     const hype = hypeBonus(t.fighters[ids[i]].streak); // streak already counts this match
@@ -13836,6 +13848,7 @@ const COND = {
   win: 9, flawlessWin: 4, loss: -9, flawlessLoss: -4, perfectRound: 3, comebackRound: 4,
   fatalityDone: 6, fatalitySuffered: -12, upset: 6, award: 4, crowdPerSp: 1 / 40, crowdCap: 5,
   streak: 3, // a streak of this many results amplifies morale changes by 50 %
+  injuryStamina: 20, // a fresh injury costs this much stamina on top of the fight toll
   exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
   hypeFrom: 3, hypeStep: 0.05, hypeMax: 0.2, // HYPE: from the 3rd straight win, +5 % fame per win (max +20 %) - people come to see the streak
   underdogs: 4, underdogFame: 0.2, underdogFromRound: 3, // from round 3, the bottom 4 of the table AT THE START OF THE ROUND get 20 % more fame
@@ -14070,6 +14083,7 @@ const INJ = {
   spectacle: 15, // spectacle points for injuring the opponent
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
+  upgradeBias: 2.5, // auto manager: the most preferred bar is 2.5× as likely as the least preferred one
   upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
@@ -14159,6 +14173,12 @@ function tickInjuries(rec) {
   rec.injuries = rec.injuries.filter((i) => i.games > 0);
 }
 
+function hashId(id) {
+  let h = 2166136261;
+  for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
 /** Purchase history (fighter card): what was bought, after which round, by whom. */
 function logPurchase(t, id, item, cost, by) {
   const f = t.fighters[id];
@@ -14200,11 +14220,18 @@ function autoInvest(t, id, baseProfile) {
   const long = f.injuries.filter((i) => i.games >= 2).sort((a, b) => b.games - a.games)[0];
   if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind, 'auto')) out.push('treat');
   const specialist = (baseProfile.cunning ?? 0.5) >= 0.6;
+  // any bar can be picked, but the preferred end (weakest for most, strongest for specialists) is
+  // moderately likelier: weights fall linearly from UPGRADE_BIAS to 1 down the preference order.
+  // Seeded by the tournament, the fighter and how much they have bought: deterministic.
+  const rng = new Rng(((t.seed || 1) ^ hashId(id) ^ Math.imul((f.purchases?.length || 0) + 1, 7919)) >>> 0);
   for (let n = 0; n < 2; n++) {
     const cur = (a) => (baseProfile[a] ?? 0.5) + (f.perm[a] || 0);
-    const cand = ATTR_IDS.slice().sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)) || upgradeCost(f, a) - upgradeCost(f, b));
-    const pick = cand.find((a) => cur(a) < 1.3);
-    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick, 'auto')) break;
+    const cand = ATTR_IDS.filter((a) => cur(a) < 1.3).sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)));
+    if (!cand.length || f.fame - reserve < upgradeCost(f, cand[0])) break;
+    const w = cand.map((_, i) => 1 + (INJ.upgradeBias - 1) * (cand.length > 1 ? 1 - i / (cand.length - 1) : 1));
+    let r = rng.next() * w.reduce((a, b) => a + b, 0), pick = cand[cand.length - 1];
+    for (let i = 0; i < cand.length; i++) { r -= w[i]; if (r <= 0) { pick = cand[i]; break; } }
+    if (!buyUpgrade(t, id, pick, 'auto')) break;
     out.push(`up:${pick}`);
   }
   return out;

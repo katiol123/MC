@@ -309,20 +309,26 @@ export const FATALITIES = {
     run(d, t) {
       const { A, V, s } = d;
       const open = P(STAND, { y: 116, lean: -4, fa: [110, 10, 0], ba: [104, 14, 0] });
-      const hug = P(STAND, { y: 112, lean: 8, chest: 6, fa: [84, 110, 0], ba: [80, 116, 0], ff: [30, 8, 0], bf: [-32, 8, 0] });
+      // the embrace (profile): both arms reach round the victim at chest height, hands behind their back;
+      // Grizz leans back to lift them off the floor, cheek on their shoulder
+      const hug = P(STAND, { y: 114, lean: -10, chest: -6, neck: 14, head: 16, fa: [70, 22, -10], ba: [78, 16, -10], ff: [30, 8, 0], bf: [-34, 8, 0] });
+      const hug2 = P(hug, { lean: -16, chest: -10, y: 112, fa: [66, 30, -14], ba: [74, 24, -14] }); // squeeze
       const shh = P(STAND, { y: 116, lean: 6, neck: 6, head: 6, fa: [120, 160, 0], ff: [18, 8, 0], bf: [-20, 8, 0] });
-      d.keys(A, t, [[0, STAND], [20, open], [40, open], [52, hug], [110, hug], [126, P(STAND, { y: 80, lean: 40, fa: [60, 20, 0], ba: [56, 24, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
+      d.keys(A, t, [[0, STAND], [20, open], [40, open], [52, hug], [60, hug2], [66, hug], [72, hug2], [78, hug], [84, hug2], [90, hug], [96, hug2], [102, hug], [108, hug2], [114, hug], [126, P(STAND, { y: 80, lean: 40, fa: [60, 20, 0], ba: [56, 24, 0], ff: [34, 8, 0], bf: [-30, 8, 0] })],
         [150, STAND], [170, shh], [230, shh], [250, P(STAND, { fa: [100, 140, 0] })], [280, FLEX]]);
       // victim is hugged (lifted, squeezed), goes limp, laid down and tucked in
-      if (t < 52) { d.at(V, d.vx + (d.fx(d.gap - 18) - d.vx) * d.span(t, 30, 52)); daze(d, V, t); }
+      const hugX = d.fx(d.gap - 44); // chest to chest, inside the bear's arms
+      if (t < 52) { d.at(V, d.vx + (hugX - d.vx) * d.span(t, 30, 52)); daze(d, V, t); }
       else if (t < 112) {
-        d.at(V, d.fx(d.gap - 18), 14 + 4 * Math.sin(t * 0.4));
-        d.pose(V, P(K.HIT_HIGH, { fa: [150, 60, 0], ba: [160, 40, 0] }), P(K.DIZZY[0], { neck: -30, head: -30, fa: [10, 10, 0], ba: [6, 10, 0] }), d.span(t, 60, 104));
+        // lifted off the floor and rocked side to side with every squeeze
+        d.at(V, hugX + d.dir * 3 * Math.sin(t * 0.52), 22 + 6 * Math.abs(Math.sin(t * 0.26)));
+        // pressed upright against the bear: arms flail over its shoulders, then go limp, head lolling
+        d.pose(V, P(STAND, { y: 116, lean: 8, chest: 4, neck: -12, head: -16, fa: [158, 50, 0], ba: [168, 34, 0], ff: [8, 8, 0], bf: [-10, 8, 0] }), P(STAND, { y: 116, lean: 12, chest: 6, neck: 22, head: 20, fa: [14, 12, 0], ba: [8, 12, 0], ff: [6, 8, 0], bf: [-8, 8, 0] }), d.span(t, 64, 104));
         V.fx.sx = 1 - 0.1 * Math.abs(Math.sin(t * 0.25));
         if (t % 16 === 0) d.sfx('squeeze');
       } else if (t < 140) {
         const k = d.span(t, 112, 140);
-        d.at(V, d.fx(d.gap - 10), 14 * (1 - k));
+        d.at(V, hugX + (d.fx(d.gap - 10) - hugX) * k, 22 * (1 - k));
         V.fx.sx = 1;
         d.pose(V, P(K.DIZZY[0], { neck: -30, head: -30 }), K.LYING, k);
       } else { d.at(V, d.fx(d.gap - 10)); d.pose(V, P(K.LYING, { neck: -6, head: -4, fa: [30, 40, 0], ba: [40, 40, 0] })); }

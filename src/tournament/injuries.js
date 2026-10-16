@@ -68,6 +68,7 @@ export const INJ = {
   spectacle: 15, // spectacle points for injuring the opponent
   treatCost: 90, // fame to shorten an injury by one round
   upgradeStep: 0.1, // bars per upgrade
+  upgradeBias: 2.5, // auto manager: the most preferred bar is 2.5× as likely as the least preferred one
   upgradeCost: 150, upgradeCostGrowth: 0.1, // 150, 165, 180, ... every upgrade the fighter buys (any attribute) raises the next price
   permScale: 1.25, // overall weight of permanent injury damage (tuned so upgrades and injuries cancel out)
   leagueReg: 4, // injury severity × (1 + leagueReg × average permanent shift of the league)
@@ -157,6 +158,12 @@ export function tickInjuries(rec) {
   rec.injuries = rec.injuries.filter((i) => i.games > 0);
 }
 
+function hashId(id) {
+  let h = 2166136261;
+  for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
 /** Purchase history (fighter card): what was bought, after which round, by whom. */
 export function logPurchase(t, id, item, cost, by) {
   const f = t.fighters[id];
@@ -198,11 +205,18 @@ export function autoInvest(t, id, baseProfile) {
   const long = f.injuries.filter((i) => i.games >= 2).sort((a, b) => b.games - a.games)[0];
   if (long && f.fame - reserve >= INJ.treatCost && treatInjury(t, id, long.kind, 'auto')) out.push('treat');
   const specialist = (baseProfile.cunning ?? 0.5) >= 0.6;
+  // any bar can be picked, but the preferred end (weakest for most, strongest for specialists) is
+  // moderately likelier: weights fall linearly from UPGRADE_BIAS to 1 down the preference order.
+  // Seeded by the tournament, the fighter and how much they have bought: deterministic.
+  const rng = new Rng(((t.seed || 1) ^ hashId(id) ^ Math.imul((f.purchases?.length || 0) + 1, 7919)) >>> 0);
   for (let n = 0; n < 2; n++) {
     const cur = (a) => (baseProfile[a] ?? 0.5) + (f.perm[a] || 0);
-    const cand = ATTR_IDS.slice().sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)) || upgradeCost(f, a) - upgradeCost(f, b));
-    const pick = cand.find((a) => cur(a) < 1.3);
-    if (!pick || f.fame - reserve < upgradeCost(f, pick) || !buyUpgrade(t, id, pick, 'auto')) break;
+    const cand = ATTR_IDS.filter((a) => cur(a) < 1.3).sort((a, b) => (specialist ? cur(b) - cur(a) : cur(a) - cur(b)));
+    if (!cand.length || f.fame - reserve < upgradeCost(f, cand[0])) break;
+    const w = cand.map((_, i) => 1 + (INJ.upgradeBias - 1) * (cand.length > 1 ? 1 - i / (cand.length - 1) : 1));
+    let r = rng.next() * w.reduce((a, b) => a + b, 0), pick = cand[cand.length - 1];
+    for (let i = 0; i < cand.length; i++) { r -= w[i]; if (r <= 0) { pick = cand[i]; break; } }
+    if (!buyUpgrade(t, id, pick, 'auto')) break;
     out.push(`up:${pick}`);
   }
   return out;

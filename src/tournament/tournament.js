@@ -208,7 +208,13 @@ export function recordResult(t, m, match, stats, overrides) {
   m.result.injuries = ids.map((id, i) => {
     tickInjuries(t.fighters[id]);
     const kind = rep.sides[i].injuredWith;
-    return kind ? addInjury(t, id, kind, drift) : null;
+    if (!kind) return null;
+    // the injury also drains stamina: rest it off or pay for treatment - not both on a budget
+    const f = t.fighters[id], c = m.result.condition[i];
+    f.stamina = Math.max(0, f.stamina - COND.injuryStamina);
+    c.stamina[1] = f.stamina;
+    c.notes.push({ label: 'Injured', stamina: -COND.injuryStamina });
+    return addInjury(t, id, kind, drift);
   });
   rep.sides.forEach((s, i) => {
     const hype = hypeBonus(t.fighters[ids[i]].streak); // streak already counts this match

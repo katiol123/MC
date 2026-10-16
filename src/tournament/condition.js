@@ -28,6 +28,7 @@ export const COND = {
   win: 9, flawlessWin: 4, loss: -9, flawlessLoss: -4, perfectRound: 3, comebackRound: 4,
   fatalityDone: 6, fatalitySuffered: -12, upset: 6, award: 4, crowdPerSp: 1 / 40, crowdCap: 5,
   streak: 3, // a streak of this many results amplifies morale changes by 50 %
+  injuryStamina: 20, // a fresh injury costs this much stamina on top of the fight toll
   exhausted: 25, exhaustedMorale: -4, // running on empty wears the spirit down too
   hypeFrom: 3, hypeStep: 0.05, hypeMax: 0.2, // HYPE: from the 3rd straight win, +5 % fame per win (max +20 %) - people come to see the streak
   underdogs: 4, underdogFame: 0.2, underdogFromRound: 3, // from round 3, the bottom 4 of the table AT THE START OF THE ROUND get 20 % more fame
